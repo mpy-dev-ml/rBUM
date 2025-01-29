@@ -17,7 +17,7 @@ rBUM provides an intuitive interface for managing Restic backups on macOS, focus
 
 ## Requirements
 
-- macOS Ventura (13.0) or later
+- macOS Sonoma (14.0) or later
 - Xcode 16.0
 - Swift 5.9.2
 - Restic installed on your system
