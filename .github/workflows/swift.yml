@@ -1,0 +1,31 @@
+name: Swift
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+        
+      - name: Build
+        run: |
+          xcodebuild clean build -scheme rBUM -destination "platform=macOS"
+          
+      - name: Run tests
+        run: |
+          xcodebuild test -scheme rBUM -destination "platform=macOS" -enableCodeCoverage YES
+          
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
