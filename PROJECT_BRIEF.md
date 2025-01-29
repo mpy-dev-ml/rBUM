@@ -5,19 +5,27 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
 
 ## MVP Phase (5 Days)
 ### Day 1: Basic Structure and Restic Integration
-- [ ] Basic Xcode project setup
-- [ ] Simple ResticCommandService implementation
-  - [ ] Repository init/list commands
-  - [ ] Basic backup/restore commands
-- [ ] Shell command execution framework
-- [ ] Basic error handling
+- [x] Basic Xcode project setup
+  - [x] Project creation with SwiftUI
+  - [x] Directory structure setup
+  - [x] Window configuration
+  - [x] Navigation structure
+- [x] Simple ResticCommandService implementation
+  - [x] Repository init/list commands
+  - [x] Basic command execution framework
+- [x] Shell command execution framework
+- [x] Basic error handling
 
 ### Day 2: Core UI Framework
-- [ ] Main navigation structure
-- [ ] Repository list view
-- [ ] Basic backup view
-- [ ] Simple settings view
-- [ ] Error display
+- [x] Main navigation structure
+  - [x] Sidebar implementation
+  - [x] Navigation split view
+- [x] Repository list view (placeholder)
+- [x] Basic settings view
+  - [x] General tab
+  - [x] Backup tab
+  - [x] Security tab
+- [x] Error display structure
 
 ### Day 3: Basic Security and Storage
 - [ ] Simple password storage using Keychain
@@ -44,9 +52,12 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
 ### 1. Project Setup and Infrastructure (1-2 days)
 - [x] Initial repository setup
 - [x] Project documentation
-- [ ] Xcode project configuration
-- [ ] CI/CD pipeline setup
-- [ ] Development environment documentation
+- [x] Xcode project configuration
+- [x] CI/CD pipeline setup
+  - [x] Swift build and test workflow
+  - [x] SwiftLint configuration
+  - [x] Documentation generation
+- [x] Development environment documentation
 
 ### 2. Core Restic Integration (2-3 weeks)
 - [ ] ResticCommandService development
