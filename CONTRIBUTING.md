@@ -42,6 +42,21 @@ For Restic-specific questions or issues, please refer to:
 - Follow MVVM architecture patterns
 - Maintain consistent behaviour across views
 
+### Storage and Security Guidelines
+
+- Use the established storage services for data persistence
+- Never store sensitive data outside of Keychain
+- Follow atomic operation patterns for file writes
+- Implement proper error handling and recovery
+- Use the logging system with appropriate privacy controls
+- Test storage operations thoroughly
+- Validate configuration changes carefully
+- Follow established patterns for:
+  - Repository metadata storage
+  - Credentials management
+  - Configuration handling
+  - Error handling and logging
+
 ### Documentation
 
 - Use clear and concise comments

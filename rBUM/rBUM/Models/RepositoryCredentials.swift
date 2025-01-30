@@ -8,7 +8,7 @@
 import Foundation
 
 /// Represents the credentials for a Restic repository
-struct RepositoryCredentials: Codable, Equatable {
+struct RepositoryCredentials: Codable {
     /// Unique identifier for the repository these credentials belong to
     let repositoryId: UUID
     
@@ -40,6 +40,16 @@ struct RepositoryCredentials: Codable, Equatable {
         self.keyFileName = keyFileName
         self.createdAt = Date()
         self.modifiedAt = Date()
+    }
+}
+
+// MARK: - Equatable
+extension RepositoryCredentials: Equatable {
+    static func == (lhs: RepositoryCredentials, rhs: RepositoryCredentials) -> Bool {
+        // Only compare the identifying properties, not timestamps
+        lhs.repositoryId == rhs.repositoryId &&
+        lhs.repositoryPath == rhs.repositoryPath &&
+        lhs.keyFileName == rhs.keyFileName
     }
 }
 

@@ -97,9 +97,36 @@ For detailed development guidelines, please refer to [CONTRIBUTING.md](CONTRIBUT
 ## Security
 
 rBUM takes security seriously:
-- Uses macOS Passkeys for secure credential storage
+- Uses macOS Keychain for secure credential storage
 - Never stores Restic passwords in plaintext
-- Leverages macOS Keychain for sensitive data
+- Secure repository credentials management
+- Encrypted configuration storage
+- Secure storage of repository metadata
+- Proper error handling and logging with privacy controls
+
+## Storage and Configuration
+
+rBUM uses a robust storage system:
+- Repository metadata storage in Application Support directory
+- Secure credentials management via macOS Keychain
+- User configuration with sensible defaults:
+  - Backup scheduling and concurrency
+  - Repository health monitoring
+  - Snapshot retention policies
+  - Compression settings
+  - Default exclude patterns
+- Atomic file operations for reliability
+- Proper error handling and recovery
+
+All data is stored in:
+```
+~/Library/Application Support/dev.mpy.rBUM/
+├── config.json         # Application configuration
+├── repositories.json   # Repository metadata
+└── credentials.json    # Repository credentials metadata
+```
+
+Sensitive data (passwords) are stored securely in the macOS Keychain.
 
 ## Licence and Attribution
 
