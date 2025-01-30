@@ -5,139 +5,178 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import XCTest
+import Testing
 @testable import rBUM
 
 @MainActor
-final class RepositoryCreationServiceTests: XCTestCase {
-    var resticService: TestMocks.MockResticCommandService!
-    var repositoryStorage: TestMocks.MockRepositoryStorage!
-    var fileManager: FileManager!
-    var sut: rBUM.RepositoryCreationService!
+struct RepositoryCreationServiceTests {
+    // MARK: - Test Setup
     
-    override func setUpWithError() throws {
-        resticService = TestMocks.MockResticCommandService()
-        repositoryStorage = TestMocks.MockRepositoryStorage()
-        fileManager = FileManager.default
-        sut = rBUM.RepositoryCreationService(
-            resticService: resticService,
-            repositoryStorage: repositoryStorage,
-            fileManager: fileManager
-        )
+    struct TestContext {
+        let resticService: TestMocks.MockResticCommandService
+        let repositoryStorage: TestMocks.MockRepositoryStorage
+        let fileManager: FileManager
+        let sut: rBUM.RepositoryCreationService
+        
+        init() {
+            self.resticService = TestMocks.MockResticCommandService()
+            self.repositoryStorage = TestMocks.MockRepositoryStorage()
+            self.fileManager = FileManager.default
+            self.sut = rBUM.RepositoryCreationService(
+                resticService: resticService,
+                repositoryStorage: repositoryStorage,
+                fileManager: fileManager
+            )
+        }
     }
     
-    override func tearDownWithError() throws {
-        resticService = nil
-        repositoryStorage = nil
-        fileManager = nil
-        sut = nil
-    }
+    // MARK: - Repository Creation Tests
     
-    func test_createRepository_success() async throws {
+    @Test("Create repository with various configurations",
+          .tags(.core, .integration, .repository),
+          arguments: [
+              (name: "Test Repository", path: "/test/path", password: "test-password"),
+              (name: "Backup Repo", path: "/backup/path", password: "complex!@#$%^&*()"),
+              (name: "System Backup", path: "/system/backup", password: "pass with spaces")
+          ])
+    func testCreateRepository(name: String, path: String, password: String) async throws {
         // Given
-        let path = URL(fileURLWithPath: "/test/path")
-        let name = "Test Repository"
-        let password = "test-password"
+        let context = TestContext()
+        let repositoryPath = URL(fileURLWithPath: path)
         
         // When
-        let repository = try await sut.createRepository(
+        let repository = try await context.sut.createRepository(
             name: name,
-            path: path,
+            path: repositoryPath,
             password: password
         )
         
         // Then
-        XCTAssertEqual(repository.name, name)
-        XCTAssertEqual(repository.path, path)
+        #expect(repository.name == name)
+        #expect(repository.path == repositoryPath)
+        #expect(try await context.repositoryStorage.exists(at: repositoryPath) == false)
     }
     
-    func test_createRepository_pathExists() async throws {
+    @Test("Handle repository creation errors",
+          .tags(.core, .integration, .repository, .error_handling),
+          arguments: [
+              (exists: true, initError: nil, expectedError: RepositoryCreationError.repositoryAlreadyExists),
+              (exists: false, initError: NSError(domain: "test", code: 1), expectedError: RepositoryCreationError.creationFailed("Failed to initialize repository"))
+          ])
+    func testCreateRepositoryErrors(exists: Bool, initError: Error?, expectedError: RepositoryCreationError) async throws {
         // Given
+        let context = TestContext()
         let path = URL(fileURLWithPath: "/test/path")
-        repositoryStorage.existsResult = true
+        context.repositoryStorage.existsResult = exists
+        if let error = initError {
+            context.resticService.initError = error
+        }
         
         // When/Then
-        do {
-            _ = try await sut.createRepository(
+        await #expect(throws: expectedError) {
+            _ = try await context.sut.createRepository(
                 name: "Test",
                 path: path,
                 password: "test"
             )
-            XCTFail("Expected error to be thrown")
-        } catch let error as rBUM.RepositoryCreationError {
-            XCTAssertEqual(error, .repositoryAlreadyExists)
         }
     }
     
-    func test_createRepository_initializationFails() async throws {
-        // Given
-        let path = URL(fileURLWithPath: "/test/path")
-        resticService.initError = NSError(domain: "test", code: 1)
-        
-        // When/Then
-        do {
-            _ = try await sut.createRepository(
-                name: "Test",
-                path: path,
-                password: "test"
-            )
-            XCTFail("Expected error to be thrown")
-        } catch let error as rBUM.RepositoryCreationError {
-            XCTAssertEqual(error, .creationFailed("Failed to initialize repository"))
-        }
-    }
+    // MARK: - Repository Import Tests
     
-    func test_importRepository_success() async throws {
+    @Test("Import existing repository with various configurations",
+          .tags(.core, .integration, .repository),
+          arguments: [
+              (name: "Imported Repo", path: "/existing/path", password: "test-password"),
+              (name: "External Backup", path: "/external/backup", password: "complex!@#$%^&*()"),
+              (name: "Network Backup", path: "/network/path", password: "pass with spaces")
+          ])
+    func testImportRepository(name: String, path: String, password: String) async throws {
         // Given
-        let path = URL(fileURLWithPath: "/test/path")
-        let name = "Test Repository"
-        let password = "test-password"
+        let context = TestContext()
+        let repositoryPath = URL(fileURLWithPath: path)
         
         // When
-        let repository = try await sut.importRepository(
+        let repository = try await context.sut.importRepository(
             name: name,
-            path: path,
+            path: repositoryPath,
             password: password
         )
         
         // Then
-        XCTAssertEqual(repository.name, name)
-        XCTAssertEqual(repository.path, path)
+        #expect(repository.name == name)
+        #expect(repository.path == repositoryPath)
+        #expect(try await context.repositoryStorage.exists(at: repositoryPath) == false)
     }
     
-    func test_importRepository_pathExists() async throws {
+    @Test("Handle repository import errors",
+          .tags(.core, .integration, .repository, .error_handling),
+          arguments: [
+              (exists: true, checkError: nil, expectedError: RepositoryCreationError.repositoryAlreadyExists),
+              (exists: false, checkError: NSError(domain: "test", code: 1), expectedError: RepositoryCreationError.importFailed("Failed to validate repository"))
+          ])
+    func testImportRepositoryErrors(exists: Bool, checkError: Error?, expectedError: RepositoryCreationError) async throws {
         // Given
+        let context = TestContext()
         let path = URL(fileURLWithPath: "/test/path")
-        repositoryStorage.existsResult = true
+        context.repositoryStorage.existsResult = exists
+        if let error = checkError {
+            context.resticService.checkError = error
+        }
         
         // When/Then
-        do {
-            _ = try await sut.importRepository(
+        await #expect(throws: expectedError) {
+            _ = try await context.sut.importRepository(
                 name: "Test",
                 path: path,
                 password: "test"
             )
-            XCTFail("Expected error to be thrown")
-        } catch let error as rBUM.RepositoryCreationError {
-            XCTAssertEqual(error, .repositoryAlreadyExists)
         }
     }
     
-    func test_importRepository_validationFails() async throws {
+    // MARK: - Edge Cases
+    
+    @Test("Handle special characters in repository paths",
+          .tags(.core, .integration, .repository, .validation))
+    func testSpecialCharactersInPath() async throws {
         // Given
-        let path = URL(fileURLWithPath: "/test/path")
-        resticService.checkError = NSError(domain: "test", code: 1)
+        let context = TestContext()
+        let paths = [
+            "/path with spaces/repo",
+            "/path/with/special/chars/!@#$%",
+            "/path/with/unicode/"
+        ]
         
-        // When/Then
-        do {
-            _ = try await sut.importRepository(
-                name: "Test",
-                path: path,
-                password: "test"
+        // Then
+        for path in paths {
+            // When
+            let repository = try await context.sut.createRepository(
+                name: "Test Repository",
+                path: URL(fileURLWithPath: path),
+                password: "test-password"
             )
-            XCTFail("Expected error to be thrown")
-        } catch let error as rBUM.RepositoryCreationError {
-            XCTAssertEqual(error, .importFailed("Failed to validate repository"))
+            
+            #expect(repository.path.path == path)
         }
+    }
+    
+    @Test("Handle very long repository names and paths",
+          .tags(.core, .integration, .repository, .validation))
+    func testLongNamesAndPaths() async throws {
+        // Given
+        let context = TestContext()
+        let longName = String(repeating: "a", count: 255)
+        let longPath = "/\(String(repeating: "directory/", count: 50))repository"
+        
+        // When
+        let repository = try await context.sut.createRepository(
+            name: longName,
+            path: URL(fileURLWithPath: longPath),
+            password: "test-password"
+        )
+        
+        // Then
+        #expect(repository.name == longName)
+        #expect(repository.path.path == longPath)
     }
 }

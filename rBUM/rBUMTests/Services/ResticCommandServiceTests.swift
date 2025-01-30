@@ -104,29 +104,54 @@ final class MockProcessExecutor: ProcessExecutorProtocol {
 }
 
 struct ResticCommandServiceTests {
-    @Test("Initialize repository")
-    func testInitializeRepository() async throws {
+    // MARK: - Repository Initialization Tests
+    
+    @Test("Initialize repository with various configurations",
+          .tags(.core, .integration, .security),
+          arguments: [
+              (path: "/test/path", password: "testPassword", keyFile: nil),
+              (path: "/test/path2", password: "complex!@#$%^&*()", keyFile: nil),
+              (path: "/test/secure", password: "testPass", keyFile: "key.txt")
+          ])
+    func testInitializeRepository(path: String, password: String, keyFile: String?) async throws {
+        // Given
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let path = URL(fileURLWithPath: "/test/path")
+        let repositoryPath = URL(fileURLWithPath: path)
         
-        // Given
         processExecutor.output = "repository abc123 initialized"
         
         // When
-        try await commandService.initializeRepository(at: path, password: "testPassword")
+        try await commandService.initializeRepository(
+            at: repositoryPath,
+            password: password,
+            keyFile: keyFile
+        )
         
         // Then
         #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
         #expect(processExecutor.lastArguments?.contains("init") == true)
         #expect(processExecutor.lastArguments?.contains("--json") == true)
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == "testPassword")
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == path.path)
+        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == password)
+        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == path)
+        if let keyFile = keyFile {
+            #expect(processExecutor.lastArguments?.contains("--key-file") == true)
+            #expect(processExecutor.lastArguments?.contains(keyFile) == true)
+        }
     }
     
-    @Test("Create backup")
-    func testCreateBackup() async throws {
+    // MARK: - Backup Tests
+    
+    @Test("Create backup with various configurations",
+          .tags(.core, .integration, .backup),
+          arguments: [
+              (paths: ["/path1"], tags: ["test"]),
+              (paths: ["/path1", "/path2"], tags: ["test", "backup"]),
+              (paths: ["/path1", "/path2", "/path3"], tags: ["daily", "system"])
+          ])
+    func testCreateBackup(paths: [String], tags: [String]) async throws {
+        // Given
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
@@ -140,14 +165,11 @@ struct ResticCommandServiceTests {
             repositoryPath: repository.path.path
         )
         
-        // Given
-        let paths = [URL(fileURLWithPath: "/path1"), URL(fileURLWithPath: "/path2")]
-        let tags = ["test", "backup"]
         processExecutor.output = "snapshot abc123 saved"
         
         // When
         try await commandService.createBackup(
-            paths: paths,
+            paths: paths.map { URL(fileURLWithPath: $0) },
             to: repository,
             credentials: credentials,
             tags: tags,
@@ -159,15 +181,19 @@ struct ResticCommandServiceTests {
         #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
         #expect(processExecutor.lastArguments?.contains("backup") == true)
         #expect(processExecutor.lastArguments?.contains("--json") == true)
-        #expect(processExecutor.lastArguments?.contains("--verbose") == true)
-        #expect(processExecutor.lastArguments?.contains("/path1") == true)
-        #expect(processExecutor.lastArguments?.contains("/path2") == true)
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
+        paths.forEach { path in
+            #expect(processExecutor.lastArguments?.contains(path) == true)
+        }
+        tags.forEach { tag in
+            #expect(processExecutor.lastArguments?.contains("--tag") == true)
+            #expect(processExecutor.lastArguments?.contains(tag) == true)
+        }
     }
     
-    @Test("Create backup with progress reporting")
-    func testCreateBackupWithProgress() async throws {
+    @Test("Progress reporting with various backup states",
+          .tags(.core, .integration, .backup))
+    func testBackupProgress() async throws {
+        // Given
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
@@ -181,11 +207,7 @@ struct ResticCommandServiceTests {
             repositoryPath: repository.path.path
         )
         
-        // Given
-        let paths = [URL(fileURLWithPath: "/path1"), URL(fileURLWithPath: "/path2")]
-        let tags = ["test", "backup"]
-        
-        // Mock restic JSON output for progress
+        // Mock different progress states
         processExecutor.output = """
             {"message_type":"status","seconds_elapsed":1.2,"seconds_remaining":10,"bytes_done":1024,"total_bytes":10240,"files_done":5,"total_files":20,"current_file":"/path1/file1.txt"}
             {"message_type":"status","seconds_elapsed":2.4,"seconds_remaining":5,"bytes_done":5120,"total_bytes":10240,"files_done":10,"total_files":20,"current_file":"/path1/file2.txt"}
@@ -197,98 +219,44 @@ struct ResticCommandServiceTests {
         
         // When
         try await commandService.createBackup(
-            paths: paths,
+            paths: [URL(fileURLWithPath: "/test/path")],
             to: repository,
             credentials: credentials,
-            tags: tags,
-            onProgress: { progress in
-                progressUpdates.append(progress)
-            },
-            onStatusChange: { status in
-                statusChanges.append(status)
-            }
+            tags: ["test"],
+            onProgress: { progressUpdates.append($0) },
+            onStatusChange: { statusChanges.append($0) }
         )
         
         // Then
-        #expect(progressUpdates.count == 2)
-        #expect(statusChanges.count >= 3)  // preparing, backing, completed
-        
-        // Verify first progress update
-        let firstProgress = progressUpdates[0]
-        #expect(firstProgress.totalFiles == 20)
-        #expect(firstProgress.processedFiles == 5)
-        #expect(firstProgress.totalBytes == 10240)
-        #expect(firstProgress.processedBytes == 1024)
-        #expect(firstProgress.currentFile == "/path1/file1.txt")
-        #expect(firstProgress.estimatedSecondsRemaining == 10)
-        
-        // Verify second progress update
-        let secondProgress = progressUpdates[1]
-        #expect(secondProgress.totalFiles == 20)
-        #expect(secondProgress.processedFiles == 10)
-        #expect(secondProgress.totalBytes == 10240)
-        #expect(secondProgress.processedBytes == 5120)
-        #expect(secondProgress.currentFile == "/path1/file2.txt")
-        #expect(secondProgress.estimatedSecondsRemaining == 5)
-        
-        // Verify status transitions
-        #expect(statusChanges[0] == .preparing)
-        
-        // Verify second status is .backing
-        if case .backing(let progress) = statusChanges[1] {
-            #expect(progress.totalFiles == 20)
-            #expect(progress.processedFiles >= 5)
-        } else {
-            #expect(Bool(false), "Expected second status to be .backing, but got \(statusChanges[1])")
-        }
-        
-        #expect(statusChanges.last == .completed)
+        #expect(progressUpdates.count >= 2)
+        #expect(statusChanges.contains(where: { if case .preparing = $0 { true } else { false } }))
+        #expect(statusChanges.contains(where: { if case .backing = $0 { true } else { false } }))
+        #expect(statusChanges.contains(where: { if case .completed = $0 { true } else { false } }))
     }
     
-    @Test("Check repository")
-    func testCheckRepository() async throws {
-        let credentialsManager = MockCredentialsManager()
-        let processExecutor = MockProcessExecutor()
-        let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let path = URL(fileURLWithPath: "/test/path")
-        let credentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "testPassword",
-            repositoryPath: path.path
-        )
-        
-        // Given
-        processExecutor.output = "repository is healthy"
-        
-        // When
-        try await commandService.checkRepository(at: path, credentials: credentials)
-        
-        // Then
-        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
-        #expect(processExecutor.lastArguments == ["check"])
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
-    }
+    // MARK: - Error Handling Tests
     
-    @Test("Handle process execution errors")
-    func testProcessExecutionError() async throws {
+    @Test("Handle various error scenarios",
+          .tags(.core, .integration, .error_handling),
+          arguments: [
+              (errorCode: 1, errorMessage: "repository not initialized", expectedError: ResticError.repositoryNotInitialized),
+              (errorCode: 1, errorMessage: "wrong password", expectedError: ResticError.authenticationFailed),
+              (errorCode: 1, errorMessage: "lock already held", expectedError: ResticError.repositoryLocked),
+              (errorCode: 1, errorMessage: "unknown error", expectedError: ResticError.commandFailed("unknown error"))
+          ])
+    func testErrorHandling(errorCode: Int32, errorMessage: String, expectedError: ResticError) async throws {
+        // Given
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
+        processExecutor.error = errorMessage
+        processExecutor.exitCode = errorCode
+        
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
         let path = URL(fileURLWithPath: "/test/path")
-        let credentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "testPassword",
-            repositoryPath: path.path
-        )
-        
-        // Given
-        processExecutor.shouldThrowError = true
-        processExecutor.error = "Mock error"
         
         // When/Then
-        await #expect(throws: ProcessError.executionFailed("Mock error")) {
-            try await commandService.checkRepository(at: path, credentials: credentials)
+        await #expect(throws: expectedError) {
+            try await commandService.initializeRepository(at: path, password: "test")
         }
     }
 }

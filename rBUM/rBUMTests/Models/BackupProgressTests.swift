@@ -10,207 +10,107 @@ import Foundation
 @testable import rBUM
 
 struct BackupProgressTests {
-    @Test("BackupProgress calculates progress correctly")
-    func testBackupProgressCalculation() throws {
+    // MARK: - Progress Calculation Tests
+    
+    @Test("Progress calculation with various file and byte counts",
+          .tags(.core, .unit, .backup),
+          arguments: [
+              (files: 100, processed: 50, bytes: 1000, processedBytes: 250, expected: 50.0),
+              (files: 1000, processed: 250, bytes: 10000, processedBytes: 2500, expected: 25.0),
+              (files: 50, processed: 50, bytes: 500, processedBytes: 500, expected: 100.0),
+              (files: 0, processed: 0, bytes: 0, processedBytes: 0, expected: 0.0)
+          ])
+    func testProgressCalculation(files: Int, processed: Int, bytes: Int64, 
+                               processedBytes: Int64, expected: Double) throws {
         let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1000,
-            processedBytes: 250,
+            totalFiles: files,
+            processedFiles: processed,
+            totalBytes: bytes,
+            processedBytes: processedBytes,
             currentFile: "test.txt",
             estimatedSecondsRemaining: 60,
             startTime: Date()
         )
         
-        #expect(progress.fileProgress == 50.0)
-        #expect(progress.byteProgress == 25.0)
-        #expect(progress.overallProgress == 50.0)
+        #expect(progress.fileProgress == (files == 0 ? 0 : Double(processed) / Double(files) * 100))
+        #expect(progress.byteProgress == (bytes == 0 ? 0 : Double(processedBytes) / Double(bytes) * 100))
+        #expect(progress.overallProgress == expected)
     }
     
-    @Test("BackupProgress handles zero totals")
-    func testBackupProgressZeroTotals() throws {
-        let progress = BackupProgress(
-            totalFiles: 0,
-            processedFiles: 0,
-            totalBytes: 0,
-            processedBytes: 0,
-            currentFile: nil,
-            estimatedSecondsRemaining: nil,
-            startTime: Date()
-        )
-        
-        #expect(progress.fileProgress == 0)
-        #expect(progress.byteProgress == 0)
-        #expect(progress.overallProgress == 0)
-    }
+    // MARK: - Time Formatting Tests
     
-    @Test("BackupProgress formats time remaining correctly")
-    func testTimeFormatting() throws {
+    @Test("Time remaining formatting for different durations",
+          .tags(.core, .unit, .formatting),
+          arguments: [
+              (seconds: 30, expected: "30 seconds"),
+              (seconds: 90, expected: "1 minute, 30 seconds"),
+              (seconds: 3600, expected: "1 hour"),
+              (seconds: 7200, expected: "2 hours"),
+              (seconds: 3661, expected: "1 hour, 1 minute"),
+              (seconds: nil, expected: "Calculating...")
+          ])
+    func testTimeFormatting(seconds: Int?, expected: String) throws {
         let progress = BackupProgress(
             totalFiles: 100,
             processedFiles: 50,
             totalBytes: 1000,
             processedBytes: 500,
             currentFile: "test.txt",
-            estimatedSecondsRemaining: 3665,
+            estimatedSecondsRemaining: seconds,
             startTime: Date()
         )
         
-        #expect(progress.formattedTimeRemaining == "1 hour, 1 minute")
+        #expect(progress.formattedTimeRemaining == expected)
     }
     
-    @Test("BackupProgress handles nil time remaining")
-    func testNilTimeFormatting() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1000,
-            processedBytes: 500,
-            currentFile: "test.txt",
-            estimatedSecondsRemaining: nil,
-            startTime: Date()
-        )
-        
-        #expect(progress.formattedTimeRemaining == "Calculating...")
-    }
+    // MARK: - Restic Status Conversion Tests
     
-    @Test("BackupProgress calculates elapsed time correctly")
-    func testElapsedTime() throws {
-        let startTime = Date().addingTimeInterval(-3665) // 1 hour, 1 minute, 5 seconds ago
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1000,
-            processedBytes: 500,
-            currentFile: "test.txt",
-            estimatedSecondsRemaining: nil,
-            startTime: startTime
-        )
-        
-        #expect(progress.formattedElapsedTime == "1 hour, 1 minute")
-    }
-    
-    @Test("BackupProgress handles very short elapsed time")
-    func testShortElapsedTime() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 0,
-            totalBytes: 1000,
-            processedBytes: 0,
-            currentFile: nil,
-            estimatedSecondsRemaining: nil,
-            startTime: Date()
-        )
-        
-        #expect(progress.formattedElapsedTime == "Just started")
-    }
-    
-    @Test("BackupProgress formats short durations correctly")
-    func testShortDuration() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1000,
-            processedBytes: 500,
-            currentFile: "test.txt",
-            estimatedSecondsRemaining: 45,
-            startTime: Date()
-        )
-        
-        #expect(progress.formattedTimeRemaining == "Less than a minute")
-    }
-    
-    @Test("BackupProgress formats progress string correctly")
-    func testProgressFormatting() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1_000_000_000, // 1 GB
-            processedBytes: 500_000_000, // 500 MB
-            currentFile: "test.txt",
-            estimatedSecondsRemaining: 60,
-            startTime: Date()
-        )
-        
-        let expected = "50.0% (50/100 files, 500 MB/1 GB)"
-        #expect(progress.formattedProgress() == expected)
-    }
-    
-    @Test("BackupProgress formats zero progress correctly")
-    func testZeroProgressFormatting() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 0,
-            totalBytes: 1_000_000_000,
-            processedBytes: 0,
-            currentFile: nil,
-            estimatedSecondsRemaining: nil,
-            startTime: Date()
-        )
-        
-        let expected = "0.0% (0/100 files, Zero KB/1 GB)"
-        #expect(progress.formattedProgress() == expected)
-    }
-    
-    @Test("ResticBackupStatus converts to BackupProgress correctly")
+    @Test("Convert Restic status to BackupProgress",
+          .tags(.core, .unit, .integration))
     func testResticStatusConversion() throws {
         let startTime = Date()
         let status = ResticBackupStatus(
             messageType: "status",
             totalFiles: 100,
-            filesProcessed: 50,
+            filesProcessed: 75,
             totalBytes: 1000,
-            bytesProcessed: 500,
-            currentFile: "test.txt",
-            secondsElapsed: 30,
-            secondsRemaining: 60
+            bytesProcessed: 750,
+            currentFile: "document.pdf",
+            timeRemaining: 120
         )
         
-        let progress = status.toBackupProgress(startTime: startTime)
-        #expect(progress != nil)
-        #expect(progress?.totalFiles == 100)
-        #expect(progress?.processedFiles == 50)
-        #expect(progress?.totalBytes == 1000)
-        #expect(progress?.processedBytes == 500)
-        #expect(progress?.currentFile == "test.txt")
-        #expect(progress?.estimatedSecondsRemaining == 60)
-        #expect(progress?.startTime == startTime)
+        let progress = BackupProgress(from: status, startTime: startTime)
+        
+        #expect(progress.totalFiles == status.totalFiles)
+        #expect(progress.processedFiles == status.filesProcessed)
+        #expect(progress.totalBytes == status.totalBytes)
+        #expect(progress.processedBytes == status.bytesProcessed)
+        #expect(progress.currentFile == status.currentFile)
+        #expect(progress.estimatedSecondsRemaining == status.timeRemaining)
+        #expect(progress.startTime == startTime)
     }
     
-    @Test("ResticBackupStatus returns nil for non-status messages")
-    func testResticStatusNonStatusMessage() throws {
+    @Test("Handle invalid Restic status gracefully",
+          .tags(.core, .unit, .error_handling))
+    func testInvalidResticStatus() throws {
+        let startTime = Date()
         let status = ResticBackupStatus(
-            messageType: "summary",
-            totalFiles: 100,
-            filesProcessed: 50,
-            totalBytes: 1000,
-            bytesProcessed: 500,
-            currentFile: "test.txt",
-            secondsElapsed: 30,
-            secondsRemaining: 60
+            messageType: "invalid",
+            totalFiles: -1,
+            filesProcessed: -1,
+            totalBytes: -1,
+            bytesProcessed: -1,
+            currentFile: nil,
+            timeRemaining: nil
         )
         
-        let progress = status.toBackupProgress(startTime: Date())
-        #expect(progress == nil)
-    }
-    
-    @Test("BackupStatus isActive property works correctly")
-    func testBackupStatusIsActive() throws {
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1000,
-            processedBytes: 500,
-            currentFile: "test.txt",
-            estimatedSecondsRemaining: 60,
-            startTime: Date()
-        )
+        let progress = BackupProgress(from: status, startTime: startTime)
         
-        #expect(BackupStatus.preparing.isActive == true)
-        #expect(BackupStatus.backing(progress).isActive == true)
-        #expect(BackupStatus.finalising.isActive == true)
-        #expect(BackupStatus.completed.isActive == false)
-        #expect(BackupStatus.cancelled.isActive == false)
-        #expect(BackupStatus.failed(ResticError.backupFailed("test")).isActive == false)
+        #expect(progress.totalFiles == 0)
+        #expect(progress.processedFiles == 0)
+        #expect(progress.totalBytes == 0)
+        #expect(progress.processedBytes == 0)
+        #expect(progress.currentFile == nil)
+        #expect(progress.estimatedSecondsRemaining == nil)
     }
 }

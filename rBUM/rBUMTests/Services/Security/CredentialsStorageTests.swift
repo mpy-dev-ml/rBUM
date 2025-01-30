@@ -269,7 +269,8 @@ struct CredentialsStorageTests {
     private static let rootTestDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("dev.mpy.rBUM.tests", isDirectory: true)
     
-    // Create a unique test directory for each test run
+    // MARK: - Test Setup
+    
     static func createTestStorage() throws -> (CredentialsStorage, URL, MockFileManager) {
         // Create test directory with unique UUID
         let testDir = rootTestDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -286,7 +287,9 @@ struct CredentialsStorageTests {
         // Nothing to clean up since we're using an in-memory MockFileManager
     }
     
-    @Test("Store and retrieve credentials")
+    // MARK: - Basic Operations Tests
+    
+    @Test("Store and retrieve credentials successfully", tags: ["basic", "storage"])
     func testStoreAndRetrieveCredentials() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -311,7 +314,7 @@ struct CredentialsStorageTests {
         #expect(allCredentials.count == 1)
     }
     
-    @Test("Update existing credentials")
+    @Test("Update existing credentials", tags: ["basic", "storage"])
     func testUpdateCredentials() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -346,7 +349,7 @@ struct CredentialsStorageTests {
         #expect(allCredentials.count == 1)
     }
     
-    @Test("Delete credentials")
+    @Test("Delete credentials successfully", tags: ["basic", "storage"])
     func testDeleteCredentials() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -371,7 +374,9 @@ struct CredentialsStorageTests {
         #expect(allCredentials.isEmpty)
     }
     
-    @Test("List multiple credentials")
+    // MARK: - List Operations Tests
+    
+    @Test("List multiple credentials", tags: ["list", "storage"])
     func testListCredentials() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -399,7 +404,7 @@ struct CredentialsStorageTests {
         #expect(allCredentials.contains { $0.repositoryPath == "/test/path2" })
     }
     
-    @Test("Empty storage returns empty array")
+    @Test("Empty storage returns empty array", tags: ["list", "storage"])
     func testEmptyStorageReturnsEmptyArray() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -408,7 +413,9 @@ struct CredentialsStorageTests {
         #expect(credentials.isEmpty)
     }
     
-    @Test("Handle corrupted credential files")
+    // MARK: - Security Tests
+    
+    @Test("Handle corrupted credential files", tags: ["security", "storage"])
     func testHandleCorruptedFiles() throws {
         let (storage, directory, fileManager) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -434,31 +441,33 @@ struct CredentialsStorageTests {
         #expect(allCredentials.first?.repositoryId == credentials.repositoryId)
     }
     
-    @Test("Handle non-directory path")
-    func testHandleNonDirectoryPath() throws {
+    @Test("Prevent password leakage in errors", tags: ["security", "storage"])
+    func testPreventPasswordLeakage() throws {
         let (storage, directory, fileManager) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
         
-        // Create a file at the directory path
-        fileManager.createFileAtDirectoryPath(
-            directory.appendingPathComponent("dev.mpy.rBUM/credentials")
-        )
-        
-        // Store should succeed by replacing the file with a directory
         let credentials = RepositoryCredentials(
             repositoryId: UUID(),
-            password: "test-password",
+            password: "sensitive-password",
             repositoryPath: "/test/path"
         )
-        try storage.store(credentials)
         
-        // Verify credentials were stored
-        let retrieved = try storage.retrieve(forRepositoryId: credentials.repositoryId)
-        #expect(retrieved != nil)
-        #expect(retrieved?.repositoryId == credentials.repositoryId)
+        // Simulate error during storage
+        fileManager.simulateError()
+        var thrownError: Error?
+        do {
+            try storage.store(credentials)
+        } catch {
+            thrownError = error
+        }
+        
+        // Verify error message doesn't contain password
+        #expect(thrownError != nil)
+        let errorDescription = String(describing: thrownError)
+        #expect(!errorDescription.contains("sensitive-password"))
     }
     
-    @Test("Handle concurrent access")
+    @Test("Handle concurrent access safely", tags: ["security", "concurrency"])
     func testConcurrentAccess() throws {
         let (storage, directory, _) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -509,7 +518,9 @@ struct CredentialsStorageTests {
         }
     }
     
-    @Test("Handle file system errors")
+    // MARK: - Error Handling Tests
+    
+    @Test("Handle file system errors", tags: ["error", "storage"])
     func testHandleFileSystemErrors() throws {
         let (storage, directory, fileManager) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -572,7 +583,7 @@ struct CredentialsStorageTests {
         #expect(thrownError as NSError? == customError)
     }
     
-    @Test("Handle directory creation failure")
+    @Test("Handle directory creation failure", tags: ["error", "storage"])
     func testHandleDirectoryCreationFailure() throws {
         let (storage, directory, fileManager) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -603,7 +614,7 @@ struct CredentialsStorageTests {
         }
     }
     
-    @Test("Handle file operation failures")
+    @Test("Handle file operation failures", tags: ["error", "storage"])
     func testHandleFileOperationFailures() throws {
         let (storage, directory, fileManager) = try Self.createTestStorage()
         defer { try? Self.cleanupTestStorage(directory) }
@@ -673,6 +684,44 @@ struct CredentialsStorageTests {
             #expect(error.domain == NSCocoaErrorDomain)
             #expect(error.code == NSFileReadNoPermissionError)
             #expect(error.userInfo[NSLocalizedDescriptionKey] as? String == "Failed to read directory: Permission denied")
+        }
+    }
+    
+    // MARK: - Parameterized Tests
+    
+    @Test("Handle various credential formats", tags: ["parameterized", "storage"])
+    func testCredentialFormats() throws {
+        let (storage, directory, _) = try Self.createTestStorage()
+        defer { try? Self.cleanupTestStorage(directory) }
+        
+        let testCases = [
+            (UUID(), "simple-password", "/path/to/repo"),
+            (UUID(), "password with spaces", "/path/with spaces/repo"),
+            (UUID(), "password!@#$%^&*()", "/path/with/special/chars/!@#$/repo"),
+            (UUID(), String(repeating: "a", count: 1000), "/very/long/path/" + String(repeating: "a", count: 1000)),
+            (UUID(), "", "/empty/password/repo"),
+            (UUID(), "password", "")
+        ]
+        
+        for (id, password, path) in testCases {
+            let credentials = RepositoryCredentials(
+                repositoryId: id,
+                password: password,
+                repositoryPath: path
+            )
+            
+            // Store credentials
+            try storage.store(credentials)
+            
+            // Retrieve and verify
+            let retrieved = try storage.retrieve(forRepositoryId: id)
+            #expect(retrieved != nil)
+            #expect(retrieved?.repositoryId == id)
+            #expect(retrieved?.password == password)
+            #expect(retrieved?.repositoryPath == path)
+            
+            // Clean up
+            try storage.delete(forRepositoryId: id)
         }
     }
 }

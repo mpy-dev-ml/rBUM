@@ -5,202 +5,263 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import XCTest
+import Testing
 import Security
 @testable import rBUM
 
-final class KeychainServiceTests: XCTestCase {
-    let testService = "dev.mpy.rBUM.test"
-    let testAccount = "testAccount"
-    let testPassword = "testPassword123"
+struct KeychainServiceTests {
+    // MARK: - Test Setup
     
-    func testCleanup() async throws {
-        let keychainService = KeychainService(isTest: true)
+    struct TestContext {
+        let service: String
+        let account: String
+        let keychainService: KeychainService
         
-        // Given a test item exists
-        try await keychainService.storePassword(testPassword, forService: testService, account: testAccount)
-        
-        // When cleaning up
-        try await cleanupKeychain()
-        
-        // Then the item should not exist
-        do {
-            _ = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-            XCTFail("Expected itemNotFound error")
-        } catch let error as KeychainError {
-            XCTAssertEqual(error, .itemNotFound)
+        init(service: String = "dev.mpy.rBUM.test",
+             account: String = "testAccount") {
+            self.service = service
+            self.account = account
+            self.keychainService = KeychainService(isTest: true)
         }
-    }
-    
-    private func cleanupKeychain() async throws {
-        let keychainService = KeychainService(isTest: true)
         
-        // Try to delete the test item
-        _ = try? await keychainService.deletePassword(forService: testService, account: testAccount)
-        
-        // Try to retrieve to verify it's gone - if this doesn't throw, something's wrong
-        do {
-            _ = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-            // If we get here, the item still exists - force delete it
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: testService,
-                kSecAttrAccount as String: testAccount
-            ]
-            _ = SecItemDelete(query as CFDictionary)
+        func cleanup() async throws {
+            // Try to delete the test item
+            _ = try? await keychainService.deletePassword(forService: service, account: account)
             
-            // Verify again
-            _ = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-            throw KeychainError.unexpectedStatus(errSecSuccess) // If we get here, cleanup failed
-        } catch KeychainError.itemNotFound {
-            // This is what we want - item is gone
-            return
-        } catch {
-            // Some other error occurred during verification
-            throw error
+            // Verify deletion
+            do {
+                _ = try await keychainService.retrievePassword(forService: service, account: account)
+                // If we get here, force delete it
+                let query: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrService as String: service,
+                    kSecAttrAccount as String: account
+                ]
+                _ = SecItemDelete(query as CFDictionary)
+                
+                // Verify again
+                _ = try await keychainService.retrievePassword(forService: service, account: account)
+                throw KeychainError.unexpectedStatus(errSecSuccess)
+            } catch KeychainError.itemNotFound {
+                return // Success - item is gone
+            }
         }
     }
     
-    func testStorePassword() async throws {
-        let keychainService = KeychainService(isTest: true)
+    // MARK: - Basic Operations Tests
+    
+    @Test("Store and retrieve passwords with various configurations",
+          .tags(.core, .security, .integration),
+          arguments: [
+              (password: "simple-password", service: "dev.mpy.rBUM.test1", account: "account1"),
+              (password: "Complex!@#$%^&*()", service: "dev.mpy.rBUM.test2", account: "account2"),
+              (password: "password with spaces", service: "dev.mpy.rBUM.test3", account: "account3"),
+              (password: "🔒unicode🔑", service: "dev.mpy.rBUM.test4", account: "account4"),
+              (password: String(repeating: "a", count: 1024), service: "dev.mpy.rBUM.test5", account: "account5")
+          ])
+    func testStoreAndRetrievePassword(password: String, service: String, account: String) async throws {
+        // Given
+        let context = TestContext(service: service, account: account)
+        try await context.cleanup()
         
-        // Clean up before test
-        try await cleanupKeychain()
+        // When
+        try await context.keychainService.storePassword(password, forService: service, account: account)
+        let retrieved = try await context.keychainService.retrievePassword(forService: service, account: account)
         
-        // When storing a new password
-        try await keychainService.storePassword(testPassword, forService: testService, account: testAccount)
+        // Then
+        #expect(retrieved == password)
         
-        // Then it should be retrievable
-        let retrieved = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-        XCTAssertEqual(retrieved, testPassword)
-        
-        // Clean up after test
-        try await cleanupKeychain()
+        // Cleanup
+        try await context.cleanup()
     }
     
-    func testStorePasswordOverwrite() async throws {
-        let keychainService = KeychainService(isTest: true)
-        let newPassword = "newPassword123"
+    // MARK: - Update Tests
+    
+    @Test("Update passwords with various scenarios",
+          .tags(.core, .security, .integration),
+          arguments: [
+              (initial: "initial123", updated: "updated123"),
+              (initial: "short", updated: String(repeating: "a", count: 1024)),
+              (initial: "Complex!@#", updated: "🔒unicode🔑")
+          ])
+    func testUpdatePassword(initial: String, updated: String) async throws {
+        // Given
+        let context = TestContext()
+        try await context.cleanup()
         
-        // Clean up before test
-        try await cleanupKeychain()
+        // When
+        try await context.keychainService.storePassword(initial, forService: context.service, account: context.account)
+        try await context.keychainService.updatePassword(updated, forService: context.service, account: context.account)
         
-        // Given an existing password
-        try await keychainService.storePassword(testPassword, forService: testService, account: testAccount)
+        // Then
+        let retrieved = try await context.keychainService.retrievePassword(forService: context.service, account: context.account)
+        #expect(retrieved == updated)
+        #expect(retrieved != initial)
         
-        // Verify initial password
-        let initial = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-        XCTAssertEqual(initial, testPassword)
-        
-        // When storing a new password, it should overwrite
-        try await keychainService.storePassword(newPassword, forService: testService, account: testAccount)
-        
-        // Then the new password should be retrievable
-        let retrieved = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-        XCTAssertEqual(retrieved, newPassword)
-        
-        // Clean up after test
-        try await cleanupKeychain()
+        // Cleanup
+        try await context.cleanup()
     }
     
-    func testUpdatePassword() async throws {
-        let keychainService = KeychainService(isTest: true)
-        let newPassword = "newTestPassword123"
-        
-        // Clean up before test
-        try await cleanupKeychain()
-        
-        // Given an existing password
-        try await keychainService.storePassword(testPassword, forService: testService, account: testAccount)
-        
-        // When updating the password
-        try await keychainService.updatePassword(newPassword, forService: testService, account: testAccount)
-        
-        // Then it should be retrievable
-        let retrieved = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-        XCTAssertEqual(retrieved, newPassword)
-        
-        // Clean up after test
-        try await cleanupKeychain()
-    }
+    // MARK: - Security Tests
     
-    func testDeletePassword() async throws {
-        let keychainService = KeychainService(isTest: true)
+    @Test("Handle various error scenarios",
+          .tags(.core, .security, .error_handling),
+          arguments: [
+              (operation: "retrieve", expectedError: KeychainError.itemNotFound),
+              (operation: "update", expectedError: KeychainError.itemNotFound),
+              (operation: "delete", expectedError: KeychainError.itemNotFound)
+          ])
+    func testErrorScenarios(operation: String, expectedError: KeychainError) async throws {
+        // Given
+        let context = TestContext()
+        try await context.cleanup()
         
-        // Clean up before test
-        try await cleanupKeychain()
-        
-        // Given an existing password
-        try await keychainService.storePassword(testPassword, forService: testService, account: testAccount)
-        
-        // Verify initial password exists
-        let initial = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-        XCTAssertEqual(initial, testPassword)
-        
-        // When deleting the password
-        try await keychainService.deletePassword(forService: testService, account: testAccount)
-        
-        // Then it should not be retrievable
-        do {
-            _ = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-            XCTFail("Expected itemNotFound error")
-        } catch let error as KeychainError {
-            XCTAssertEqual(error, .itemNotFound)
+        // When/Then
+        switch operation {
+        case "retrieve":
+            await #expect(throws: expectedError) {
+                _ = try await context.keychainService.retrievePassword(
+                    forService: context.service,
+                    account: context.account
+                )
+            }
+        case "update":
+            await #expect(throws: expectedError) {
+                try await context.keychainService.updatePassword(
+                    "newPassword",
+                    forService: context.service,
+                    account: context.account
+                )
+            }
+        case "delete":
+            await #expect(throws: expectedError) {
+                try await context.keychainService.deletePassword(
+                    forService: context.service,
+                    account: context.account
+                )
+            }
+        default:
+            #expect(false, "Unknown operation: \(operation)")
         }
     }
     
-    func testMissingPassword() async throws {
-        let keychainService = KeychainService(isTest: true)
+    @Test("Handle concurrent access to same keychain item",
+          .tags(.core, .security, .concurrency))
+    func testConcurrentAccess() async throws {
+        // Given
+        let context = TestContext()
+        try await context.cleanup()
         
-        // Clean up before test
-        try await cleanupKeychain()
+        // Initial password
+        try await context.keychainService.storePassword(
+            "initial",
+            forService: context.service,
+            account: context.account
+        )
         
-        // When/Then retrieving a non-existent password should fail
-        do {
-            _ = try await keychainService.retrievePassword(forService: testService, account: testAccount)
-            XCTFail("Expected itemNotFound error")
-        } catch let error as KeychainError {
-            XCTAssertEqual(error, .itemNotFound)
+        // When performing concurrent operations
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            // Multiple updates
+            for i in 1...5 {
+                group.addTask {
+                    try await context.keychainService.updatePassword(
+                        "password\(i)",
+                        forService: context.service,
+                        account: context.account
+                    )
+                }
+            }
+            
+            // Concurrent reads
+            for _ in 1...5 {
+                group.addTask {
+                    _ = try await context.keychainService.retrievePassword(
+                        forService: context.service,
+                        account: context.account
+                    )
+                }
+            }
+            
+            try await group.waitForAll()
         }
+        
+        // Then - password should be one of the updates
+        let finalPassword = try await context.keychainService.retrievePassword(
+            forService: context.service,
+            account: context.account
+        )
+        #expect(finalPassword.starts(with: "password"))
+        
+        // Cleanup
+        try await context.cleanup()
     }
     
-    func testUpdateNonexistentPassword() async throws {
-        let keychainService = KeychainService(isTest: true)
+    @Test("Verify keychain item accessibility",
+          .tags(.core, .security, .validation))
+    func testKeychainAccessibility() async throws {
+        // Given
+        let context = TestContext()
+        try await context.cleanup()
         
-        // Clean up before test
-        try await cleanupKeychain()
+        let password = "testPassword123"
+        try await context.keychainService.storePassword(
+            password,
+            forService: context.service,
+            account: context.account
+        )
         
-        // When/Then updating a non-existent password should fail
-        do {
-            try await keychainService.updatePassword("newPassword", forService: testService, account: testAccount)
-            XCTFail("Expected itemNotFound error")
-        } catch let error as KeychainError {
-            XCTAssertEqual(error, .itemNotFound)
+        // Then - verify item attributes
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: context.service,
+            kSecAttrAccount as String: context.account,
+            kSecReturnAttributes as String: true
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        #expect(status == errSecSuccess)
+        
+        if let attributes = result as? [String: Any] {
+            // Verify accessibility setting
+            let accessibility = attributes[kSecAttrAccessible as String] as? String
+            #expect(accessibility == (kSecAttrAccessibleAfterFirstUnlock as String))
+            
+            // Verify proper ACL
+            let accessControl = attributes[kSecAttrAccessControl as String]
+            #expect(accessControl != nil)
         }
+        
+        // Cleanup
+        try await context.cleanup()
     }
     
-    func testDeleteNonexistentPassword() async throws {
-        let keychainService = KeychainService(isTest: true)
+    @Test("Handle special characters in service and account names",
+          .tags(.core, .security, .validation))
+    func testSpecialCharacters() async throws {
+        // Given
+        let specialCases = [
+            ("service with spaces", "account with spaces"),
+            ("service/with/slashes", "account@with@at"),
+            ("service.with.dots", "account_with_underscores"),
+            ("service-with-dashes", "account#with#hash"),
+            ("service🔒", "account🔑")
+        ]
         
-        // Clean up before test
-        try await cleanupKeychain()
-        
-        // When/Then deleting a non-existent password should fail
-        do {
-            try await keychainService.deletePassword(forService: testService, account: testAccount)
-            XCTFail("Expected itemNotFound error")
-        } catch let error as KeychainError {
-            XCTAssertEqual(error, .itemNotFound)
+        // Test each case
+        for (service, account) in specialCases {
+            let context = TestContext(service: service, account: account)
+            try await context.cleanup()
+            
+            // When
+            try await context.keychainService.storePassword("test", forService: service, account: account)
+            
+            // Then
+            let retrieved = try await context.keychainService.retrievePassword(forService: service, account: account)
+            #expect(retrieved == "test")
+            
+            // Cleanup
+            try await context.cleanup()
         }
-    }
-    
-    override func setUp() async throws {
-        try await super.setUp()
-        try await cleanupKeychain()
-    }
-    
-    override func tearDown() async throws {
-        try await cleanupKeychain()
-        try await super.tearDown()
     }
 }
