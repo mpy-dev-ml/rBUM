@@ -13,7 +13,7 @@ final class BackupViewModel: ObservableObject {
     enum BackupState {
         case idle
         case selecting
-        case backing(progress: Double)
+        case inProgress(BackupProgress)
         case completed
         case failed(Error)
     }
@@ -21,6 +21,8 @@ final class BackupViewModel: ObservableObject {
     @Published private(set) var state: BackupState = .idle
     @Published var selectedPaths: [URL] = []
     @Published var showError = false
+    @Published private(set) var currentStatus: BackupStatus?
+    @Published private(set) var currentProgress: BackupProgress?
     
     private let repository: Repository
     private let resticService: ResticCommandServiceProtocol
@@ -59,7 +61,10 @@ final class BackupViewModel: ObservableObject {
         guard !selectedPaths.isEmpty else { return }
         
         do {
-            state = .backing(progress: 0)
+            // Reset state
+            currentStatus = nil
+            currentProgress = nil
+            state = .idle
             
             // Create credentials for backup
             let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
@@ -69,32 +74,84 @@ final class BackupViewModel: ObservableObject {
                 repositoryPath: repository.path.path
             )
             
-            // Start backup
+            // Start backup with progress reporting
             try await resticService.createBackup(
                 paths: selectedPaths,
                 to: repository,
                 credentials: credentials,
-                tags: nil
+                tags: nil,
+                onProgress: { [weak self] progress in
+                    Task { @MainActor in
+                        self?.currentProgress = progress
+                        self?.state = .inProgress(progress)
+                    }
+                },
+                onStatusChange: { [weak self] status in
+                    Task { @MainActor in
+                        self?.currentStatus = status
+                        if case .completed = status {
+                            self?.handleBackupCompleted()
+                        } else if case .failed(let error) = status {
+                            self?.handleBackupFailed(error)
+                        }
+                    }
+                }
             )
-            
-            state = .completed
-            logger.infoMessage("Backup completed successfully")
-            
-            // Reset for next backup
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                self.state = .idle
-                self.selectedPaths = []
-            }
         } catch {
-            logger.errorMessage("Backup failed: \(error.localizedDescription)")
-            state = .failed(error)
-            showError = true
+            handleBackupFailed(error)
         }
+    }
+    
+    private func handleBackupCompleted() {
+        state = .completed
+        logger.infoMessage("Backup completed successfully")
+        
+        // Reset for next backup after delay
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            reset()
+        }
+    }
+    
+    private func handleBackupFailed(_ error: Error) {
+        logger.errorMessage("Backup failed: \(error.localizedDescription)")
+        state = .failed(error)
+        showError = true
     }
     
     func reset() {
         state = .idle
         selectedPaths = []
         showError = false
+        currentStatus = nil
+        currentProgress = nil
+    }
+    
+    // MARK: - Progress Formatting
+    
+    var progressMessage: String {
+        switch state {
+        case .idle:
+            return "Ready to start backup"
+        case .selecting:
+            return "Selecting files..."
+        case .inProgress(let progress):
+            return "Backing up: \(progress.formattedProgress())"
+        case .completed:
+            return "Backup completed successfully"
+        case .failed(let error):
+            return "Backup failed: \(error.localizedDescription)"
+        }
+    }
+    
+    var progressPercentage: Double {
+        switch state {
+        case .inProgress(let progress):
+            return progress.overallProgress
+        case .completed:
+            return 100
+        default:
+            return 0
+        }
     }
 }

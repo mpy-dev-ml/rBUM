@@ -69,11 +69,15 @@ protocol ResticCommandServiceProtocol {
     ///   - repository: Repository to store the backup
     ///   - credentials: Credentials for accessing the repository
     ///   - tags: Optional tags to apply to the backup
+    ///   - onProgress: Optional callback for progress updates
+    ///   - onStatusChange: Optional callback for status changes
     func createBackup(
         paths: [URL],
         to repository: Repository,
         credentials: RepositoryCredentials,
-        tags: [String]?
+        tags: [String]?,
+        onProgress: ((BackupProgress) -> Void)?,
+        onStatusChange: ((BackupStatus) -> Void)?
     ) async throws
     
     /// List snapshots in a repository
@@ -125,20 +129,58 @@ final class ResticCommandService: ResticCommandServiceProtocol {
     }
     
     @discardableResult
-    private func executeCommand(_ arguments: [String], credentials: RepositoryCredentials) async throws -> String {
+    private func executeCommand(
+        _ arguments: [String],
+        credentials: RepositoryCredentials,
+        onOutput: ((String) -> Void)? = nil
+    ) async throws -> String {
         var environment: [String: String] = [:]
         
         // Set password and repository path from credentials
         environment["RESTIC_PASSWORD"] = credentials.password
         environment["RESTIC_REPOSITORY"] = credentials.repositoryPath
         
-        let result = try await processExecutor.execute(command: resticPath, arguments: arguments, environment: environment)
+        let result = try await processExecutor.execute(
+            command: resticPath,
+            arguments: arguments,
+            environment: environment,
+            onOutput: onOutput
+        )
         
         if result.exitCode != 0 {
             throw ResticError.commandFailed(result.error)
         }
         
         return result.output
+    }
+    
+    private func parseBackupOutput(
+        _ line: String,
+        startTime: Date,
+        onProgress: ((BackupProgress) -> Void)?,
+        onStatusChange: ((BackupStatus) -> Void)?
+    ) {
+        guard let data = line.data(using: .utf8) else { return }
+        
+        do {
+            let status = try JSONDecoder().decode(ResticBackupStatus.self, from: data)
+            
+            // Handle different message types
+            switch status.messageType {
+            case "status":
+                if let progress = status.toBackupProgress(startTime: startTime) {
+                    onProgress?(progress)
+                    onStatusChange?(.backing(progress))
+                }
+            case "summary":
+                onStatusChange?(.finalising)
+            default:
+                break
+            }
+        } catch {
+            // Not all lines will be valid JSON status updates, ignore those
+            logger.debugMessage("Failed to parse backup status: \(error.localizedDescription)")
+        }
     }
     
     func initializeRepository(at path: URL, password: String) async throws {
@@ -160,7 +202,9 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         paths: [URL],
         to repository: Repository,
         credentials: RepositoryCredentials,
-        tags: [String]?
+        tags: [String]?,
+        onProgress: ((BackupProgress) -> Void)?,
+        onStatusChange: ((BackupStatus) -> Void)?
     ) async throws {
         guard !paths.isEmpty else {
             throw ResticError.invalidArgument("No paths specified for backup")
@@ -188,7 +232,28 @@ final class ResticCommandService: ResticCommandServiceProtocol {
             }
         }
         
-        try await executeCommand(arguments, credentials: credentials)
+        // Track start time for progress calculation
+        let startTime = Date()
+        onStatusChange?(.preparing)
+        
+        do {
+            try await executeCommand(
+                arguments,
+                credentials: credentials,
+                onOutput: { line in
+                    self.parseBackupOutput(
+                        line,
+                        startTime: startTime,
+                        onProgress: onProgress,
+                        onStatusChange: onStatusChange
+                    )
+                }
+            )
+            onStatusChange?(.completed)
+        } catch {
+            onStatusChange?(.failed(error))
+            throw error
+        }
     }
     
     func listSnapshots(

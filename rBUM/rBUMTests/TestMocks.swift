@@ -83,10 +83,36 @@ enum TestMocks {
             }
         }
         
-        func createBackup(paths: [URL], to repository: Repository, credentials: RepositoryCredentials, tags: [String]?) async throws {
+        func createBackup(
+            paths: [URL],
+            to repository: Repository,
+            credentials: RepositoryCredentials,
+            tags: [String]?,
+            onProgress: ((BackupProgress) -> Void)?,
+            onStatusChange: ((BackupStatus) -> Void)?
+        ) async throws {
             if let error = backupError {
                 throw error
             }
+            
+            // Simulate backup progress
+            onStatusChange?(.preparing)
+            
+            // Simulate some progress updates
+            let progress = BackupProgress(
+                totalFiles: 10,
+                processedFiles: 5,
+                totalBytes: 1024,
+                processedBytes: 512,
+                currentFile: "/test/file.txt",
+                estimatedSecondsRemaining: 10,
+                startTime: Date()
+            )
+            onProgress?(progress)
+            onStatusChange?(.backing(progress))
+            
+            // Simulate completion
+            onStatusChange?(.completed)
         }
         
         func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot] {
@@ -96,7 +122,15 @@ enum TestMocks {
             return []
         }
         
-        func pruneSnapshots(in repository: Repository, credentials: RepositoryCredentials, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
+        func pruneSnapshots(
+            in repository: Repository,
+            credentials: RepositoryCredentials,
+            keepLast: Int?,
+            keepDaily: Int?,
+            keepWeekly: Int?,
+            keepMonthly: Int?,
+            keepYearly: Int?
+        ) async throws {
             if let error = pruneError {
                 throw error
             }

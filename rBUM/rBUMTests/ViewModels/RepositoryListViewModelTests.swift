@@ -155,6 +155,10 @@ final class MockRepositoryStorage: RepositoryStorageProtocol {
 }
 
 final class MockResticCommandService: ResticCommandServiceProtocol {
+    func createBackup(paths: [URL], to repository: rBUM.Repository, credentials: rBUM.RepositoryCredentials, tags: [String]?, onProgress: ((rBUM.BackupProgress) -> Void)?, onStatusChange: ((rBUM.BackupStatus) -> Void)?) async throws {
+        <#code#>
+    }
+    
     func initializeRepository(at path: URL, password: String) async throws {}
     
     func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}

@@ -79,13 +79,26 @@ final class MockProcessExecutor: ProcessExecutorProtocol {
     var lastArguments: [String]?
     var lastEnvironment: [String: String]?
     
-    func execute(command: String, arguments: [String], environment: [String: String]?) async throws -> ProcessResult {
+    func execute(
+        command: String,
+        arguments: [String],
+        environment: [String: String]?,
+        onOutput: ((String) -> Void)?
+    ) async throws -> ProcessResult {
         if shouldThrowError {
             throw ProcessError.executionFailed(error)
         }
         lastCommand = command
         lastArguments = arguments
         lastEnvironment = environment
+        
+        // If we have an output callback, simulate streaming output
+        if let onOutput = onOutput {
+            output.split(separator: "\n").forEach { line in
+                onOutput(String(line))
+            }
+        }
+        
         return ProcessResult(output: output, error: error, exitCode: exitCode)
     }
 }
@@ -169,6 +182,79 @@ struct ResticCommandServiceTests {
         #expect(processExecutor.lastArguments?.contains("/path2") == true)
         #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
         #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
+    }
+    
+    @Test("Create backup with progress reporting")
+    func testCreateBackupWithProgress() async throws {
+        let credentialsManager = MockCredentialsManager()
+        let processExecutor = MockProcessExecutor()
+        let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
+        let repository = Repository(
+            name: "Test Repo",
+            path: URL(fileURLWithPath: "/test/path")
+        )
+        let credentials = RepositoryCredentials(
+            repositoryId: repository.id,
+            password: "testPassword",
+            repositoryPath: repository.path.path
+        )
+        
+        // Given
+        let paths = [URL(fileURLWithPath: "/path1"), URL(fileURLWithPath: "/path2")]
+        let tags = ["test", "backup"]
+        
+        // Mock restic JSON output for progress
+        processExecutor.output = """
+            {"message_type":"status","seconds_elapsed":1.2,"seconds_remaining":10,"bytes_done":1024,"total_bytes":10240,"files_done":5,"total_files":20,"current_file":"/path1/file1.txt"}
+            {"message_type":"status","seconds_elapsed":2.4,"seconds_remaining":5,"bytes_done":5120,"total_bytes":10240,"files_done":10,"total_files":20,"current_file":"/path1/file2.txt"}
+            {"message_type":"summary","total_bytes":10240,"total_files":20}
+            """
+        
+        var progressUpdates: [BackupProgress] = []
+        var statusChanges: [BackupStatus] = []
+        
+        // When
+        try await commandService.createBackup(
+            paths: paths,
+            to: repository,
+            credentials: credentials,
+            tags: tags,
+            onProgress: { progress in
+                progressUpdates.append(progress)
+            },
+            onStatusChange: { status in
+                statusChanges.append(status)
+            }
+        )
+        
+        // Then
+        #expect(progressUpdates.count == 2)
+        #expect(statusChanges.count >= 3)  // preparing, backing, completed
+        
+        // Verify first progress update
+        let firstProgress = progressUpdates[0]
+        #expect(firstProgress.totalFiles == 20)
+        #expect(firstProgress.processedFiles == 5)
+        #expect(firstProgress.totalBytes == 10240)
+        #expect(firstProgress.processedBytes == 1024)
+        #expect(firstProgress.currentFile == "/path1/file1.txt")
+        #expect(firstProgress.estimatedSecondsRemaining == 10)
+        
+        // Verify second progress update
+        let secondProgress = progressUpdates[1]
+        #expect(secondProgress.totalFiles == 20)
+        #expect(secondProgress.processedFiles == 10)
+        #expect(secondProgress.totalBytes == 10240)
+        #expect(secondProgress.processedBytes == 5120)
+        #expect(secondProgress.currentFile == "/path1/file2.txt")
+        #expect(secondProgress.estimatedSecondsRemaining == 5)
+        
+        // Verify status transitions
+        #expect(statusChanges[0] == .preparing)
+        if case .backing = statusChanges[1] {} else {
+            XCTFail("Second status should be .backing")
+        }
+        #expect(statusChanges.last == .completed)
     }
     
     @Test("Handle process execution errors")
