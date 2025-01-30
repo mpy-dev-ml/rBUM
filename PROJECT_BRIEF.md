@@ -39,10 +39,22 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
 - [x] Error display structure
 
 ### Day 3: Basic Security and Storage
-- [ ] Simple password storage using Keychain
-- [ ] Basic repository credentials management
-- [ ] Repository location storage
-- [ ] Configuration storage
+- [x] Simple password storage using Keychain
+  - [x] Secure password storage implementation
+  - [x] Error handling and validation
+  - [x] Test coverage
+- [x] Basic repository credentials management
+  - [x] Credentials model and storage
+  - [x] Keychain integration
+  - [x] Update and deletion handling
+- [x] Repository location storage
+  - [x] Repository metadata model
+  - [x] Atomic file operations
+  - [x] Path validation
+- [x] Configuration storage
+  - [x] Default settings management
+  - [x] User preferences
+  - [x] Secure storage implementation
 
 ### Day 4: Essential Features
 - [ ] Repository creation/import
