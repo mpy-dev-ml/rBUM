@@ -9,33 +9,49 @@ import SwiftUI
 
 struct RepositoryDetailView: View {
     @StateObject private var viewModel: RepositoryDetailViewModel
+    private let resticService: ResticCommandServiceProtocol
     
     init(repository: Repository, resticService: ResticCommandServiceProtocol) {
         _viewModel = StateObject(wrappedValue: RepositoryDetailViewModel(
             repository: repository,
             resticService: resticService
         ))
+        self.resticService = resticService
     }
     
     var body: some View {
         TabView(selection: $viewModel.selectedTab) {
-            overviewTab
-                .tabItem {
-                    Label(
-                        RepositoryDetailViewModel.Tab.overview.rawValue,
-                        systemImage: RepositoryDetailViewModel.Tab.overview.icon
-                    )
+            VStack {
+                Text("Repository Details")
+                    .font(.title)
+                
+                Form {
+                    Section("General") {
+                        LabeledContent("Name", value: viewModel.repository.name)
+                        LabeledContent("Path", value: viewModel.repository.path.path())
+                        LabeledContent("Created", value: viewModel.repository.createdAt.formatted())
+                    }
                 }
-                .tag(RepositoryDetailViewModel.Tab.overview)
+            }
+            .tabItem {
+                Label(
+                    RepositoryDetailViewModel.Tab.overview.rawValue,
+                    systemImage: RepositoryDetailViewModel.Tab.overview.icon
+                )
+            }
+            .tag(RepositoryDetailViewModel.Tab.overview)
             
-            Text("Snapshots")
-                .tabItem {
-                    Label(
-                        RepositoryDetailViewModel.Tab.snapshots.rawValue,
-                        systemImage: RepositoryDetailViewModel.Tab.snapshots.icon
-                    )
-                }
-                .tag(RepositoryDetailViewModel.Tab.snapshots)
+            SnapshotListView(
+                repository: viewModel.repository,
+                resticService: resticService
+            )
+            .tabItem {
+                Label(
+                    RepositoryDetailViewModel.Tab.snapshots.rawValue,
+                    systemImage: RepositoryDetailViewModel.Tab.snapshots.icon
+                )
+            }
+            .tag(RepositoryDetailViewModel.Tab.snapshots)
             
             Text("Settings")
                 .tabItem {
@@ -45,6 +61,15 @@ struct RepositoryDetailView: View {
                     )
                 }
                 .tag(RepositoryDetailViewModel.Tab.settings)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    BackupView(repository: viewModel.repository, resticService: resticService)
+                } label: {
+                    Label("Backup", systemImage: "arrow.up.doc")
+                }
+            }
         }
         .navigationTitle(viewModel.repository.name)
         .alert("Error", isPresented: $viewModel.showError) {
@@ -114,9 +139,9 @@ struct RepositoryDetailView: View {
                 }
                 
                 Button {
-                    // TODO: Implement restore
+                    viewModel.selectedTab = .snapshots
                 } label: {
-                    Label("Restore Files", systemImage: "arrow.uturn.backward")
+                    Label("View Snapshots", systemImage: "clock")
                 }
                 
                 Button {

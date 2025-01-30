@@ -143,6 +143,39 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
 - [ ] Troubleshooting guide
 - [ ] Release notes
 
+## Development Phases
+
+### MVP Phase
+- Basic repository management (create, import, delete)
+- Snapshot management (create, restore, delete, prune)
+- Backup creation with path selection
+- Repository health monitoring
+- Secure credential storage using macOS Keychain
+- Error handling and logging
+- Basic UI with repository list and details
+
+### Post-MVP Phase
+
+#### Snapshot Analytics and Statistics
+- Snapshot size trends over time
+- Backup frequency analysis
+- Storage efficiency metrics
+- Deduplication statistics
+- Growth rate predictions
+- Data type distribution analysis
+- Visual graphs and charts
+- Export statistics as reports
+- Customisable time ranges for analysis
+- Comparative analysis between repositories
+
+#### Additional Features
+- Advanced scheduling options
+- Complex restore scenarios
+- Detailed backup statistics
+- Advanced UI animations
+- Non-critical settings
+- Advanced documentation features (defer to basic command reference)
+
 ## Timeline Summary
 - Work Schedule: 5.5 days/week, 9 hours/day
 - Total Development Time: 6 weeks (297 hours)

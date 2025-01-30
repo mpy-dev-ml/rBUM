@@ -94,6 +94,22 @@ This project follows the MVVM (Model-View-ViewModel) architecture pattern and us
 
 For detailed development guidelines, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Planned Features
+
+The following features are planned for future releases:
+
+### Snapshot Analytics and Statistics
+- Comprehensive snapshot size analysis
+- Backup frequency trends
+- Storage efficiency metrics
+- Deduplication statistics
+- Growth rate predictions
+- Visual data representation
+- Exportable reports
+
+### Additional Features
+- Additional features will be announced as they are planned.
+
 ## Security
 
 rBUM takes security seriously:
