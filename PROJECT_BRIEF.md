@@ -1,7 +1,18 @@
 # rBUM Project Brief
 
 ## Project Overview
-rBUM (Restic Backup Manager) is a native macOS application providing a graphical user interface for Restic backup operations. The application aims to simplify backup management while maintaining Restic's powerful features and security model.
+
+rBUM (Restic Backup Manager) is a native macOS application providing a graphical user interface for [Restic](https://restic.net/) backup operations. The application aims to enhance the user experience of Restic on macOS whilst maintaining its powerful features and security model.
+
+### About Restic Integration
+
+rBUM is built as a GUI wrapper around Restic, developed by Alexander Neumann and contributors. We acknowledge and respect Restic's:
+- Robust security architecture
+- Efficient backup engine
+- Proven reliability
+- Active community development
+
+Our goal is to complement Restic by providing a native macOS interface, not to replace or modify its core functionality. All backup operations are performed by Restic itself, ensuring that users benefit from its security guarantees and performance optimisations.
 
 ## MVP Phase (5 Days)
 ### Day 1: Basic Structure and Restic Integration
@@ -59,7 +70,7 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
   - [x] Documentation generation
 - [x] Development environment documentation
 
-### 2. Core Restic Integration (2-3 weeks)
+### 2. Core Integration with Restic (2-3 weeks)
 - [ ] ResticCommandService development
   - [ ] Command execution framework
   - [ ] Error handling and logging
@@ -167,6 +178,11 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
   - Animation refinements
   - Accessibility improvements
   - Dark/Light mode support
+  - Integrated documentation viewer
+    - Restic command reference
+    - Quick help integration
+    - Context-sensitive help
+    - Offline documentation support
 - Security Hardening
   - Security audit
   - Penetration testing
@@ -174,13 +190,18 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
 
 ### Week 6 (49.5 hours)
 - Final Testing
-  - Performance optimization
+  - Performance optimisation
   - Edge case handling
   - UI/UX testing
 - Documentation
   - User guide
   - API documentation
   - Release notes
+  - Integrated Restic documentation
+    - Command reference integration
+    - Example usage scenarios
+    - Troubleshooting guides
+    - Quick reference cards
 - Release Preparation
   - Final bug fixes
   - Release packaging
@@ -193,6 +214,7 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
 2. Restic command integration complexity
 3. Security implementation thoroughness
 4. Feature scope management
+5. Documentation synchronisation with Restic updates
 
 ### Mitigation Strategies
 1. Daily progress tracking and scope adjustment
@@ -201,6 +223,7 @@ rBUM (Restic Backup Manager) is a native macOS application providing a graphical
 4. Regular stakeholder reviews
 5. Clear MVP definition and feature prioritisation
 6. Automated testing from Week 2 onwards
+7. Documentation version tracking system
 
 ### Scope Management
 Features that could be deferred if needed:
@@ -209,6 +232,7 @@ Features that could be deferred if needed:
 3. Detailed backup statistics
 4. Advanced UI animations
 5. Non-critical settings
+6. Advanced documentation features (defer to basic command reference)
 
 ## Success Criteria
 1. Successful management of Restic repositories
@@ -216,10 +240,12 @@ Features that could be deferred if needed:
 3. Reliable backup scheduling
 4. Intuitive user interface
 5. Comprehensive error handling
-6. Performance within acceptable parameters:
+6. Accessible integrated documentation
+7. Performance within acceptable parameters:
    - Repository scan < 30 seconds
    - Backup initiation < 5 seconds
    - UI responsiveness < 100ms
+   - Documentation search < 500ms
 
 ## Next Steps
 1. Set up Xcode project structure

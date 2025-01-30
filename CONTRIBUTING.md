@@ -2,12 +2,27 @@
 
 Thank you for your interest in contributing to rBUM! This document provides guidelines and information for contributors.
 
+## Restic Compatibility
+
+rBUM is a GUI wrapper for [Restic](https://restic.net/), and maintaining compatibility with Restic is our highest priority. When contributing, please ensure:
+
+1. All backup operations are performed through Restic's command-line interface
+2. No modifications are made to Restic's core functionality
+3. Restic's security model is strictly respected
+4. All Restic features remain accessible
+5. Changes accommodate Restic's versioning and updates
+
+For Restic-specific questions or issues, please refer to:
+- [Restic Documentation](https://restic.readthedocs.io/)
+- [Restic GitHub Issues](https://github.com/restic/restic/issues)
+- [Restic Forum](https://forum.restic.net/)
+
 ## Development Environment
 
 - Xcode 16.0 or later
 - Swift 5.9.2
 - macOS Ventura (13.0) or later
-- Restic installed locally
+- Restic installed locally (via Homebrew recommended)
 
 ## Code Style Guidelines
 
@@ -25,6 +40,7 @@ Thank you for your interest in contributing to rBUM! This document provides guid
 - Use appropriate view modifiers
 - Extract reusable components
 - Follow MVVM architecture patterns
+- Maintain consistent behaviour across views
 
 ### Documentation
 
@@ -32,6 +48,21 @@ Thank you for your interest in contributing to rBUM! This document provides guid
 - Document public APIs using Swift's documentation comments
 - Include usage examples for complex functionality
 - Keep README and other documentation up to date
+- Clearly indicate which features are provided by Restic vs. rBUM
+- Use British English in all user-facing text
+
+## Testing
+
+- Write unit tests for new functionality
+- Ensure all tests pass before submitting PR
+- Use XCTest framework
+- Include UI tests for new views
+- Ensure all tests pass with multiple Restic versions
+- Verify compatibility with different repository types
+- Test error handling for Restic command failures
+- Validate security-related functionality thoroughly
+- Check proper handling of Restic output formats
+- Verify localisation works correctly
 
 ## Git Workflow
 
@@ -57,13 +88,6 @@ Add repository scanning functionality
 - Update documentation
 ```
 
-## Testing
-
-- Write unit tests for new functionality
-- Ensure all tests pass before submitting PR
-- Use XCTest framework
-- Include UI tests for new views
-
 ## Pull Request Process
 
 1. Update documentation if needed
@@ -71,6 +95,11 @@ Add repository scanning functionality
 3. Ensure all tests pass
 4. Update the README if needed
 5. Request review from maintainers
+6. Describe changes and their impact on Restic integration
+7. Document any new dependencies or requirements
+8. Explain security implications, if any
+9. Include relevant test results
+10. Update documentation as needed
 
 ## Code Review
 
