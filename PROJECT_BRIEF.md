@@ -57,14 +57,20 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
   - [x] Secure storage implementation
 
 ### Day 4: Essential Features
-- [ ] Repository creation/import
+- [x] Repository creation/import
+  - [x] Repository initialization
+  - [x] Credential management
+  - [x] Path validation
 - [ ] Manual backup execution
 - [ ] Basic restore functionality
 - [ ] Simple progress indication
 - [ ] Basic error reporting
 
 ### Day 5: Testing and Polish
-- [ ] Basic integration testing
+- [x] Basic integration testing
+  - [x] Mock implementations
+  - [x] Service tests
+  - [x] Error handling tests
 - [ ] UI refinements
 - [ ] Critical bug fixes
 - [ ] Basic user documentation
@@ -83,13 +89,13 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
 - [x] Development environment documentation
 
 ### 2. Core Integration with Restic (2-3 weeks)
-- [ ] ResticCommandService development
-  - [ ] Command execution framework
-  - [ ] Error handling and logging
-  - [ ] Repository management commands
+- [x] ResticCommandService development
+  - [x] Command execution framework
+  - [x] Error handling and logging
+  - [x] Repository management commands
   - [ ] Backup operations
   - [ ] Restore operations
-  - [ ] Unit tests
+  - [x] Unit tests
 - [ ] Drive scanning service
   - [ ] Repository discovery
   - [ ] Repository validation

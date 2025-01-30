@@ -12,6 +12,9 @@ struct RepositoryCredentials: Codable {
     /// Unique identifier for the repository these credentials belong to
     let repositoryId: UUID
     
+    /// Repository password used for encryption
+    var password: String
+    
     /// Path to the repository, used as the account identifier in Keychain
     let repositoryPath: String
     
@@ -34,12 +37,23 @@ struct RepositoryCredentials: Codable {
         repositoryPath
     }
     
-    init(repositoryId: UUID, repositoryPath: String, keyFileName: String? = nil) {
+    init(
+        repositoryId: UUID,
+        password: String,
+        repositoryPath: String,
+        keyFileName: String? = nil
+    ) {
         self.repositoryId = repositoryId
+        self.password = password
         self.repositoryPath = repositoryPath
         self.keyFileName = keyFileName
         self.createdAt = Date()
         self.modifiedAt = Date()
+    }
+    
+    mutating func updatePassword(_ newPassword: String) {
+        password = newPassword
+        modifiedAt = Date()
     }
 }
 
@@ -48,70 +62,8 @@ extension RepositoryCredentials: Equatable {
     static func == (lhs: RepositoryCredentials, rhs: RepositoryCredentials) -> Bool {
         // Only compare the identifying properties, not timestamps
         lhs.repositoryId == rhs.repositoryId &&
+        lhs.password == rhs.password &&
         lhs.repositoryPath == rhs.repositoryPath &&
         lhs.keyFileName == rhs.keyFileName
-    }
-}
-
-/// Protocol for managing repository credentials
-protocol RepositoryCredentialsManager {
-    /// Store credentials for a repository
-    /// - Parameters:
-    ///   - password: The repository password
-    ///   - credentials: The repository credentials
-    func storeCredentials(_ password: String, for credentials: RepositoryCredentials) async throws
-    
-    /// Retrieve password for a repository
-    /// - Parameter credentials: The repository credentials
-    /// - Returns: The repository password
-    func retrievePassword(for credentials: RepositoryCredentials) async throws -> String
-    
-    /// Update password for a repository
-    /// - Parameters:
-    ///   - password: The new password
-    ///   - credentials: The repository credentials
-    func updatePassword(_ password: String, for credentials: RepositoryCredentials) async throws
-    
-    /// Delete credentials for a repository
-    /// - Parameter credentials: The repository credentials
-    func deleteCredentials(_ credentials: RepositoryCredentials) async throws
-}
-
-/// Manages repository credentials using the Keychain service
-final class KeychainCredentialsManager: RepositoryCredentialsManager {
-    private let keychainService: KeychainServiceProtocol
-    
-    init(keychainService: KeychainServiceProtocol) {
-        self.keychainService = keychainService
-    }
-    
-    func storeCredentials(_ password: String, for credentials: RepositoryCredentials) async throws {
-        try await keychainService.storePassword(
-            password,
-            forService: credentials.keychainService,
-            account: credentials.keychainAccount
-        )
-    }
-    
-    func retrievePassword(for credentials: RepositoryCredentials) async throws -> String {
-        try await keychainService.retrievePassword(
-            forService: credentials.keychainService,
-            account: credentials.keychainAccount
-        )
-    }
-    
-    func updatePassword(_ password: String, for credentials: RepositoryCredentials) async throws {
-        try await keychainService.updatePassword(
-            password,
-            forService: credentials.keychainService,
-            account: credentials.keychainAccount
-        )
-    }
-    
-    func deleteCredentials(_ credentials: RepositoryCredentials) async throws {
-        try await keychainService.deletePassword(
-            forService: credentials.keychainService,
-            account: credentials.keychainAccount
-        )
     }
 }

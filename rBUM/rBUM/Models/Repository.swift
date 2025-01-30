@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Repository: Identifiable, Codable {
+struct Repository: Identifiable, Codable, Hashable {
     let id: UUID
     var name: String
     var path: URL
@@ -17,12 +17,14 @@ struct Repository: Identifiable, Codable {
     var createdAt: Date
     var modifiedAt: Date
     
-    /// The credentials associated with this repository
-    var credentials: RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: id,
-            repositoryPath: path.path
-        )
+    /// The keychain service name for this repository
+    var keychainService: String {
+        "dev.mpy.rBUM.repository.\(id.uuidString)"
+    }
+    
+    /// The keychain account name for this repository
+    var keychainAccount: String {
+        path.path
     }
     
     init(id: UUID = UUID(), name: String, path: URL) {
@@ -34,25 +36,27 @@ struct Repository: Identifiable, Codable {
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
+    
+    // MARK: - Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: Repository, rhs: Repository) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Repository Storage
 extension Repository {
     /// The default directory for storing repositories
     static var defaultStorageDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent("dev.mpy.rBUM", isDirectory: true)
-            .appendingPathComponent("Repositories", isDirectory: true) ?? URL(fileURLWithPath: "")
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Repositories", isDirectory: true)
     }
     
-    /// Create the default storage directory if it doesn't exist
-    static func createDefaultStorageDirectory() throws {
-        let directory = defaultStorageDirectory
-        try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true,
-            attributes: nil
-        )
+    /// The directory for this repository's data
+    var storageDirectory: URL {
+        Self.defaultStorageDirectory.appendingPathComponent(id.uuidString, isDirectory: true)
     }
 }

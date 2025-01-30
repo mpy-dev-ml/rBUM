@@ -23,6 +23,7 @@ enum Logging {
         case restore = "Restore"
         case settings = "Settings"
         case configuration = "Configuration"
+        case storage = "Storage"
         
         /// Get a logger configured for this category
         var logger: Logger {

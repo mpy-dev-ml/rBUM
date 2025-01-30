@@ -9,84 +9,67 @@ import SwiftUI
 
 struct RepositoryListView: View {
     @StateObject private var viewModel: RepositoryListViewModel
-    private let creationService: RepositoryCreationServiceProtocol
-    private let resticService: ResticCommandServiceProtocol
+    @State private var showAddSheet = false
+    @State private var showingDeleteAlert = false
+    @State private var repositoryToDelete: Repository?
     
-    init(
-        repositoryStorage: RepositoryStorageProtocol,
-        creationService: RepositoryCreationServiceProtocol,
-        resticService: ResticCommandServiceProtocol
-    ) {
-        _viewModel = StateObject(wrappedValue: RepositoryListViewModel(repositoryStorage: repositoryStorage))
-        self.creationService = creationService
-        self.resticService = resticService
+    init() {
+        _viewModel = StateObject(wrappedValue: RepositoryListViewModel())
     }
     
     var body: some View {
-        NavigationSplitView {
-            List {
-                if viewModel.repositories.isEmpty {
-                    ContentUnavailableView(
-                        "No Repositories",
-                        systemImage: "folder.badge.questionmark",
-                        description: Text("Add a repository to get started")
-                    )
-                } else {
-                    ForEach(viewModel.repositories) { repository in
-                        NavigationLink(value: repository) {
-                            RepositoryRowView(repository: repository)
-                        }
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            viewModel.deleteRepository(viewModel.repositories[index])
-                        }
+        NavigationStack {
+            List(viewModel.repositories) { repository in
+                NavigationLink(destination: RepositoryDetailView(repository: repository)) {
+                    RepositoryRowView(repository: repository)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        repositoryToDelete = repository
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
             }
             .navigationTitle("Repositories")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: viewModel.showCreateRepository) {
+                    Button {
+                        showAddSheet = true
+                    } label: {
                         Label("Add Repository", systemImage: "plus")
                     }
                 }
             }
-        } detail: {
-            NavigationStack {
-                if let repository = viewModel.repositories.first {
-                    RepositoryDetailView(
-                        repository: repository,
-                        resticService: resticService
-                    )
-                } else {
-                    Text("Select a repository")
-                        .foregroundStyle(.secondary)
+            .alert("Delete Repository", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    if let repository = repositoryToDelete {
+                        Task {
+                            await viewModel.deleteRepository(repository)
+                        }
+                    }
+                }
+            } message: {
+                if let repository = repositoryToDelete {
+                    Text("Are you sure you want to delete '\(repository.name)'? This action cannot be undone.")
                 }
             }
-        }
-        .sheet(isPresented: $viewModel.showCreationSheet) {
-            NavigationStack {
-                RepositoryCreationView(creationService: creationService)
-                    .onChange(of: viewModel.showCreationSheet) { oldValue, newValue in
+            .sheet(isPresented: $showAddSheet) {
+                RepositoryCreationView(creationService: viewModel.repositoryCreationService)
+                    .onChange(of: showAddSheet) { oldValue, newValue in
                         if !newValue {
                             // Sheet was dismissed, check for new repository
-                            viewModel.loadRepositories()
+                            Task {
+                                await viewModel.loadRepositories()
+                            }
                         }
                     }
             }
-        }
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.showError = false
+            .task {
+                await viewModel.loadRepositories()
             }
-        } message: {
-            if let error = viewModel.error {
-                Text(error.localizedDescription)
-            }
-        }
-        .task {
-            viewModel.loadRepositories()
         }
     }
 }
@@ -105,5 +88,11 @@ private struct RepositoryRowView: View {
                 .lineLimit(1)
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct RepositoryListView_Previews: PreviewProvider {
+    static var previews: some View {
+        RepositoryListView()
     }
 }

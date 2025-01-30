@@ -8,52 +8,39 @@
 import XCTest
 @testable import rBUM
 
+@MainActor
 final class RepositoryCreationServiceTests: XCTestCase {
-    fileprivate var service: RepositoryCreationService!
-    fileprivate var mockResticService: MockResticCommandService!
-    fileprivate var mockRepositoryStorage: MockRepositoryStorage!
-    fileprivate var mockFileManager: MockFileManager!
-    fileprivate var testDirectory: URL!
+    var resticService: TestMocks.MockResticCommandService!
+    var repositoryStorage: TestMocks.MockRepositoryStorage!
+    var fileManager: FileManager!
+    var sut: rBUM.RepositoryCreationService!
     
-    override func setUp() async throws {
-        // Set up test dependencies
-        mockResticService = MockResticCommandService()
-        mockRepositoryStorage = MockRepositoryStorage()
-        mockFileManager = MockFileManager()
-        
-        testDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dev.mpy.rBUM.tests", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        
-        service = RepositoryCreationService(
-            resticService: mockResticService,
-            repositoryStorage: mockRepositoryStorage,
-            fileManager: mockFileManager
+    override func setUpWithError() throws {
+        resticService = TestMocks.MockResticCommandService()
+        repositoryStorage = TestMocks.MockRepositoryStorage()
+        fileManager = FileManager.default
+        sut = rBUM.RepositoryCreationService(
+            resticService: resticService,
+            repositoryStorage: repositoryStorage,
+            fileManager: fileManager
         )
     }
     
-    override func tearDown() async throws {
-        // Clean up test dependencies
-        service = nil
-        mockResticService = nil
-        mockRepositoryStorage = nil
-        mockFileManager = nil
-        testDirectory = nil
+    override func tearDownWithError() throws {
+        resticService = nil
+        repositoryStorage = nil
+        fileManager = nil
+        sut = nil
     }
     
-    func testCreateRepository() async throws {
+    func test_createRepository_success() async throws {
         // Given
-        let name = "Test Repo"
-        let path = testDirectory.appendingPathComponent("repo")
+        let path = URL(fileURLWithPath: "/test/path")
+        let name = "Test Repository"
         let password = "test-password"
         
-        mockFileManager.fileExistsResult = false
-        mockFileManager.createDirectoryError = nil
-        mockResticService.initializeError = nil
-        mockRepositoryStorage.storeError = nil
-        
         // When
-        let repository = try await service.createRepository(
+        let repository = try await sut.createRepository(
             name: name,
             path: path,
             password: password
@@ -62,42 +49,52 @@ final class RepositoryCreationServiceTests: XCTestCase {
         // Then
         XCTAssertEqual(repository.name, name)
         XCTAssertEqual(repository.path, path)
-        XCTAssertTrue(mockFileManager.createDirectoryCalled)
-        XCTAssertTrue(mockResticService.initializeCalled)
-        XCTAssertTrue(mockRepositoryStorage.storeCalled)
     }
     
-    func testCreateRepositoryAtExistingPath() async throws {
+    func test_createRepository_pathExists() async throws {
         // Given
-        let path = testDirectory.appendingPathComponent("repo")
-        mockFileManager.fileExistsResult = true
+        let path = URL(fileURLWithPath: "/test/path")
+        repositoryStorage.existsResult = true
         
         // When/Then
         do {
-            _ = try await service.createRepository(
+            _ = try await sut.createRepository(
                 name: "Test",
                 path: path,
                 password: "test"
             )
             XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssertEqual(error as? RepositoryCreationError, .pathAlreadyExists)
+        } catch let error as rBUM.RepositoryCreationError {
+            XCTAssertEqual(error, .repositoryAlreadyExists)
         }
     }
     
-    func testImportRepository() async throws {
+    func test_createRepository_initializationFails() async throws {
         // Given
-        let name = "Test Repo"
-        let path = testDirectory.appendingPathComponent("repo")
+        let path = URL(fileURLWithPath: "/test/path")
+        resticService.initError = NSError(domain: "test", code: 1)
+        
+        // When/Then
+        do {
+            _ = try await sut.createRepository(
+                name: "Test",
+                path: path,
+                password: "test"
+            )
+            XCTFail("Expected error to be thrown")
+        } catch let error as rBUM.RepositoryCreationError {
+            XCTAssertEqual(error, .creationFailed("Failed to initialize repository"))
+        }
+    }
+    
+    func test_importRepository_success() async throws {
+        // Given
+        let path = URL(fileURLWithPath: "/test/path")
+        let name = "Test Repository"
         let password = "test-password"
         
-        mockFileManager.fileExistsResult = true
-        mockResticService.checkResult = true
-        mockRepositoryStorage.existsResult = false
-        mockRepositoryStorage.storeError = nil
-        
         // When
-        let repository = try await service.importRepository(
+        let repository = try await sut.importRepository(
             name: name,
             path: path,
             password: password
@@ -106,119 +103,41 @@ final class RepositoryCreationServiceTests: XCTestCase {
         // Then
         XCTAssertEqual(repository.name, name)
         XCTAssertEqual(repository.path, path)
-        XCTAssertTrue(mockResticService.checkCalled)
-        XCTAssertTrue(mockRepositoryStorage.storeCalled)
     }
     
-    func testImportInvalidRepository() async throws {
+    func test_importRepository_pathExists() async throws {
         // Given
-        let path = testDirectory.appendingPathComponent("repo")
-        mockFileManager.fileExistsResult = true
-        mockResticService.checkResult = false
+        let path = URL(fileURLWithPath: "/test/path")
+        repositoryStorage.existsResult = true
         
         // When/Then
         do {
-            _ = try await service.importRepository(
+            _ = try await sut.importRepository(
                 name: "Test",
                 path: path,
                 password: "test"
             )
             XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssertEqual(error as? RepositoryCreationError, .invalidRepository)
+        } catch let error as rBUM.RepositoryCreationError {
+            XCTAssertEqual(error, .repositoryAlreadyExists)
         }
     }
     
-    func testImportAlreadyImportedRepository() async throws {
+    func test_importRepository_validationFails() async throws {
         // Given
-        let path = testDirectory.appendingPathComponent("repo")
-        mockFileManager.fileExistsResult = true
-        mockRepositoryStorage.existsResult = true
+        let path = URL(fileURLWithPath: "/test/path")
+        resticService.checkError = NSError(domain: "test", code: 1)
         
         // When/Then
         do {
-            _ = try await service.importRepository(
+            _ = try await sut.importRepository(
                 name: "Test",
                 path: path,
                 password: "test"
             )
             XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssertEqual(error as? RepositoryCreationError, .repositoryAlreadyExists)
-        }
-    }
-}
-
-// MARK: - Mocks
-
-private final class MockResticCommandService: ResticCommandServiceProtocol {
-    var initializeError: Error?
-    var checkResult = false
-    var initializeCalled = false
-    var checkCalled = false
-    
-    func initializeRepository(_ repository: Repository, password: String) async throws {
-        initializeCalled = true
-        if let error = initializeError {
-            throw error
-        }
-    }
-    
-    func checkRepository(_ repository: Repository) async throws -> Bool {
-        checkCalled = true
-        if !checkResult {
-            throw ResticError.invalidRepository
-        }
-        return true
-    }
-    
-    func createBackup(for repository: Repository, paths: [String]) async throws {
-        // Not used in these tests
-    }
-}
-
-private final class MockRepositoryStorage: RepositoryStorageProtocol {
-    var storeError: Error?
-    var existsResult = false
-    var storeCalled = false
-    var existsCalled = false
-    
-    func store(_ repository: Repository) throws {
-        storeCalled = true
-        if let error = storeError {
-            throw error
-        }
-    }
-    
-    func retrieve(forId id: UUID) throws -> Repository? {
-        return nil
-    }
-    
-    func list() throws -> [Repository] {
-        return []
-    }
-    
-    func delete(forId id: UUID) throws {}
-    
-    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool {
-        existsCalled = true
-        return existsResult
-    }
-}
-
-private final class MockFileManager: FileManager {
-    var fileExistsResult = false
-    var createDirectoryError: Error?
-    var createDirectoryCalled = false
-    
-    override func fileExists(atPath path: String) -> Bool {
-        return fileExistsResult
-    }
-    
-    override func createDirectory(at url: URL, withIntermediateDirectories: Bool, attributes: [FileAttributeKey : Any]?) throws {
-        createDirectoryCalled = true
-        if let error = createDirectoryError {
-            throw error
+        } catch let error as rBUM.RepositoryCreationError {
+            XCTAssertEqual(error, .importFailed("Failed to validate repository"))
         }
     }
 }

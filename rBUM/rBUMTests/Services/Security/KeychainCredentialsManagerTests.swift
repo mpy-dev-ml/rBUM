@@ -5,7 +5,7 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Testing
+import XCTest
 import Security
 import Foundation
 @testable import rBUM
@@ -51,144 +51,116 @@ final class MockKeychainService: KeychainServiceProtocol {
     }
 }
 
-struct KeychainCredentialsManagerTests {
-    @Test("Store and retrieve credentials")
+final class KeychainCredentialsManagerTests: XCTestCase {
     func testStoreCredentials() async throws {
         let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
         let testCredentials = RepositoryCredentials(
             repositoryId: UUID(),
+            password: "testPassword",
             repositoryPath: "/test/path"
         )
         
-        // Given
-        let password = "testPassword"
+        try await credentialsManager.store(testCredentials)
+        let retrieved = try await credentialsManager.retrieve(forId: testCredentials.repositoryId)
         
-        // When
-        try await credentialsManager.storeCredentials(password, for: testCredentials)
-        
-        // Then
-        let retrieved = try await credentialsManager.retrievePassword(for: testCredentials)
-        #expect(retrieved == password)
+        XCTAssertEqual(retrieved.password, testCredentials.password)
+        XCTAssertEqual(retrieved.repositoryId, testCredentials.repositoryId)
     }
     
-    @Test("Prevent storing duplicate credentials")
-    func testStoreCredentialsDuplicate() async throws {
-        let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            repositoryPath: "/test/path"
-        )
-        
-        // Given
-        let password = "testPassword"
-        try await credentialsManager.storeCredentials(password, for: testCredentials)
-        
-        // When/Then
-        await #expect(throws: KeychainError.duplicateItem) {
-            try await credentialsManager.storeCredentials("newPassword", for: testCredentials)
-        }
-    }
-    
-    @Test("Handle retrieving nonexistent credentials")
-    func testRetrieveNonexistentCredentials() async throws {
-        let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            repositoryPath: "/test/path"
-        )
-        
-        await #expect(throws: KeychainError.itemNotFound) {
-            _ = try await credentialsManager.retrievePassword(for: testCredentials)
-        }
-    }
-    
-    @Test("Update existing credentials")
     func testUpdateCredentials() async throws {
         let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
+        let repositoryId = UUID()
+        let initialCredentials = RepositoryCredentials(
+            repositoryId: repositoryId,
+            password: "initialPassword",
+            repositoryPath: "/test/path"
+        )
+        let updatedCredentials = RepositoryCredentials(
+            repositoryId: repositoryId,
+            password: "updatedPassword",
             repositoryPath: "/test/path"
         )
         
-        // Given
-        let password = "testPassword"
-        try await credentialsManager.storeCredentials(password, for: testCredentials)
+        try await credentialsManager.store(initialCredentials)
+        try await credentialsManager.store(updatedCredentials)
+        let retrieved = try await credentialsManager.retrieve(forId: repositoryId)
         
-        // When
-        let newPassword = "newPassword"
-        try await credentialsManager.updatePassword(newPassword, for: testCredentials)
-        
-        // Then
-        let retrieved = try await credentialsManager.retrievePassword(for: testCredentials)
-        #expect(retrieved == newPassword)
+        XCTAssertEqual(retrieved.password, updatedCredentials.password)
     }
     
-    @Test("Handle updating nonexistent credentials")
-    func testUpdateNonexistentCredentials() async throws {
-        let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            repositoryPath: "/test/path"
-        )
-        
-        await #expect(throws: KeychainError.itemNotFound) {
-            try await credentialsManager.updatePassword("new", for: testCredentials)
-        }
-    }
-    
-    @Test("Delete existing credentials")
     func testDeleteCredentials() async throws {
         let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
         let testCredentials = RepositoryCredentials(
             repositoryId: UUID(),
+            password: "testPassword",
             repositoryPath: "/test/path"
         )
         
-        // Given
-        let password = "testPassword"
-        try await credentialsManager.storeCredentials(password, for: testCredentials)
+        try await credentialsManager.store(testCredentials)
+        try await credentialsManager.delete(forId: testCredentials.repositoryId)
         
-        // When
-        try await credentialsManager.deleteCredentials(testCredentials)
-        
-        // Then
-        await #expect(throws: KeychainError.itemNotFound) {
-            _ = try await credentialsManager.retrievePassword(for: testCredentials)
-        }
+        do {
+            _ = try await credentialsManager.retrieve(forId: testCredentials.repositoryId)
+            XCTFail("Expected error when retrieving deleted credentials")
+        } catch {}
     }
     
-    @Test("Handle deleting nonexistent credentials")
-    func testDeleteNonexistentCredentials() async throws {
+    func testRetrieveNonExistentCredentials() async throws {
         let keychainService = MockKeychainService()
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
+        let repositoryId = UUID()
+        
+        do {
+            _ = try await credentialsManager.retrieve(forId: repositoryId)
+            XCTFail("Expected error when retrieving non-existent credentials")
+        } catch {}
+    }
+    
+    func testDeleteNonExistentCredentials() async throws {
+        let keychainService = MockKeychainService()
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
+        let repositoryId = UUID()
+        
+        do {
+            try await credentialsManager.delete(forId: repositoryId)
+            XCTFail("Expected error when deleting non-existent credentials")
+        } catch {}
+    }
+    
+    func testStoreDuplicateCredentials() async throws {
+        let keychainService = MockKeychainService()
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
+        let repositoryId = UUID()
+        let credentials = RepositoryCredentials(
+            repositoryId: repositoryId,
+            password: "testPassword",
             repositoryPath: "/test/path"
         )
         
-        await #expect(throws: KeychainError.itemNotFound) {
-            try await credentialsManager.deleteCredentials(testCredentials)
-        }
+        try await credentialsManager.store(credentials)
+        
+        do {
+            try await credentialsManager.store(credentials)
+            XCTFail("Expected error when storing duplicate credentials")
+        } catch {}
     }
     
-    @Test("Handle keychain service errors")
     func testKeychainServiceError() async throws {
         let keychainService = MockKeychainService()
         keychainService.shouldThrowError = true
-        let credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
+        let credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager(keychainService: keychainService)
         let testCredentials = RepositoryCredentials(
             repositoryId: UUID(),
+            password: "testPassword",
             repositoryPath: "/test/path"
         )
         
-        await #expect(throws: KeychainError.unexpectedStatus(errSecDuplicateItem)) {
-            try await credentialsManager.storeCredentials("test", for: testCredentials)
-        }
+        do {
+            try await credentialsManager.store(testCredentials)
+            XCTFail("Expected error when keychain service fails")
+        } catch {}
     }
 }

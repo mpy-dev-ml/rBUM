@@ -9,27 +9,54 @@ import SwiftUI
 
 struct RepositoryDetailView: View {
     @StateObject private var viewModel: RepositoryDetailViewModel
+    @State private var showPasswordSheet = false
     private let resticService: ResticCommandServiceProtocol
+    private let credentialsManager: CredentialsManagerProtocol
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(
+        repository: Repository,
+        resticService: ResticCommandServiceProtocol = ResticCommandService(
+            credentialsManager: KeychainCredentialsManager(),
+            processExecutor: ProcessExecutor()
+        ),
+        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+    ) {
         _viewModel = StateObject(wrappedValue: RepositoryDetailViewModel(
             repository: repository,
-            resticService: resticService
+            resticService: resticService,
+            credentialsManager: credentialsManager
         ))
         self.resticService = resticService
+        self.credentialsManager = credentialsManager
     }
     
     var body: some View {
         TabView(selection: $viewModel.selectedTab) {
-            VStack {
-                Text("Repository Details")
-                    .font(.title)
+            // Overview tab
+            Form {
+                Section("Repository Status") {
+                    HStack {
+                        Label {
+                            Text(viewModel.isChecking ? "Checking..." : "Status")
+                        } icon: {
+                            if viewModel.isChecking {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "circle.fill")
+                                    .foregroundStyle(viewModel.statusColor)
+                            }
+                        }
+                    }
+                }
                 
-                Form {
-                    Section("General") {
-                        LabeledContent("Name", value: viewModel.repository.name)
-                        LabeledContent("Path", value: viewModel.repository.path.path())
-                        LabeledContent("Created", value: viewModel.repository.createdAt.formatted())
+                Section("General") {
+                    LabeledContent("Name", value: viewModel.repository.name)
+                    LabeledContent("Path", value: viewModel.repository.path.path())
+                    LabeledContent("Created", value: viewModel.repository.createdAt.formatted())
+                    
+                    if let lastCheck = viewModel.lastCheck {
+                        LabeledContent("Last Check", value: lastCheck.formatted())
                     }
                 }
             }
@@ -41,10 +68,10 @@ struct RepositoryDetailView: View {
             }
             .tag(RepositoryDetailViewModel.Tab.overview)
             
-            SnapshotListView(
-                repository: viewModel.repository,
-                resticService: resticService
-            )
+            // Snapshots tab
+            NavigationLink(destination: SnapshotListView(repository: viewModel.repository)) {
+                Label("Snapshots", systemImage: "clock.arrow.circlepath")
+            }
             .tabItem {
                 Label(
                     RepositoryDetailViewModel.Tab.snapshots.rawValue,
@@ -53,6 +80,7 @@ struct RepositoryDetailView: View {
             }
             .tag(RepositoryDetailViewModel.Tab.snapshots)
             
+            // Settings tab
             Text("Settings")
                 .tabItem {
                     Label(
@@ -64,10 +92,8 @@ struct RepositoryDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    BackupView(repository: viewModel.repository, resticService: resticService)
-                } label: {
-                    Label("Backup", systemImage: "arrow.up.doc")
+                NavigationLink(destination: BackupView(repository: viewModel.repository)) {
+                    Label("Backup", systemImage: "arrow.clockwise.circle")
                 }
             }
         }
@@ -81,77 +107,16 @@ struct RepositoryDetailView: View {
                 Text(error.localizedDescription)
             }
         }
-    }
-    
-    private var overviewTab: some View {
-        Form {
-            Section("Repository Status") {
-                HStack {
-                    Label {
-                        Text(viewModel.isChecking ? "Checking..." : "Status")
-                    } icon: {
-                        if viewModel.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "circle.fill")
-                                .foregroundStyle(viewModel.statusColor)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Button("Check Now") {
-                        Task {
-                            await viewModel.checkRepository()
-                        }
-                    }
-                    .disabled(viewModel.isChecking)
-                }
-                
-                LabeledContent("Last Check") {
-                    Text(viewModel.formattedLastCheck)
-                }
-            }
-            
-            Section("Repository Details") {
-                LabeledContent("Name") {
-                    Text(viewModel.repository.name)
-                }
-                
-                LabeledContent("Location") {
-                    Text(viewModel.repository.path.path())
-                        .textSelection(.enabled)
-                }
-                
-                LabeledContent("ID") {
-                    Text(viewModel.repository.id.uuidString)
-                        .textSelection(.enabled)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Section("Quick Actions") {
-                Button {
-                    // TODO: Implement backup
-                } label: {
-                    Label("Create Backup", systemImage: "arrow.clockwise")
-                }
-                
-                Button {
-                    viewModel.selectedTab = .snapshots
-                } label: {
-                    Label("View Snapshots", systemImage: "clock")
-                }
-                
-                Button {
-                    // TODO: Implement prune
-                } label: {
-                    Label("Prune Old Snapshots", systemImage: "trash")
-                }
-                .foregroundStyle(.red)
-            }
+        .task {
+            await viewModel.checkRepository()
         }
-        .formStyle(.grouped)
+    }
+}
+
+struct RepositoryDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        RepositoryDetailView(
+            repository: Repository(name: "Test", path: URL(fileURLWithPath: "/tmp/test"))
+        )
     }
 }

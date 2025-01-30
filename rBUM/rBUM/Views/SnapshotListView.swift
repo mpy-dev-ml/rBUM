@@ -12,10 +12,14 @@ struct SnapshotListView: View {
     @State private var showingDeleteAlert = false
     @State private var snapshotToDelete: Snapshot?
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: SnapshotListViewModel(
             repository: repository,
-            resticService: resticService
+            resticService: ResticCommandService(
+                credentialsManager: KeychainCredentialsManager(),
+                processExecutor: ProcessExecutor()
+            ),
+            credentialsManager: KeychainCredentialsManager()
         ))
     }
     
@@ -241,13 +245,6 @@ private struct PruneSheetView: View {
                 
                 Section("Keep Time-Based") {
                     HStack {
-                        Text("Hourly")
-                        TextField("", value: $viewModel.pruneOptions.keepHourly, format: .number)
-                            .multilineTextAlignment(.trailing)
-                        Text("snapshots")
-                    }
-                    
-                    HStack {
                         Text("Daily")
                         TextField("", value: $viewModel.pruneOptions.keepDaily, format: .number)
                             .multilineTextAlignment(.trailing)
@@ -279,12 +276,12 @@ private struct PruneSheetView: View {
                 Section("Keep Tags") {
                     ForEach(viewModel.uniqueTags, id: \.self) { tag in
                         Toggle(tag, isOn: Binding(
-                            get: { viewModel.pruneOptions.keepTags?.contains(tag) ?? false },
+                            get: { viewModel.pruneOptions.tags?.contains(tag) ?? false },
                             set: { isOn in
                                 if isOn {
-                                    viewModel.pruneOptions.keepTags = (viewModel.pruneOptions.keepTags ?? []) + [tag]
+                                    viewModel.pruneOptions.tags = (viewModel.pruneOptions.tags ?? []) + [tag]
                                 } else {
-                                    viewModel.pruneOptions.keepTags?.removeAll { $0 == tag }
+                                    viewModel.pruneOptions.tags?.removeAll { $0 == tag }
                                 }
                             }
                         ))
@@ -311,10 +308,17 @@ private struct PruneSheetView: View {
                             dismiss()
                         }
                     }
-                    .foregroundStyle(.red)
                 }
             }
         }
         .frame(width: 400)
+    }
+}
+
+struct SnapshotListView_Previews: PreviewProvider {
+    static var previews: some View {
+        SnapshotListView(
+            repository: Repository(name: "Test", path: URL(fileURLWithPath: "/tmp/test"))
+        )
     }
 }

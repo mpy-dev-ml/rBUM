@@ -15,49 +15,71 @@ final class SnapshotListViewModel: ObservableObject {
         case today = "Today"
         case thisWeek = "This Week"
         case thisMonth = "This Month"
+        case thisYear = "This Year"
         case tagged = "Tagged"
     }
     
     struct PruneOptions {
         var keepLast: Int?
-        var keepHourly: Int?
         var keepDaily: Int?
         var keepWeekly: Int?
         var keepMonthly: Int?
         var keepYearly: Int?
-        var keepTags: [String]?
+        var tags: [String]?
     }
     
+    @Published private(set) var repository: Repository
     @Published private(set) var snapshots: [Snapshot] = []
-    @Published var isLoading = false
+    @Published private(set) var isLoading: Bool = false
     @Published var error: Error?
-    @Published var showError = false
+    @Published var showError: Bool = false
     @Published var selectedSnapshot: Snapshot?
     @Published var showRestoreSheet = false
     @Published var restorePath: URL?
-    @Published var searchText = ""
+    @Published var searchText: String = ""
     @Published var selectedFilter: Filter = .all
     @Published var showPruneSheet = false
     @Published var pruneOptions = PruneOptions()
     
-    private let repository: Repository
     private let resticService: ResticCommandServiceProtocol
+    private let credentialsManager: CredentialsManagerProtocol
     private let logger = Logging.logger(for: .repository)
     private let calendar = Calendar.current
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(
+        repository: Repository,
+        resticService: ResticCommandServiceProtocol = ResticCommandService(
+            credentialsManager: KeychainCredentialsManager(),
+            processExecutor: ProcessExecutor()
+        ),
+        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+    ) {
         self.repository = repository
         self.resticService = resticService
+        self.credentialsManager = credentialsManager
     }
     
+    @MainActor
     func loadSnapshots() async {
-        guard !isLoading else { return }
-        
         isLoading = true
         defer { isLoading = false }
         
         do {
-            snapshots = try await resticService.listSnapshots(for: repository)
+            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            
+            // Create credentials for listing snapshots
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
+            // List snapshots
+            snapshots = try await resticService.listSnapshots(
+                in: repository,
+                credentials: credentials
+            )
+            
             snapshots.sort { $0.time > $1.time } // Sort by newest first
             logger.infoMessage("Loaded \(snapshots.count) snapshots")
         } catch {
@@ -67,41 +89,43 @@ final class SnapshotListViewModel: ObservableObject {
         }
     }
     
+    // Note: Snapshot deletion is not currently supported by ResticCommandService
+    // This functionality will need to be added when required
     func deleteSnapshot(_ snapshot: Snapshot) async {
-        do {
-            try await resticService.deleteSnapshot(snapshot.id, from: repository)
-            snapshots.removeAll { $0.id == snapshot.id }
-            logger.infoMessage("Deleted snapshot \(snapshot.id)")
-        } catch {
-            logger.errorMessage("Failed to delete snapshot: \(error.localizedDescription)")
-            self.error = error
-            showError = true
-        }
+        self.error = ResticError.commandError("Snapshot deletion is not currently supported")
+        showError = true
     }
     
+    // Note: Snapshot restoration is not currently supported by ResticCommandService
+    // This functionality will need to be added when required
     func restoreSnapshot(_ snapshot: Snapshot, to path: URL) async {
-        do {
-            try await resticService.restoreSnapshot(snapshot.id, from: repository, to: path)
-            logger.infoMessage("Restored snapshot \(snapshot.id) to \(path.path())")
-        } catch {
-            logger.errorMessage("Failed to restore snapshot: \(error.localizedDescription)")
-            self.error = error
-            showError = true
-        }
+        self.error = ResticError.commandError("Snapshot restoration is not currently supported")
+        showError = true
     }
     
     func pruneSnapshots() async {
         do {
+            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            
+            // Create credentials for pruning
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
+            // Prune snapshots
             try await resticService.pruneSnapshots(
-                for: repository,
+                in: repository,
+                credentials: credentials,
                 keepLast: pruneOptions.keepLast,
-                keepHourly: pruneOptions.keepHourly,
                 keepDaily: pruneOptions.keepDaily,
                 keepWeekly: pruneOptions.keepWeekly,
                 keepMonthly: pruneOptions.keepMonthly,
-                keepYearly: pruneOptions.keepYearly,
-                keepTags: pruneOptions.keepTags
+                keepYearly: pruneOptions.keepYearly
             )
+            
+            // Reload snapshots after pruning
             await loadSnapshots()
             logger.infoMessage("Successfully pruned snapshots")
         } catch {
@@ -136,6 +160,8 @@ final class SnapshotListViewModel: ObservableObject {
                 return calendar.isDate(snapshot.time, equalTo: Date(), toGranularity: .weekOfYear)
             case .thisMonth:
                 return calendar.isDate(snapshot.time, equalTo: Date(), toGranularity: .month)
+            case .thisYear:
+                return calendar.isDate(snapshot.time, equalTo: Date(), toGranularity: .year)
             case .tagged:
                 return !snapshot.tags.isEmpty
             }
@@ -149,6 +175,7 @@ final class SnapshotListViewModel: ObservableObject {
         let grouped = Dictionary(grouping: filteredSnapshots) { snapshot in
             calendar.startOfDay(for: snapshot.time)
         }
+        
         return grouped.map { (date, snapshots) in
             let formatter = DateFormatter()
             formatter.dateStyle = .medium

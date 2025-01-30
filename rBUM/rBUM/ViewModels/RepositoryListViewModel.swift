@@ -11,20 +11,47 @@ import SwiftUI
 @MainActor
 final class RepositoryListViewModel: ObservableObject {
     @Published private(set) var repositories: [Repository] = []
-    @Published var showCreationSheet = false
     @Published var error: Error?
     @Published var showError = false
     
     private let repositoryStorage: RepositoryStorageProtocol
+    let repositoryCreationService: RepositoryCreationServiceProtocol
+    private let resticService: ResticCommandServiceProtocol
     private let logger = Logging.logger(for: .repository)
     
-    init(repositoryStorage: RepositoryStorageProtocol) {
-        self.repositoryStorage = repositoryStorage
+    convenience init() {
+        let credentialsManager = KeychainCredentialsManager()
+        let processExecutor = ProcessExecutor()
+        let resticService = ResticCommandService(
+            credentialsManager: credentialsManager,
+            processExecutor: processExecutor
+        )
+        let repositoryStorage = RepositoryStorage()
+        let repositoryCreationService = RepositoryCreationService(
+            resticService: resticService,
+            repositoryStorage: repositoryStorage
+        )
+        
+        self.init(
+            resticService: resticService,
+            repositoryStorage: repositoryStorage,
+            repositoryCreationService: repositoryCreationService
+        )
     }
     
-    func loadRepositories() {
+    init(
+        resticService: ResticCommandServiceProtocol,
+        repositoryStorage: RepositoryStorageProtocol,
+        repositoryCreationService: RepositoryCreationServiceProtocol
+    ) {
+        self.resticService = resticService
+        self.repositoryStorage = repositoryStorage
+        self.repositoryCreationService = repositoryCreationService
+    }
+    
+    func loadRepositories() async {
         do {
-            repositories = try repositoryStorage.list()
+            repositories = try await repositoryStorage.list()
             logger.infoMessage("Loaded \(repositories.count) repositories")
         } catch {
             logger.errorMessage("Failed to load repositories: \(error.localizedDescription)")
@@ -33,22 +60,12 @@ final class RepositoryListViewModel: ObservableObject {
         }
     }
     
-    func showCreateRepository() {
-        showCreationSheet = true
-    }
-    
-    func handleNewRepository(_ repository: Repository) {
-        // Only add if not already in list
-        if !repositories.contains(where: { $0.id == repository.id }) {
-            repositories.append(repository)
-            repositories.sort { $0.name < $1.name }
-        }
-    }
-    
-    func deleteRepository(_ repository: Repository) {
+    func deleteRepository(_ repository: Repository) async {
         do {
-            try repositoryStorage.delete(forId: repository.id)
-            repositories.removeAll { $0.id == repository.id }
+            try await repositoryStorage.delete(forId: repository.id)
+            if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
+                repositories.remove(at: index)
+            }
             logger.infoMessage("Deleted repository: \(repository.id)")
         } catch {
             logger.errorMessage("Failed to delete repository: \(error.localizedDescription)")

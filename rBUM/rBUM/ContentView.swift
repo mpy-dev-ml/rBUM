@@ -8,33 +8,19 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedSidebarItem: SidebarItem? = .repositories
+    @StateObject private var viewModel: ContentViewModel
     
-    private let repositoryStorage: RepositoryStorageProtocol
-    private let repositoryCreationService: RepositoryCreationServiceProtocol
-    private let resticService: ResticCommandServiceProtocol
-    
-    init(
-        repositoryStorage: RepositoryStorageProtocol,
-        repositoryCreationService: RepositoryCreationServiceProtocol,
-        resticService: ResticCommandServiceProtocol
-    ) {
-        self.repositoryStorage = repositoryStorage
-        self.repositoryCreationService = repositoryCreationService
-        self.resticService = resticService
+    init(credentialsManager: CredentialsManagerProtocol) {
+        _viewModel = StateObject(wrappedValue: ContentViewModel(credentialsManager: credentialsManager))
     }
     
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $selectedSidebarItem)
+            SidebarView(selection: $viewModel.selectedSidebarItem)
         } detail: {
-            switch selectedSidebarItem {
+            switch viewModel.selectedSidebarItem {
             case .repositories:
-                RepositoryListView(
-                    repositoryStorage: repositoryStorage,
-                    creationService: repositoryCreationService,
-                    resticService: resticService
-                )
+                RepositoryListView()
             case .backups:
                 Text("Backup List")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,9 +66,10 @@ struct SidebarView: View {
 
 #Preview {
     ContentView(
-        repositoryStorage: PreviewRepositoryStorage(),
-        repositoryCreationService: PreviewRepositoryCreationService(),
-        resticService: PreviewResticCommandService()
+        credentialsManager: KeychainCredentialsManager(
+            keychainService: MockKeychainService(),
+            credentialsStorage: MockCredentialsStorage()
+        )
     )
 }
 
@@ -107,7 +94,53 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
-    func initializeRepository(_ repository: Repository, password: String) async throws {}
-    func checkRepository(_ repository: Repository) async throws -> Bool { true }
-    func createBackup(for repository: Repository, paths: [String]) async throws {}
+    func initializeRepository(at path: URL, password: String) async throws {}
+    
+    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
+    
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        credentials: RepositoryCredentials,
+        tags: [String]?
+    ) async throws {}
+    
+    func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot] {
+        []
+    }
+    
+    func pruneSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials,
+        keepLast: Int?,
+        keepDaily: Int?,
+        keepWeekly: Int?,
+        keepMonthly: Int?,
+        keepYearly: Int?
+    ) async throws {}
+}
+
+class ContentViewModel: ObservableObject {
+    @Published var selectedSidebarItem: SidebarItem? = .repositories
+    
+    let repositoryStorage: RepositoryStorageProtocol
+    let repositoryCreationService: RepositoryCreationServiceProtocol
+    let resticService: ResticCommandServiceProtocol
+    let credentialsManager: CredentialsManagerProtocol
+    
+    init(credentialsManager: CredentialsManagerProtocol) {
+        self.credentialsManager = credentialsManager
+        self.repositoryStorage = RepositoryStorage()
+        self.resticService = ResticCommandService(
+            credentialsManager: credentialsManager,
+            processExecutor: ProcessExecutor()
+        )
+        self.repositoryCreationService = RepositoryCreationService(
+            resticService: resticService,
+            repositoryStorage: repositoryStorage
+        )
+    }
 }

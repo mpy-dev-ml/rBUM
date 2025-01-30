@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// Errors that can occur during Restic operations
 enum ResticError: LocalizedError {
     case commandFailed(String)
     case invalidRepository
@@ -34,10 +35,6 @@ enum ResticError: LocalizedError {
             return "Command failed: \(message)"
         case .commandFailed(let message):
             return "Command failed: \(message)"
-        case .invalidRepository:
-            return "The specified path is not a valid Restic repository"
-        case .invalidPassword:
-            return "Invalid repository password"
         case .repositoryNotFound:
             return "Repository not found"
         case .backupFailed(let message):
@@ -52,51 +49,88 @@ enum ResticError: LocalizedError {
     }
 }
 
-/// Protocol defining the ResticCommandService interface
+/// Protocol for interacting with the Restic command-line tool
 protocol ResticCommandServiceProtocol {
-    func initializeRepository(_ repository: Repository, password: String) async throws
-    func checkRepository(_ repository: Repository) async throws -> Bool
-    func createBackup(for repository: Repository, paths: [String]) async throws
-    func listSnapshots(for repository: Repository) async throws -> [Snapshot]
-    func deleteSnapshot(_ snapshotId: String, from repository: Repository) async throws
-    func restoreSnapshot(_ snapshotId: String, from repository: Repository, to path: URL) async throws
+    /// Initialize a new repository at the given path
+    /// - Parameters:
+    ///   - path: Path where the repository should be created
+    ///   - password: Password to encrypt the repository
+    func initializeRepository(at path: URL, password: String) async throws
+    
+    /// Check if a repository is valid and accessible
+    /// - Parameters:
+    ///   - path: Path to the repository
+    ///   - credentials: Credentials for accessing the repository
+    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws
+    
+    /// Create a backup of specified paths
+    /// - Parameters:
+    ///   - paths: Paths to backup
+    ///   - repository: Repository to store the backup
+    ///   - credentials: Credentials for accessing the repository
+    ///   - tags: Optional tags to apply to the backup
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        credentials: RepositoryCredentials,
+        tags: [String]?
+    ) async throws
+    
+    /// List snapshots in a repository
+    /// - Parameters:
+    ///   - repository: Repository to list snapshots from
+    ///   - credentials: Credentials for accessing the repository
+    /// - Returns: Array of snapshots
+    func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot]
+    
+    /// Prune old snapshots from a repository
+    /// - Parameters:
+    ///   - repository: Repository to prune
+    ///   - credentials: Credentials for accessing the repository
+    ///   - keepLast: Number of most recent snapshots to keep
+    ///   - keepDaily: Number of daily snapshots to keep
+    ///   - keepWeekly: Number of weekly snapshots to keep
+    ///   - keepMonthly: Number of monthly snapshots to keep
+    ///   - keepYearly: Number of yearly snapshots to keep
     func pruneSnapshots(
-        for repository: Repository,
+        in repository: Repository,
+        credentials: RepositoryCredentials,
         keepLast: Int?,
-        keepHourly: Int?,
         keepDaily: Int?,
         keepWeekly: Int?,
         keepMonthly: Int?,
-        keepYearly: Int?,
-        keepTags: [String]?
+        keepYearly: Int?
     ) async throws
 }
 
-/// Service for executing Restic commands
+/// Service for interacting with the Restic command-line tool
 final class ResticCommandService: ResticCommandServiceProtocol {
     private let fileManager = FileManager.default
     private let resticPath: String
     private let credentialsManager: CredentialsManagerProtocol
     private let processExecutor: ProcessExecutorProtocol
     private let logger = Logging.logger(for: .repository)
-    private let decoder = JSONDecoder()
     
-    init(credentialsManager: CredentialsManagerProtocol, processExecutor: ProcessExecutorProtocol) {
-        // TODO: Make this configurable in settings
-        self.resticPath = "restic"
+    init(
+        resticPath: String = "/opt/homebrew/bin/restic",
+        credentialsManager: CredentialsManagerProtocol,
+        processExecutor: ProcessExecutorProtocol
+    ) {
+        self.resticPath = resticPath
         self.credentialsManager = credentialsManager
         self.processExecutor = processExecutor
     }
     
     @discardableResult
-    private func executeCommand(_ arguments: [String], password: String? = nil, repository: Repository? = nil) async throws -> String {
+    private func executeCommand(_ arguments: [String], credentials: RepositoryCredentials) async throws -> String {
         var environment: [String: String] = [:]
-        if let password = password {
-            environment["RESTIC_PASSWORD"] = password
-        }
-        if let repository = repository {
-            environment["RESTIC_REPOSITORY"] = repository.path.path
-        }
+        
+        // Set password and repository path from credentials
+        environment["RESTIC_PASSWORD"] = credentials.password
+        environment["RESTIC_REPOSITORY"] = credentials.repositoryPath
         
         let result = try await processExecutor.execute(command: resticPath, arguments: arguments, environment: environment)
         
@@ -107,96 +141,81 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         return result.output
     }
     
-    func initializeRepository(_ repository: Repository, password: String) async throws {
+    func initializeRepository(at path: URL, password: String) async throws {
         let arguments = ["init"]
-        try await executeCommand(arguments, password: password, repository: repository)
-        try await credentialsManager.storeCredentials(password, for: repository.credentials)
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),
+            password: password,
+            repositoryPath: path.path
+        )
+        try await executeCommand(arguments, credentials: credentials)
     }
     
-    func checkRepository(_ repository: Repository) async throws -> Bool {
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
-        
+    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {
         let arguments = ["check"]
-        do {
-            _ = try await executeCommand(arguments, password: password, repository: repository)
-            return true
-        } catch ResticError.commandFailed {
-            return false
-        }
+        try await executeCommand(arguments, credentials: credentials)
     }
     
-    func createBackup(for repository: Repository, paths: [String]) async throws {
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        credentials: RepositoryCredentials,
+        tags: [String]?
+    ) async throws {
         guard !paths.isEmpty else {
             throw ResticError.invalidArgument("No paths specified for backup")
         }
         
         // Validate all paths exist
         for path in paths {
-            guard fileManager.fileExists(atPath: path) else {
-                throw ResticError.invalidArgument("Path does not exist: \(path)")
+            guard fileManager.fileExists(atPath: path.path) else {
+                throw ResticError.invalidArgument("Path does not exist: \(path.path)")
             }
         }
         
         var arguments = ["backup"]
-        arguments.append(contentsOf: paths)
+        arguments.append(contentsOf: paths.map { $0.path })
         
         // Add standard flags
         arguments.append("--json")  // Get JSON output for progress
         arguments.append("--verbose")  // Get detailed output
         
-        // Get repository password
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
+        // Add tags if specified
+        if let tags = tags {
+            for tag in tags {
+                arguments.append("--tag")
+                arguments.append(tag)
+            }
+        }
         
-        // Execute backup command
-        try await executeCommand(arguments, password: password, repository: repository)
+        try await executeCommand(arguments, credentials: credentials)
     }
     
-    func listSnapshots(for repository: Repository) async throws -> [Snapshot] {
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
-        
+    func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot] {
         let arguments = ["snapshots", "--json"]
         
-        let output = try await executeCommand(arguments, password: password, repository: repository)
+        let output = try await executeCommand(arguments, credentials: credentials)
         
-        return try decoder.decode([Snapshot].self, from: Data(output.utf8))
-    }
-    
-    func deleteSnapshot(_ snapshotId: String, from repository: Repository) async throws {
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
-        
-        let arguments = ["forget", "--prune", snapshotId]
-        
-        try await executeCommand(arguments, password: password, repository: repository)
-    }
-    
-    func restoreSnapshot(_ snapshotId: String, from repository: Repository, to path: URL) async throws {
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
-        
-        let arguments = ["restore", snapshotId, "--target", path.path]
-        
-        try await executeCommand(arguments, password: password, repository: repository)
+        return try JSONDecoder().decode([Snapshot].self, from: Data(output.utf8))
     }
     
     func pruneSnapshots(
-        for repository: Repository,
+        in repository: Repository,
+        credentials: RepositoryCredentials,
         keepLast: Int?,
-        keepHourly: Int?,
         keepDaily: Int?,
         keepWeekly: Int?,
         keepMonthly: Int?,
-        keepYearly: Int?,
-        keepTags: [String]?
+        keepYearly: Int?
     ) async throws {
         var arguments = ["forget", "--prune"]
         
         if let keepLast = keepLast {
             arguments.append("--keep-last")
             arguments.append("\(keepLast)")
-        }
-        
-        if let keepHourly = keepHourly {
-            arguments.append("--keep-hourly")
-            arguments.append("\(keepHourly)")
         }
         
         if let keepDaily = keepDaily {
@@ -219,12 +238,6 @@ final class ResticCommandService: ResticCommandServiceProtocol {
             arguments.append("\(keepYearly)")
         }
         
-        if let keepTags = keepTags, !keepTags.isEmpty {
-            arguments.append("--keep-tag")
-            arguments.append(contentsOf: keepTags)
-        }
-        
-        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
-        try await executeCommand(arguments, password: password, repository: repository)
+        try await executeCommand(arguments, credentials: credentials)
     }
 }

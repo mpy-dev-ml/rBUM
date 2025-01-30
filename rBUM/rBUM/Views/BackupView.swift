@@ -11,10 +11,14 @@ struct BackupView: View {
     @StateObject private var viewModel: BackupViewModel
     @Environment(\.dismiss) private var dismiss
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: BackupViewModel(
             repository: repository,
-            resticService: resticService
+            resticService: ResticCommandService(
+                credentialsManager: KeychainCredentialsManager(),
+                processExecutor: ProcessExecutor()
+            ),
+            credentialsManager: KeychainCredentialsManager()
         ))
     }
     
@@ -101,4 +105,42 @@ struct BackupView: View {
             }
         }
     }
+}
+
+// MARK: - Preview Helpers
+
+private final class PreviewResticCommandService: ResticCommandServiceProtocol {
+    func initializeRepository(at path: URL, password: String) async throws {}
+    
+    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
+    
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        credentials: RepositoryCredentials,
+        tags: [String]?
+    ) async throws {}
+    
+    func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot] {
+        []
+    }
+    
+    func pruneSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials,
+        keepLast: Int?,
+        keepDaily: Int?,
+        keepWeekly: Int?,
+        keepMonthly: Int?,
+        keepYearly: Int?
+    ) async throws {}
+}
+
+#Preview {
+    BackupView(
+        repository: Repository(name: "Test", path: URL(fileURLWithPath: "/tmp/test"))
+    )
 }

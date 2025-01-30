@@ -7,142 +7,154 @@
 
 import Foundation
 
-/// Protocol for storing repository credentials metadata
+/// Protocol defining the interface for storing repository credentials metadata
 protocol CredentialsStorageProtocol {
-    /// Store credentials metadata
+    /// Store new credentials metadata
     /// - Parameter credentials: The credentials to store
+    /// - Throws: Error if storage fails
     func store(_ credentials: RepositoryCredentials) throws
     
+    /// Update existing credentials metadata
+    /// - Parameter credentials: The updated credentials
+    /// - Throws: Error if update fails
+    func update(_ credentials: RepositoryCredentials) throws
+    
     /// Retrieve credentials metadata for a repository
-    /// - Parameter repositoryId: The repository ID
-    /// - Returns: The stored credentials metadata
-    func retrieve(forRepositoryId repositoryId: UUID) throws -> RepositoryCredentials?
+    /// - Parameter id: The repository ID
+    /// - Returns: The credentials metadata if found
+    /// - Throws: Error if retrieval fails
+    func retrieve(forRepositoryId id: UUID) throws -> RepositoryCredentials?
     
-    /// List all stored credentials metadata
-    /// - Returns: Array of stored credentials metadata
+    /// Delete credentials metadata for a repository
+    /// - Parameter id: The repository ID
+    /// - Throws: Error if deletion fails
+    func delete(forRepositoryId id: UUID) throws
+    
+    /// List all stored credentials
+    /// - Returns: Array of all stored credentials
+    /// - Throws: Error if listing fails
     func list() throws -> [RepositoryCredentials]
-    
-    /// Delete credentials metadata
-    /// - Parameter repositoryId: The repository ID
-    func delete(forRepositoryId repositoryId: UUID) throws
 }
 
 /// Error types for credentials storage operations
 enum CredentialsStorageError: LocalizedError {
     case fileOperationFailed(String)
-    case invalidData
     case credentialsNotFound
+    case invalidData
     
     var errorDescription: String? {
         switch self {
         case .fileOperationFailed(let operation):
-            return "Failed to \(operation) credentials file"
-        case .invalidData:
-            return "Invalid credentials data format"
+            return "Failed to \(operation) credentials"
         case .credentialsNotFound:
             return "Credentials not found"
+        case .invalidData:
+            return "Invalid credentials data"
         }
     }
 }
 
-/// Manages the storage of repository credentials metadata using FileManager
+/// File-based implementation of CredentialsStorageProtocol
 final class CredentialsStorage: CredentialsStorageProtocol {
     private let fileManager: FileManager
-    private let logger = Logging.logger(for: .keychain)
-    private let customStorageURL: URL?
+    private let logger = Logging.logger(for: .storage)
     
-    /// URL where credentials metadata is stored
-    private var storageURL: URL {
-        if let customURL = customStorageURL {
-            return customURL
-        }
-        
-        let appSupport = try! fileManager.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        return appSupport
-            .appendingPathComponent("dev.mpy.rBUM", isDirectory: true)
-            .appendingPathComponent("credentials.json")
+    /// Directory where credentials metadata is stored
+    private var credentialsDirectory: URL {
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("dev.mpy.rBUM/credentials", isDirectory: true)
     }
     
-    init(fileManager: FileManager = .default, storageURL: URL? = nil) {
+    init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        self.customStorageURL = storageURL
-        try? createStorageDirectoryIfNeeded()
-    }
-    
-    private func createStorageDirectoryIfNeeded() throws {
-        let directory = storageURL.deletingLastPathComponent()
-        if !fileManager.fileExists(atPath: directory.path) {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
-        }
+        try? createCredentialsDirectory()
     }
     
     func store(_ credentials: RepositoryCredentials) throws {
-        var existingCredentials = try list()
-        
-        // Update or append
-        if let index = existingCredentials.firstIndex(where: { $0.repositoryId == credentials.repositoryId }) {
-            existingCredentials[index] = credentials
-        } else {
-            existingCredentials.append(credentials)
-        }
-        
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        
-        do {
-            let data = try encoder.encode(existingCredentials)
-            try data.write(to: storageURL, options: .atomic)
-            logger.infoMessage("Stored credentials for repository: \(credentials.repositoryId)")
-        } catch {
-            logger.errorMessage("Failed to store credentials: \(error.localizedDescription)")
-            throw CredentialsStorageError.fileOperationFailed("write")
-        }
+        let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
+        let data = try JSONEncoder().encode(credentials)
+        try data.write(to: url)
+        logger.infoMessage("Stored credentials metadata for repository: \(credentials.repositoryId)")
     }
     
-    func retrieve(forRepositoryId repositoryId: UUID) throws -> RepositoryCredentials? {
-        let credentials = try list()
-        return credentials.first { $0.repositoryId == repositoryId }
+    func update(_ credentials: RepositoryCredentials) throws {
+        let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
+        guard fileManager.fileExists(atPath: url.path) else {
+            throw CredentialsStorageError.credentialsNotFound
+        }
+        let data = try JSONEncoder().encode(credentials)
+        try data.write(to: url)
+        logger.infoMessage("Updated credentials metadata for repository: \(credentials.repositoryId)")
+    }
+    
+    func retrieve(forRepositoryId id: UUID) throws -> RepositoryCredentials? {
+        let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
+        guard fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(RepositoryCredentials.self, from: data)
+    }
+    
+    func delete(forRepositoryId id: UUID) throws {
+        let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
+        guard fileManager.fileExists(atPath: url.path) else {
+            throw CredentialsStorageError.credentialsNotFound
+        }
+        try fileManager.removeItem(at: url)
+        logger.infoMessage("Deleted credentials metadata for repository: \(id)")
     }
     
     func list() throws -> [RepositoryCredentials] {
-        guard fileManager.fileExists(atPath: storageURL.path) else {
-            return []
+        let contents = try fileManager.contentsOfDirectory(at: credentialsDirectory, includingPropertiesForKeys: nil)
+        var credentials: [RepositoryCredentials] = []
+        for url in contents {
+            guard url.pathExtension == "json" else { continue }
+            let data = try Data(contentsOf: url)
+            let credential = try JSONDecoder().decode(RepositoryCredentials.self, from: data)
+            credentials.append(credential)
         }
-        
-        do {
-            let data = try Data(contentsOf: storageURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode([RepositoryCredentials].self, from: data)
-        } catch {
-            logger.errorMessage("Failed to read credentials: \(error.localizedDescription)")
-            throw CredentialsStorageError.fileOperationFailed("read")
-        }
+        return credentials
     }
     
-    func delete(forRepositoryId repositoryId: UUID) throws {
-        var credentials = try list()
-        credentials.removeAll { $0.repositoryId == repositoryId }
-        
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        
-        do {
-            let data = try encoder.encode(credentials)
-            try data.write(to: storageURL, options: .atomic)
-            logger.infoMessage("Deleted credentials for repository: \(repositoryId)")
-        } catch {
-            logger.errorMessage("Failed to delete credentials: \(error.localizedDescription)")
-            throw CredentialsStorageError.fileOperationFailed("delete")
+    // MARK: - Private Methods
+    
+    private func createCredentialsDirectory() throws {
+        var isDirectory: ObjCBool = false
+        if !fileManager.fileExists(atPath: credentialsDirectory.path, isDirectory: &isDirectory) {
+            try fileManager.createDirectory(at: credentialsDirectory, withIntermediateDirectories: true)
+            logger.infoMessage("Created credentials directory at: \(credentialsDirectory.path)")
         }
+    }
+}
+
+/// Mock implementation of CredentialsStorage for previews and testing
+final class MockCredentialsStorage: CredentialsStorageProtocol {
+    private var credentials: [UUID: RepositoryCredentials] = [:]
+    
+    func store(_ credentials: RepositoryCredentials) throws {
+        self.credentials[credentials.repositoryId] = credentials
+    }
+    
+    func update(_ credentials: RepositoryCredentials) throws {
+        guard self.credentials[credentials.repositoryId] != nil else {
+            throw CredentialsError.notFound
+        }
+        self.credentials[credentials.repositoryId] = credentials
+    }
+    
+    func retrieve(forRepositoryId id: UUID) throws -> RepositoryCredentials? {
+        credentials[id]
+    }
+    
+    func delete(forRepositoryId id: UUID) throws {
+        guard credentials[id] != nil else {
+            throw CredentialsError.notFound
+        }
+        credentials.removeValue(forKey: id)
+    }
+    
+    func list() throws -> [RepositoryCredentials] {
+        Array(credentials.values)
     }
 }

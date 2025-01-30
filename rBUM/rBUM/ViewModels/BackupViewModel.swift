@@ -24,11 +24,17 @@ final class BackupViewModel: ObservableObject {
     
     private let repository: Repository
     private let resticService: ResticCommandServiceProtocol
+    private let credentialsManager: CredentialsManagerProtocol
     private let logger = Logging.logger(for: .backup)
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(
+        repository: Repository,
+        resticService: ResticCommandServiceProtocol,
+        credentialsManager: CredentialsManagerProtocol
+    ) {
         self.repository = repository
         self.resticService = resticService
+        self.credentialsManager = credentialsManager
     }
     
     func selectPaths() {
@@ -54,7 +60,23 @@ final class BackupViewModel: ObservableObject {
         
         do {
             state = .backing(progress: 0)
-            try await resticService.createBackup(for: repository, paths: selectedPaths.map(\.path))
+            
+            // Create credentials for backup
+            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
+            // Start backup
+            try await resticService.createBackup(
+                paths: selectedPaths,
+                to: repository,
+                credentials: credentials,
+                tags: nil
+            )
+            
             state = .completed
             logger.infoMessage("Backup completed successfully")
             

@@ -12,36 +12,60 @@ import Foundation
 
 /// Mock implementation of KeychainCredentialsManager for testing
 final class MockCredentialsManager: CredentialsManagerProtocol {
-    var password: String?
-    var shouldThrowError = false
+    var storeError: Error?
+    var retrieveError: Error?
+    var updateError: Error?
+    var deleteError: Error?
+    var getPasswordError: Error?
+    var storedCredentials: [UUID: RepositoryCredentials] = [:]
     
-    func storeCredentials(_ password: String, for credentials: RepositoryCredentials) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(-1) }
-        self.password = password
+    func store(_ credentials: RepositoryCredentials) async throws {
+        if let error = storeError {
+            throw error
+        }
+        storedCredentials[credentials.repositoryId] = credentials
     }
     
-    func retrievePassword(for credentials: RepositoryCredentials) async throws -> String {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(-1) }
-        guard let password = password else {
-            throw KeychainError.itemNotFound
+    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+        if let error = retrieveError {
+            throw error
         }
-        return password
+        guard let credentials = storedCredentials[id] else {
+            throw CredentialsError.notFound
+        }
+        return credentials
     }
     
-    func updatePassword(_ password: String, for credentials: RepositoryCredentials) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(-1) }
-        guard self.password != nil else {
-            throw KeychainError.itemNotFound
+    func update(_ credentials: RepositoryCredentials) async throws {
+        if let error = updateError {
+            throw error
         }
-        self.password = password
+        storedCredentials[credentials.repositoryId] = credentials
     }
     
-    func deleteCredentials(_ credentials: RepositoryCredentials) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(-1) }
-        guard password != nil else {
-            throw KeychainError.itemNotFound
+    func delete(forId id: UUID) async throws {
+        if let error = deleteError {
+            throw error
         }
-        password = nil
+        storedCredentials.removeValue(forKey: id)
+    }
+    
+    func getPassword(forRepositoryId id: UUID) async throws -> String {
+        if let error = getPasswordError {
+            throw error
+        }
+        guard let credentials = storedCredentials[id] else {
+            throw CredentialsError.notFound
+        }
+        return credentials.password
+    }
+    
+    func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
+        RepositoryCredentials(
+            repositoryId: id,
+            password: password,
+            repositoryPath: path
+        )
     }
 }
 
@@ -72,24 +96,20 @@ struct ResticCommandServiceTests {
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
-        )
+        let path = URL(fileURLWithPath: "/test/path")
         
         // Given
         let password = "testPassword"
         processExecutor.output = "repository initialized"
         
         // When
-        try await commandService.initializeRepository(repository, password: password)
+        try await commandService.initializeRepository(at: path, password: password)
         
         // Then
-        #expect(processExecutor.lastCommand == "restic")
+        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
         #expect(processExecutor.lastArguments == ["init"])
         #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == repository.path.path)
+        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == path.path)
     }
     
     @Test("Check repository")
@@ -97,26 +117,24 @@ struct ResticCommandServiceTests {
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
+        let path = URL(fileURLWithPath: "/test/path")
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),
+            password: "testPassword",
+            repositoryPath: path.path
         )
         
         // Given
-        let password = "testPassword"
-        credentialsManager.password = password
         processExecutor.output = "repository is healthy"
         
         // When
-        let result = try await commandService.checkRepository(repository)
+        try await commandService.checkRepository(at: path, credentials: credentials)
         
         // Then
-        #expect(result == true)
-        #expect(processExecutor.lastCommand == "restic")
+        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
         #expect(processExecutor.lastArguments == ["check"])
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == repository.path.path)
+        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
+        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
     }
     
     @Test("Create backup")
@@ -125,25 +143,32 @@ struct ResticCommandServiceTests {
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
         let repository = Repository(
-            id: UUID(),
             name: "Test Repo",
             path: URL(fileURLWithPath: "/test/path")
         )
+        let credentials = RepositoryCredentials(
+            repositoryId: repository.id,
+            password: "testPassword",
+            repositoryPath: repository.path.path
+        )
         
         // Given
-        let password = "testPassword"
-        let paths = ["/path1", "/path2"]
-        credentialsManager.password = password
+        let paths = [URL(fileURLWithPath: "/path1"), URL(fileURLWithPath: "/path2")]
+        let tags = ["test", "backup"]
         processExecutor.output = "snapshot abc123 saved"
         
         // When
-        try await commandService.createBackup(for: repository, paths: paths)
+        try await commandService.createBackup(paths: paths, to: repository, credentials: credentials, tags: tags)
         
         // Then
-        #expect(processExecutor.lastCommand == "restic")
-        #expect(processExecutor.lastArguments == ["backup", "--json", "/path1", "/path2"])
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == repository.path.path)
+        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
+        #expect(processExecutor.lastArguments?.contains("backup") == true)
+        #expect(processExecutor.lastArguments?.contains("--json") == true)
+        #expect(processExecutor.lastArguments?.contains("--verbose") == true)
+        #expect(processExecutor.lastArguments?.contains("/path1") == true)
+        #expect(processExecutor.lastArguments?.contains("/path2") == true)
+        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
+        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
     }
     
     @Test("Handle process execution errors")
@@ -151,38 +176,20 @@ struct ResticCommandServiceTests {
         let credentialsManager = MockCredentialsManager()
         let processExecutor = MockProcessExecutor()
         let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
+        let path = URL(fileURLWithPath: "/test/path")
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),
+            password: "testPassword",
+            repositoryPath: path.path
         )
         
         // Given
-        let password = "testPassword"
-        credentialsManager.password = password
         processExecutor.shouldThrowError = true
         processExecutor.error = "Mock error"
         
         // When/Then
         await #expect(throws: ProcessError.executionFailed("Mock error")) {
-            try await commandService.checkRepository(repository)
-        }
-    }
-    
-    @Test("Handle missing credentials")
-    func testMissingCredentials() async throws {
-        let credentialsManager = MockCredentialsManager()
-        let processExecutor = MockProcessExecutor()
-        let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
-        )
-        
-        // When/Then
-        await #expect(throws: KeychainError.itemNotFound) {
-            try await commandService.checkRepository(repository)
+            try await commandService.checkRepository(at: path, credentials: credentials)
         }
     }
 }

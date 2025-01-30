@@ -28,18 +28,27 @@ final class RepositoryDetailViewModel: ObservableObject {
     }
     
     @Published var selectedTab: Tab = .overview
-    @Published var repository: Repository
-    @Published var lastCheck: Date?
+    @Published private(set) var repository: Repository
+    @Published private(set) var lastCheck: Date?
+    @Published private(set) var isChecking: Bool = false
     @Published var error: Error?
-    @Published var showError = false
-    @Published var isChecking = false
+    @Published var showError: Bool = false
     
     private let resticService: ResticCommandServiceProtocol
+    private let credentialsManager: CredentialsManagerProtocol
     private let logger = Logging.logger(for: .repository)
     
-    init(repository: Repository, resticService: ResticCommandServiceProtocol) {
+    init(
+        repository: Repository,
+        resticService: ResticCommandServiceProtocol = ResticCommandService(
+            credentialsManager: KeychainCredentialsManager(),
+            processExecutor: ProcessExecutor()
+        ),
+        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+    ) {
         self.repository = repository
         self.resticService = resticService
+        self.credentialsManager = credentialsManager
     }
     
     func checkRepository() async {
@@ -49,18 +58,41 @@ final class RepositoryDetailViewModel: ObservableObject {
         defer { isChecking = false }
         
         do {
-            let isValid = try await resticService.checkRepository(repository)
-            if isValid {
-                lastCheck = Date()
-                logger.infoMessage("Repository check successful: \(repository.id)")
-            } else {
-                throw RepositoryCreationError.invalidRepository
-            }
+            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            
+            // Create credentials for checking
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
+            // Check repository
+            try await resticService.checkRepository(at: repository.path, credentials: credentials)
+            
+            // Update last check time
+            lastCheck = Date()
+            logger.infoMessage("Repository check successful: \(repository.id)")
         } catch {
             logger.errorMessage("Repository check failed: \(error.localizedDescription)")
-            self.error = error
+            self.error = error is ResticError ? error : ResticError.commandFailed(error.localizedDescription)
             showError = true
         }
+    }
+    
+    func updatePassword(_ newPassword: String) async throws {
+        guard !newPassword.isEmpty else {
+            throw ResticError.invalidPassword
+        }
+        
+        let credentials = RepositoryCredentials(
+            repositoryId: repository.id,
+            password: newPassword,
+            repositoryPath: repository.path.path
+        )
+        
+        try await credentialsManager.store(credentials)
+        logger.infoMessage("Updated password for repository: \(repository.id)")
     }
     
     var formattedLastCheck: String {

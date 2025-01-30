@@ -12,31 +12,33 @@ private let logger = Logging.logger(for: .app)
 
 @main
 struct rBUMApp: App {
+    private let processExecutor = ProcessExecutor()
+    private let credentialsManager: CredentialsManagerProtocol
     private let repositoryStorage: RepositoryStorageProtocol
-    private let repositoryCreationService: RepositoryCreationServiceProtocol
     private let resticService: ResticCommandServiceProtocol
+    private let repositoryCreationService: RepositoryCreationServiceProtocol
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     
     init() {
+        // Initialize services
+        let keychainService = KeychainService()
+        self.credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
         let storage = RepositoryStorage()
-        let resticService = ResticCommandService(credentialsManager: <#any CredentialsManagerProtocol#>, processExecutor: <#any ProcessExecutorProtocol#>)
-        
         self.repositoryStorage = storage
+        self.resticService = ResticCommandService(
+            credentialsManager: credentialsManager,
+            processExecutor: processExecutor
+        )
         self.repositoryCreationService = RepositoryCreationService(
             resticService: resticService,
             repositoryStorage: storage
         )
-        self.resticService = resticService
     }
     
     var body: some Scene {
         WindowGroup {
-            ContentView(
-                repositoryStorage: repositoryStorage,
-                repositoryCreationService: repositoryCreationService,
-                resticService: resticService
-            )
-                .onAppear {
+            ContentView(credentialsManager: credentialsManager)
+            .onAppear {
                 logger.infoMessage("ContentView appeared")
             }
         }

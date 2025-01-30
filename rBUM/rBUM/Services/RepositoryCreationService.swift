@@ -7,53 +7,69 @@
 
 import Foundation
 
-/// Protocol for repository creation and import operations
+/// Errors that can occur during repository creation
+enum RepositoryCreationError: LocalizedError, Equatable {
+    case invalidPath(String)
+    case pathAlreadyExists
+    case creationFailed(String)
+    case importFailed(String)
+    case repositoryAlreadyExists
+    case invalidRepository
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidPath(let reason):
+            return "Invalid repository path: \(reason)"
+        case .pathAlreadyExists:
+            return "A file or directory already exists at this path"
+        case .creationFailed(let reason):
+            return "Failed to create repository: \(reason)"
+        case .importFailed(let reason):
+            return "Failed to import repository: \(reason)"
+        case .repositoryAlreadyExists:
+            return "A repository already exists at this location"
+        case .invalidRepository:
+            return "The specified path is not a valid Restic repository"
+        }
+    }
+    
+    static func == (lhs: RepositoryCreationError, rhs: RepositoryCreationError) -> Bool {
+        switch (lhs, rhs) {
+        case (.invalidPath(let l), .invalidPath(let r)):
+            return l == r
+        case (.pathAlreadyExists, .pathAlreadyExists):
+            return true
+        case (.creationFailed(let l), .creationFailed(let r)):
+            return l == r
+        case (.importFailed(let l), .importFailed(let r)):
+            return l == r
+        case (.repositoryAlreadyExists, .repositoryAlreadyExists):
+            return true
+        case (.invalidRepository, .invalidRepository):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+/// Protocol for creating and importing repositories
 protocol RepositoryCreationServiceProtocol {
     /// Create a new repository at the specified path
     /// - Parameters:
     ///   - name: Name of the repository
     ///   - path: Path where the repository should be created
-    ///   - password: Password for the repository
+    ///   - password: Password to encrypt the repository
     /// - Returns: The created repository
     func createRepository(name: String, path: URL, password: String) async throws -> Repository
     
-    /// Import an existing repository
+    /// Import an existing repository from the specified path
     /// - Parameters:
     ///   - name: Name for the repository
     ///   - path: Path to the existing repository
-    ///   - password: Password for the repository
+    ///   - password: Password to access the repository
     /// - Returns: The imported repository
     func importRepository(name: String, path: URL, password: String) async throws -> Repository
-}
-
-/// Errors that can occur during repository creation
-enum RepositoryCreationError: LocalizedError, Equatable {
-    case invalidPath(String)
-    case pathAlreadyExists
-    case repositoryAlreadyExists
-    case creationFailed(String)
-    case importFailed(String)
-    case invalidRepository
-    case invalidPassword
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidPath(let path):
-            return "Invalid repository path: \(path)"
-        case .pathAlreadyExists:
-            return "A repository already exists at this path"
-        case .repositoryAlreadyExists:
-            return "This repository has already been imported"
-        case .creationFailed(let reason):
-            return "Failed to create repository: \(reason)"
-        case .importFailed(let reason):
-            return "Failed to import repository: \(reason)"
-        case .invalidRepository:
-            return "The specified path is not a valid Restic repository"
-        case .invalidPassword:
-            return "Invalid repository password"
-        }
-    }
 }
 
 /// Service for creating and importing repositories
@@ -81,18 +97,23 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         
         // Check if path exists
         if fileManager.fileExists(atPath: path.path) {
-            throw RepositoryCreationError.pathAlreadyExists
-        }
-        
-        // Create directory if needed
-        do {
-            try fileManager.createDirectory(
-                at: path,
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
-        } catch {
-            throw RepositoryCreationError.creationFailed("Failed to create directory: \(error.localizedDescription)")
+            // Check if repository already exists
+            if try repositoryStorage.exists(atPath: path, excludingId: nil) {
+                throw RepositoryCreationError.repositoryAlreadyExists
+            } else {
+                throw RepositoryCreationError.pathAlreadyExists
+            }
+        } else {
+            // Create directory
+            do {
+                try fileManager.createDirectory(
+                    at: path,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                throw RepositoryCreationError.creationFailed("Failed to create directory: \(error.localizedDescription)")
+            }
         }
         
         // Create repository
@@ -103,7 +124,7 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         
         do {
             // Initialize repository with restic
-            try await resticService.initializeRepository(repository, password: password)
+            try await resticService.initializeRepository(at: path, password: password)
             
             // Store repository metadata
             try repositoryStorage.store(repository)
@@ -144,16 +165,21 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         )
         
         do {
+            // Create credentials for checking
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
             // Verify repository with restic
-            if try await resticService.checkRepository(repository) {
-                // Store repository metadata
-                try repositoryStorage.store(repository)
-                
-                logger.infoMessage("Imported repository: \(repository.id) from \(path.path)")
-                return repository
-            } else {
-                throw RepositoryCreationError.invalidRepository
-            }
+            try await resticService.checkRepository(at: path, credentials: credentials)
+            
+            // Store repository metadata
+            try repositoryStorage.store(repository)
+            
+            logger.infoMessage("Imported repository: \(repository.id) from \(path.path)")
+            return repository
         } catch ResticError.invalidRepository {
             throw RepositoryCreationError.invalidRepository
         } catch ResticError.commandFailed(let error) {

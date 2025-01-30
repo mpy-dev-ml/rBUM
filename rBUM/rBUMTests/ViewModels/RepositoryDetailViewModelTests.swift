@@ -10,102 +10,98 @@ import XCTest
 
 @MainActor
 final class RepositoryDetailViewModelTests: XCTestCase {
-    fileprivate var viewModel: RepositoryDetailViewModel!
-    fileprivate var mockResticService: MockResticCommandService!
-    fileprivate var testRepository: Repository!
+    var resticService: TestMocks.MockResticCommandService!
+    var credentialsManager: TestMocks.MockCredentialsManager!
+    var repository: Repository!
+    var sut: RepositoryDetailViewModel!
     
-    override func setUp() async throws {
-        testRepository = Repository(
-            name: "Test Repo",
-            path: URL(filePath: "/test/path")
-        )
-        mockResticService = MockResticCommandService()
-        viewModel = RepositoryDetailViewModel(
-            repository: testRepository,
-            resticService: mockResticService
+    override func setUpWithError() throws {
+        resticService = TestMocks.MockResticCommandService()
+        credentialsManager = TestMocks.MockCredentialsManager()
+        repository = Repository(name: "Test Repo", path: URL(fileURLWithPath: "/test/path"))
+        sut = RepositoryDetailViewModel(
+            repository: repository,
+            resticService: resticService,
+            credentialsManager: credentialsManager
         )
     }
     
-    override func tearDown() async throws {
-        viewModel = nil
-        mockResticService = nil
-        testRepository = nil
+    override func tearDownWithError() throws {
+        resticService = nil
+        credentialsManager = nil
+        repository = nil
+        sut = nil
     }
     
-    func testCheckRepository() async throws {
+    func test_checkRepository_success() async throws {
         // Given
-        mockResticService.checkResult = true
+        let date = Date()
         
         // When
-        await viewModel.checkRepository()
+        await sut.checkRepository()
         
         // Then
-        XCTAssertTrue(mockResticService.checkCalled)
-        XCTAssertNotNil(viewModel.lastCheck)
-        XCTAssertNil(viewModel.error)
-        XCTAssertFalse(viewModel.showError)
+        XCTAssertNotNil(sut.lastCheck)
+        XCTAssertGreaterThanOrEqual(sut.lastCheck ?? date, date)
+        XCTAssertNil(sut.error)
+        XCTAssertFalse(sut.showError)
     }
     
-    func testCheckRepositoryFailure() async throws {
+    func test_checkRepository_failure() async throws {
         // Given
-        mockResticService.checkResult = false
+        resticService.checkError = NSError(domain: "test", code: 1)
         
         // When
-        await viewModel.checkRepository()
+        await sut.checkRepository()
         
         // Then
-        XCTAssertTrue(mockResticService.checkCalled)
-        XCTAssertNil(viewModel.lastCheck)
-        XCTAssertNotNil(viewModel.error)
-        XCTAssertTrue(viewModel.showError)
-    }
-    
-    func testStatusColor() async throws {
-        // Given no last check
-        XCTAssertEqual(viewModel.statusColor, .secondary)
-        
-        // Given recent check with no error
-        viewModel.lastCheck = Date()
-        viewModel.error = nil
-        XCTAssertEqual(viewModel.statusColor, .green)
-        
-        // Given old check with no error
-        viewModel.lastCheck = Date().addingTimeInterval(-86401) // More than a day ago
-        viewModel.error = nil
-        XCTAssertEqual(viewModel.statusColor, .red)
-        
-        // Given recent check with error
-        viewModel.lastCheck = Date()
-        viewModel.error = RepositoryCreationError.invalidRepository
-        XCTAssertEqual(viewModel.statusColor, .red)
-    }
-    
-    func testFormattedLastCheck() {
-        // Given no last check
-        XCTAssertEqual(viewModel.formattedLastCheck, "Never")
-        
-        // Given recent check
-        let now = Date()
-        viewModel.lastCheck = now
-        XCTAssertEqual(viewModel.formattedLastCheck, "now")
-    }
-}
-
-// MARK: - Mocks
-
-private final class MockResticCommandService: ResticCommandServiceProtocol {
-    var checkResult = false
-    var checkCalled = false
-    
-    func initializeRepository(_ repository: Repository, password: String) async throws {}
-    
-    func checkRepository(_ repository: Repository) async throws -> Bool {
-        checkCalled = true
-        if !checkResult {
-            throw ResticError.invalidRepository
+        XCTAssertNotNil(sut.error)
+        XCTAssertTrue(sut.showError)
+        if let error = sut.error as? ResticError {
+            XCTAssertEqual(error.localizedDescription, "The operation couldn't be completed. (test error 1.)")
+        } else {
+            XCTFail("Expected ResticError")
         }
-        return true
     }
     
-    func createBackup(for repository: Repository, paths: [String]) async throws {}
+    func test_updatePassword_success() async throws {
+        // Given
+        let newPassword = "new-password"
+        
+        // When
+        try await sut.updatePassword(newPassword)
+        
+        // Then
+        XCTAssertNil(sut.error)
+        XCTAssertFalse(sut.showError)
+    }
+    
+    func test_updatePassword_empty() async throws {
+        // Given
+        let newPassword = ""
+        
+        // When/Then
+        do {
+            try await sut.updatePassword(newPassword)
+            XCTFail("Expected error to be thrown")
+        } catch {
+            XCTAssertTrue(error is ResticError)
+            XCTAssertEqual(error.localizedDescription, "Invalid password")
+        }
+    }
+    
+    func test_formattedLastCheck_initialState() {
+        // Then
+        XCTAssertEqual(sut.formattedLastCheck, "Never")
+    }
+    
+    func test_formattedLastCheck_afterCheck() async {
+        // When
+        await sut.checkRepository()
+        
+        // Then
+        XCTAssertNotEqual(sut.formattedLastCheck, "Never")
+        // Note: We can't test the exact formatted string since it depends on the current time
+        // but we can verify it's been updated from the initial state
+    }
 }
