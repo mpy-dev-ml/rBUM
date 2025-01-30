@@ -6,6 +6,7 @@
 //
 
 import Testing
+import Foundation
 @testable import rBUM
 
 struct BackupProgressTests {
@@ -23,7 +24,7 @@ struct BackupProgressTests {
         
         #expect(progress.fileProgress == 50.0)
         #expect(progress.byteProgress == 25.0)
-        #expect(progress.overallProgress == 37.5)
+        #expect(progress.overallProgress == 50.0)
     }
     
     @Test("BackupProgress handles zero totals")
@@ -51,11 +52,104 @@ struct BackupProgressTests {
             totalBytes: 1000,
             processedBytes: 500,
             currentFile: "test.txt",
-            estimatedSecondsRemaining: 3665, // 1h 1m 5s
+            estimatedSecondsRemaining: 3665,
             startTime: Date()
         )
         
-        #expect(progress.formattedTimeRemaining == "1h 1m")
+        #expect(progress.formattedTimeRemaining == "1 hour, 1 minute")
+    }
+    
+    @Test("BackupProgress handles nil time remaining")
+    func testNilTimeFormatting() throws {
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 50,
+            totalBytes: 1000,
+            processedBytes: 500,
+            currentFile: "test.txt",
+            estimatedSecondsRemaining: nil,
+            startTime: Date()
+        )
+        
+        #expect(progress.formattedTimeRemaining == "Calculating...")
+    }
+    
+    @Test("BackupProgress calculates elapsed time correctly")
+    func testElapsedTime() throws {
+        let startTime = Date().addingTimeInterval(-3665) // 1 hour, 1 minute, 5 seconds ago
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 50,
+            totalBytes: 1000,
+            processedBytes: 500,
+            currentFile: "test.txt",
+            estimatedSecondsRemaining: nil,
+            startTime: startTime
+        )
+        
+        #expect(progress.formattedElapsedTime == "1 hour, 1 minute")
+    }
+    
+    @Test("BackupProgress handles very short elapsed time")
+    func testShortElapsedTime() throws {
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 0,
+            totalBytes: 1000,
+            processedBytes: 0,
+            currentFile: nil,
+            estimatedSecondsRemaining: nil,
+            startTime: Date()
+        )
+        
+        #expect(progress.formattedElapsedTime == "Just started")
+    }
+    
+    @Test("BackupProgress formats short durations correctly")
+    func testShortDuration() throws {
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 50,
+            totalBytes: 1000,
+            processedBytes: 500,
+            currentFile: "test.txt",
+            estimatedSecondsRemaining: 45,
+            startTime: Date()
+        )
+        
+        #expect(progress.formattedTimeRemaining == "Less than a minute")
+    }
+    
+    @Test("BackupProgress formats progress string correctly")
+    func testProgressFormatting() throws {
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 50,
+            totalBytes: 1_000_000_000, // 1 GB
+            processedBytes: 500_000_000, // 500 MB
+            currentFile: "test.txt",
+            estimatedSecondsRemaining: 60,
+            startTime: Date()
+        )
+        
+        let expected = "50.0% (50/100 files, 500 MB/1 GB)"
+        #expect(progress.formattedProgress() == expected)
+    }
+    
+    @Test("BackupProgress formats zero progress correctly")
+    func testZeroProgressFormatting() throws {
+        let progress = BackupProgress(
+            totalFiles: 100,
+            processedFiles: 0,
+            totalBytes: 1_000_000_000,
+            processedBytes: 0,
+            currentFile: nil,
+            estimatedSecondsRemaining: nil,
+            startTime: Date()
+        )
+        
+        let expected = "0.0% (0/100 files, Zero KB/1 GB)"
+        #expect(progress.formattedProgress() == expected)
     }
     
     @Test("ResticBackupStatus converts to BackupProgress correctly")

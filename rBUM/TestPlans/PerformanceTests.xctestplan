@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "E7C93F69-D5GB-5G0C-BF3E-F0G5H6I7J904",
+      "name" : "Performance Tests",
+      "options" : {
+        "defaultTestExecutionTimeAllowance" : 300,
+        "testTimeoutsEnabled" : true,
+        "performanceTestConfiguration" : "default"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:rBUM.xcodeproj",
+      "identifier" : "rBUM",
+      "name" : "rBUM"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "rBUMPerformanceTests",
+        "name" : "rBUMPerformanceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

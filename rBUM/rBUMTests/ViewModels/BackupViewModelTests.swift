@@ -8,14 +8,15 @@
 import XCTest
 @testable import rBUM
 
+@MainActor
 final class BackupViewModelTests: XCTestCase {
     var resticService: TestMocks.MockResticCommandService!
     var credentialsManager: TestMocks.MockCredentialsManager!
     var viewModel: BackupViewModel!
     var repository: Repository!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         resticService = TestMocks.MockResticCommandService()
         credentialsManager = TestMocks.MockCredentialsManager()
         repository = Repository(name: "Test Repo", path: URL(fileURLWithPath: "/test/repo"))
@@ -26,15 +27,15 @@ final class BackupViewModelTests: XCTestCase {
         )
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         resticService = nil
         credentialsManager = nil
         viewModel = nil
         repository = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
-    func testInitialState() {
+    func testInitialState() async {
         XCTAssertEqual(viewModel.state, .idle)
         XCTAssertTrue(viewModel.selectedPaths.isEmpty)
         XCTAssertFalse(viewModel.showError)
@@ -48,7 +49,12 @@ final class BackupViewModelTests: XCTestCase {
         // Given
         let paths = [URL(fileURLWithPath: "/test/file1")]
         viewModel.selectedPaths = paths
-        credentialsManager.passwords[repository.id] = "testPassword"
+        let credentials = credentialsManager.createCredentials(
+            id: repository.id,
+            path: repository.path.path,
+            password: "testPassword"
+        )
+        try? await credentialsManager.store(credentials)
         
         // When
         let progressExpectation = expectation(description: "Progress update received")
@@ -74,7 +80,7 @@ final class BackupViewModelTests: XCTestCase {
             statusExpectation.fulfill()
         }
         
-        await fulfillment(of: [progressExpectation, statusExpectation], timeout: 5)
+        await waitForExpectations(timeout: 5)
         
         // Verify final state
         XCTAssertEqual(viewModel.state, .completed)
@@ -86,7 +92,12 @@ final class BackupViewModelTests: XCTestCase {
         // Given
         let paths = [URL(fileURLWithPath: "/test/file1")]
         viewModel.selectedPaths = paths
-        credentialsManager.passwords[repository.id] = "testPassword"
+        let credentials = credentialsManager.createCredentials(
+            id: repository.id,
+            path: repository.path.path,
+            password: "testPassword"
+        )
+        try? await credentialsManager.store(credentials)
         
         let testError = ResticError.backupFailed("Test error")
         resticService.backupError = testError
@@ -95,19 +106,24 @@ final class BackupViewModelTests: XCTestCase {
         await viewModel.startBackup()
         
         // Then
-        XCTAssertEqual(viewModel.state, .failed(testError))
+        if case let .failed(error) = viewModel.state,
+           let resticError = error as? ResticError {
+            XCTAssertEqual(resticError, testError)
+        } else {
+            XCTFail("Expected .failed state with ResticError")
+        }
         XCTAssertTrue(viewModel.showError)
         XCTAssertEqual(viewModel.progressPercentage, 0)
         XCTAssertEqual(viewModel.progressMessage, "Backup failed: \(testError.localizedDescription)")
     }
     
-    func testReset() {
+    func testReset() async {
         // Given
         viewModel.selectedPaths = [URL(fileURLWithPath: "/test/file1")]
         viewModel.showError = true
         
         // When
-        viewModel.reset()
+        await viewModel.reset()
         
         // Then
         XCTAssertEqual(viewModel.state, .idle)

@@ -1,0 +1,32 @@
+{
+  "configurations" : [
+    {
+      "id" : "D6B92E58-C4FA-4F9B-AE2D-E9F4G7H8I903",
+      "name" : "UI Tests",
+      "options" : {
+        "defaultTestExecutionTimeAllowance" : 60,
+        "testTimeoutsEnabled" : true,
+        "uiTestingScreenshotsEnabled" : true,
+        "userAttachmentLifetime" : "keepAlways"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:rBUM.xcodeproj",
+      "identifier" : "rBUM",
+      "name" : "rBUM"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "rBUMUITests",
+        "name" : "rBUMUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

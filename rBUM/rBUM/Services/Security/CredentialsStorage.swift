@@ -71,6 +71,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     }
     
     func store(_ credentials: RepositoryCredentials) throws {
+        try createCredentialsDirectory()
         let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
         let data = try JSONEncoder().encode(credentials)
         try data.write(to: url)
@@ -78,6 +79,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     }
     
     func update(_ credentials: RepositoryCredentials) throws {
+        try createCredentialsDirectory()
         let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             throw CredentialsStorageError.credentialsNotFound
@@ -88,6 +90,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     }
     
     func retrieve(forRepositoryId id: UUID) throws -> RepositoryCredentials? {
+        try createCredentialsDirectory()
         let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             return nil
@@ -97,6 +100,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     }
     
     func delete(forRepositoryId id: UUID) throws {
+        try createCredentialsDirectory()
         let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             throw CredentialsStorageError.credentialsNotFound
@@ -106,13 +110,28 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     }
     
     func list() throws -> [RepositoryCredentials] {
-        let contents = try fileManager.contentsOfDirectory(at: credentialsDirectory, includingPropertiesForKeys: nil)
+        // Create directory if it doesn't exist
+        try createCredentialsDirectory()
+        
+        // Get directory contents
+        let contents = try fileManager.contentsOfDirectory(
+            at: credentialsDirectory,
+            includingPropertiesForKeys: nil,
+            options: .skipsHiddenFiles
+        )
+        
+        // Load and decode each credential file
         var credentials: [RepositoryCredentials] = []
-        for url in contents {
-            guard url.pathExtension == "json" else { continue }
-            let data = try Data(contentsOf: url)
-            let credential = try JSONDecoder().decode(RepositoryCredentials.self, from: data)
-            credentials.append(credential)
+        for url in contents where url.pathExtension == "json" {
+            do {
+                let data = try Data(contentsOf: url)
+                if let credential = try? JSONDecoder().decode(RepositoryCredentials.self, from: data) {
+                    credentials.append(credential)
+                }
+            } catch {
+                logger.errorMessage("Failed to load credentials from \(url.lastPathComponent): \(error.localizedDescription)")
+                continue
+            }
         }
         return credentials
     }
@@ -122,8 +141,21 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     private func createCredentialsDirectory() throws {
         var isDirectory: ObjCBool = false
         if !fileManager.fileExists(atPath: credentialsDirectory.path, isDirectory: &isDirectory) {
-            try fileManager.createDirectory(at: credentialsDirectory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: credentialsDirectory,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
             logger.infoMessage("Created credentials directory at: \(credentialsDirectory.path)")
+        } else if !isDirectory.boolValue {
+            // If path exists but is not a directory, remove it and create directory
+            try fileManager.removeItem(at: credentialsDirectory)
+            try fileManager.createDirectory(
+                at: credentialsDirectory,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            logger.infoMessage("Replaced file with directory at: \(credentialsDirectory.path)")
         }
     }
 }

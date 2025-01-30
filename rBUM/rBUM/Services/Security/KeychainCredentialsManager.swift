@@ -116,7 +116,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
     
     func getPassword(forRepositoryId id: UUID) async throws -> String {
         // Get metadata
-        guard let credentials = try await credentialsStorage.retrieve(forRepositoryId: id) else {
+        guard let credentials = try credentialsStorage.retrieve(forRepositoryId: id) else {
             throw KeychainError.itemNotFound
         }
         

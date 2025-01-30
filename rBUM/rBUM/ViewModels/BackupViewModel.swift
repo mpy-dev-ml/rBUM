@@ -10,12 +10,27 @@ import SwiftUI
 
 @MainActor
 final class BackupViewModel: ObservableObject {
-    enum BackupState {
+    enum BackupState: Equatable {
         case idle
         case selecting
         case inProgress(BackupProgress)
         case completed
         case failed(Error)
+        
+        static func == (lhs: BackupState, rhs: BackupState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle),
+                (.selecting, .selecting),
+                (.completed, .completed):
+                return true
+            case let (.inProgress(lhsProgress), .inProgress(rhsProgress)):
+                return lhsProgress == rhsProgress
+            case let (.failed(lhsError), .failed(rhsError)):
+                return lhsError.localizedDescription == rhsError.localizedDescription
+            default:
+                return false
+            }
+        }
     }
     
     @Published private(set) var state: BackupState = .idle

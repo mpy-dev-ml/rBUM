@@ -63,67 +63,48 @@ struct BackupProgress: Equatable {
     let processedFiles: Int
     /// Total bytes to backup
     let totalBytes: Int64
-    /// Bytes processed so far
+    /// Number of bytes processed so far
     let processedBytes: Int64
-    /// Current file being processed
+    /// Currently processing file
     let currentFile: String?
     /// Estimated seconds remaining
     let estimatedSecondsRemaining: TimeInterval?
-    /// Start time of the backup
+    /// Time when backup started
     let startTime: Date
     
-    /// Percentage of files processed (0-100)
+    /// Progress as percentage of files processed (0-100)
     var fileProgress: Double {
-        guard totalFiles > 0 else { return 0 }
-        return Double(processedFiles) / Double(totalFiles) * 100
+        totalFiles > 0 ? (Double(processedFiles) / Double(totalFiles)) * 100 : 0
     }
     
-    /// Percentage of bytes processed (0-100)
+    /// Progress as percentage of bytes processed (0-100)
     var byteProgress: Double {
-        guard totalBytes > 0 else { return 0 }
-        return Double(processedBytes) / Double(totalBytes) * 100
+        totalBytes > 0 ? (Double(processedBytes) / Double(totalBytes)) * 100 : 0
     }
     
-    /// Overall progress percentage (0-100), based on byte progress
+    /// Overall progress as percentage of files processed (0-100)
     var overallProgress: Double {
-        byteProgress
+        fileProgress
     }
     
-    /// Elapsed time since backup started
-    var elapsedTime: TimeInterval {
-        Date().timeIntervalSince(startTime)
-    }
-    
-    /// Formats a time interval into a human-readable string
-    /// - Parameter timeInterval: The time interval to format
-    /// - Returns: A formatted string like "2h 30m" or "5m 30s"
-    static func formatTimeInterval(_ timeInterval: TimeInterval) -> String {
-        let hours = Int(timeInterval) / 3600
-        let minutes = Int(timeInterval) / 60 % 60
-        let seconds = Int(timeInterval) % 60
-        
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if minutes > 0 {
-            return "\(minutes)m \(seconds)s"
-        } else {
-            return "\(seconds)s"
+    /// Formatted string for time remaining
+    var formattedTimeRemaining: String {
+        guard let seconds = estimatedSecondsRemaining else {
+            return "Calculating..."
         }
+        return formatDuration(seconds: Int(seconds))
     }
     
-    /// Human-readable elapsed time
+    /// Formatted string for elapsed time
     var formattedElapsedTime: String {
-        Self.formatTimeInterval(elapsedTime)
+        let elapsed = -startTime.timeIntervalSinceNow
+        if elapsed < 1 {
+            return "Just started"
+        }
+        return formatDuration(seconds: Int(elapsed))
     }
     
-    /// Human-readable estimated time remaining
-    var formattedEstimatedTimeRemaining: String? {
-        guard let remaining = estimatedSecondsRemaining else { return nil }
-        return Self.formatTimeInterval(remaining)
-    }
-    
-    /// Creates a string representation of the current progress
-    /// - Returns: A string like "50% (5/10 files, 1.2GB/2.4GB)"
+    /// Format progress as a string with file and byte counts
     func formattedProgress() -> String {
         let byteFormatter = ByteCountFormatter()
         byteFormatter.countStyle = .file
@@ -139,6 +120,24 @@ struct BackupProgress: Equatable {
             processedBytesStr,
             totalBytesStr
         )
+    }
+    
+    /// Format duration in seconds to human-readable string
+    private func formatDuration(seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        
+        var parts: [String] = []
+        if hours > 0 {
+            parts.append("\(hours) hour\(hours == 1 ? "" : "s")")
+        }
+        if minutes > 0 {
+            parts.append("\(minutes) minute\(minutes == 1 ? "" : "s")")
+        }
+        if parts.isEmpty {
+            return "Less than a minute"
+        }
+        return parts.joined(separator: ", ")
     }
     
     static func == (lhs: BackupProgress, rhs: BackupProgress) -> Bool {

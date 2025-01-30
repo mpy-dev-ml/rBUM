@@ -51,7 +51,7 @@ final class RepositoryListViewModel: ObservableObject {
     
     func loadRepositories() async {
         do {
-            repositories = try await repositoryStorage.list()
+            repositories = try repositoryStorage.list()
             logger.infoMessage("Loaded \(repositories.count) repositories")
         } catch {
             logger.errorMessage("Failed to load repositories: \(error.localizedDescription)")
@@ -62,7 +62,7 @@ final class RepositoryListViewModel: ObservableObject {
     
     func deleteRepository(_ repository: Repository) async {
         do {
-            try await repositoryStorage.delete(forId: repository.id)
+            try repositoryStorage.delete(forId: repository.id)
             if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
                 repositories.remove(at: index)
             }

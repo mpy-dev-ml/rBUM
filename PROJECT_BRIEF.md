@@ -61,10 +61,20 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
   - [x] Repository initialization
   - [x] Credential management
   - [x] Path validation
-- [ ] Manual backup execution
+- [x] Manual backup execution
+  - [x] Path selection
+  - [x] Progress reporting
+  - [x] Status updates
+  - [x] Error handling
 - [ ] Basic restore functionality
-- [ ] Simple progress indication
-- [ ] Basic error reporting
+- [x] Progress indication
+  - [x] Percentage display
+  - [x] Time remaining
+  - [x] Current operation status
+- [x] Basic error reporting
+  - [x] User-friendly messages
+  - [x] Error state handling
+  - [x] Recovery options
 
 ### Day 5: Testing and Polish
 - [x] Basic integration testing
@@ -93,9 +103,15 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
   - [x] Command execution framework
   - [x] Error handling and logging
   - [x] Repository management commands
-  - [ ] Backup operations
+  - [x] Backup operations
+    - [x] Path selection
+    - [x] Progress monitoring
+    - [x] Status reporting
   - [ ] Restore operations
   - [x] Unit tests
+    - [x] Mock services
+    - [x] Preview helpers
+    - [x] Integration tests
 - [ ] Drive scanning service
   - [ ] Repository discovery
   - [ ] Repository validation
@@ -132,15 +148,53 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
 - [ ] Schedule conflict resolution
 - [ ] Notification system integration
 
-### 6. Testing and Quality Assurance (Ongoing, 2-3 weeks focused)
-- [ ] Unit testing
-  - [ ] Core services
-  - [ ] ViewModels
-  - [ ] Utilities
-- [ ] Integration testing
-- [ ] UI testing
-- [ ] Performance testing
-- [ ] Security testing
+### 6. Testing and Quality Assurance (2-3 weeks)
+#### Testing Framework Strategy
+- Swift Testing Framework
+  - Unit tests for models, services, and viewmodels
+  - Parameterized testing for multiple scenarios
+  - Tagged tests for organised test execution
+  - Async/await support for concurrent operations
+  
+- XCTest Framework
+  - UI testing with XCUITest
+  - Performance testing with XCTMetric
+  - Baseline measurements and metrics
+
+#### Test Categories and Timeline
+1. Model Tests (Week 1)
+   - Repository credentials
+   - Backup progress monitoring
+   - Data models validation
+
+2. Service Tests (Week 2)
+   - Core Restic command integration
+   - Security and keychain services
+   - Storage and configuration services
+
+3. ViewModel Tests (Week 3)
+   - Backup operations
+   - Repository management
+   - Settings and configuration
+
+4. UI and Performance Tests (Weeks 4-5)
+   - User interface flows
+   - Backup performance metrics
+   - Search and filter operations
+   - Resource utilisation
+
+#### Test Plan Structure
+- Separate test plans for different scenarios:
+  - Unit tests (Swift Testing)
+  - UI tests (XCTest)
+  - Performance tests (XCTest)
+  - CI/CD pipeline tests
+
+- Code coverage requirements:
+  - Models: 95%
+  - Services: 90%
+  - ViewModels: 85%
+  - UI Components: 75%
 
 ### 7. Documentation and Polish (1-2 weeks)
 - [ ] User documentation

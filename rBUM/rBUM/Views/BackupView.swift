@@ -29,11 +29,13 @@ struct BackupView: View {
                     }
                     .progressViewStyle(.linear)
                     
-                    if let timeRemaining = progress.formattedEstimatedTimeRemaining {
-                        Text("\(timeRemaining) remaining")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(progress.formattedTimeRemaining)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(progress.formattedElapsedTime)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding()
             } else if case .completed = viewModel.state {

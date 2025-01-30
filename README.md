@@ -82,6 +82,44 @@ rBUM/
 └── rBUMUITests/
 ```
 
+## Testing
+
+rBUM uses a hybrid testing approach leveraging both Swift Testing and XCTest frameworks:
+
+### Test Framework Strategy
+
+- **Swift Testing** for unit tests (models, services, viewmodels)
+  - Expressive test syntax with `@Test` and `#expect`
+  - Parameterized testing support
+  - Tagged test organisation
+  - Native async/await support
+
+- **XCTest** for UI and performance tests
+  - UI automation with XCUITest
+  - Performance metrics with XCTMetric
+  - Baseline measurements
+
+### Running Tests
+
+1. **Using Xcode**
+   - Open the project in Xcode
+   - Select the appropriate test plan:
+     - `UnitTests.xctestplan` for unit tests
+     - `UITests.xctestplan` for UI tests
+     - `PerformanceTests.xctestplan` for performance tests
+   - Use Product > Test or ⌘U to run tests
+
+2. **Command Line**
+   ```bash
+   # Run all tests
+   xcodebuild test -scheme rBUM -testPlan rBUM
+   
+   # Run specific test plan
+   xcodebuild test -scheme rBUM -testPlan UnitTests
+   ```
+
+For detailed testing guidelines, see our [Contributing Guidelines](CONTRIBUTING.md).
+
 ## Installation
 
 1. Clone the repository

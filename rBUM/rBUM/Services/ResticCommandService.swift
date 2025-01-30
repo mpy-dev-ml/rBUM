@@ -8,7 +8,7 @@
 import Foundation
 
 /// Errors that can occur during Restic operations
-enum ResticError: LocalizedError {
+enum ResticError: LocalizedError, Equatable {
     case commandFailed(String)
     case invalidRepository
     case invalidPassword
@@ -45,6 +45,26 @@ enum ResticError: LocalizedError {
             return "Credentials not found"
         case .invalidArgument(let message):
             return "Invalid argument: \(message)"
+        }
+    }
+    
+    static func == (lhs: ResticError, rhs: ResticError) -> Bool {
+        switch (lhs, rhs) {
+        case (.invalidRepository, .invalidRepository),
+             (.invalidPassword, .invalidPassword),
+             (.repositoryNotFound, .repositoryNotFound),
+             (.credentialsNotFound, .credentialsNotFound):
+            return true
+        case let (.commandFailed(lhsMessage), .commandFailed(rhsMessage)),
+             let (.backupFailed(lhsMessage), .backupFailed(rhsMessage)),
+             let (.restoreFailed(lhsMessage), .restoreFailed(rhsMessage)),
+             let (.snapshotNotFound(lhsMessage), .snapshotNotFound(rhsMessage)),
+             let (.restoreError(lhsMessage), .restoreError(rhsMessage)),
+             let (.commandError(lhsMessage), .commandError(rhsMessage)),
+             let (.invalidArgument(lhsMessage), .invalidArgument(rhsMessage)):
+            return lhsMessage == rhsMessage
+        default:
+            return false
         }
     }
 }

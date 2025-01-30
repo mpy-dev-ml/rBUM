@@ -112,42 +112,17 @@ struct ResticCommandServiceTests {
         let path = URL(fileURLWithPath: "/test/path")
         
         // Given
-        let password = "testPassword"
-        processExecutor.output = "repository initialized"
+        processExecutor.output = "repository abc123 initialized"
         
         // When
-        try await commandService.initializeRepository(at: path, password: password)
+        try await commandService.initializeRepository(at: path, password: "testPassword")
         
         // Then
         #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
-        #expect(processExecutor.lastArguments == ["init"])
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == password)
+        #expect(processExecutor.lastArguments?.contains("init") == true)
+        #expect(processExecutor.lastArguments?.contains("--json") == true)
+        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == "testPassword")
         #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == path.path)
-    }
-    
-    @Test("Check repository")
-    func testCheckRepository() async throws {
-        let credentialsManager = MockCredentialsManager()
-        let processExecutor = MockProcessExecutor()
-        let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
-        let path = URL(fileURLWithPath: "/test/path")
-        let credentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "testPassword",
-            repositoryPath: path.path
-        )
-        
-        // Given
-        processExecutor.output = "repository is healthy"
-        
-        // When
-        try await commandService.checkRepository(at: path, credentials: credentials)
-        
-        // Then
-        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
-        #expect(processExecutor.lastArguments == ["check"])
-        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
-        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
     }
     
     @Test("Create backup")
@@ -171,7 +146,14 @@ struct ResticCommandServiceTests {
         processExecutor.output = "snapshot abc123 saved"
         
         // When
-        try await commandService.createBackup(paths: paths, to: repository, credentials: credentials, tags: tags)
+        try await commandService.createBackup(
+            paths: paths,
+            to: repository,
+            credentials: credentials,
+            tags: tags,
+            onProgress: { _ in },
+            onStatusChange: { _ in }
+        )
         
         // Then
         #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
@@ -251,10 +233,41 @@ struct ResticCommandServiceTests {
         
         // Verify status transitions
         #expect(statusChanges[0] == .preparing)
-        if case .backing = statusChanges[1] {} else {
-            XCTFail("Second status should be .backing")
+        
+        // Verify second status is .backing
+        if case .backing(let progress) = statusChanges[1] {
+            #expect(progress.totalFiles == 20)
+            #expect(progress.processedFiles >= 5)
+        } else {
+            #expect(Bool(false), "Expected second status to be .backing, but got \(statusChanges[1])")
         }
+        
         #expect(statusChanges.last == .completed)
+    }
+    
+    @Test("Check repository")
+    func testCheckRepository() async throws {
+        let credentialsManager = MockCredentialsManager()
+        let processExecutor = MockProcessExecutor()
+        let commandService = ResticCommandService(credentialsManager: credentialsManager, processExecutor: processExecutor)
+        let path = URL(fileURLWithPath: "/test/path")
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),
+            password: "testPassword",
+            repositoryPath: path.path
+        )
+        
+        // Given
+        processExecutor.output = "repository is healthy"
+        
+        // When
+        try await commandService.checkRepository(at: path, credentials: credentials)
+        
+        // Then
+        #expect(processExecutor.lastCommand == "/opt/homebrew/bin/restic")
+        #expect(processExecutor.lastArguments == ["check"])
+        #expect(processExecutor.lastEnvironment?["RESTIC_PASSWORD"] == credentials.password)
+        #expect(processExecutor.lastEnvironment?["RESTIC_REPOSITORY"] == credentials.repositoryPath)
     }
     
     @Test("Handle process execution errors")

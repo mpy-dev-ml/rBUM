@@ -1,0 +1,74 @@
+{
+  "configurations" : [
+    {
+      "id" : "B147DC38-A6A9-46D9-9E3E-71F5E547AB82",
+      "name" : "Default",
+      "options" : {
+        "defaultTestExecutionTimeAllowance" : 60,
+        "testTimeoutsEnabled" : true
+      }
+    },
+    {
+      "id" : "5F8C9D23-B4E7-4F1A-9B2C-D8F3E6A7C901",
+      "name" : "CI",
+      "options" : {
+        "defaultTestExecutionTimeAllowance" : 120,
+        "testTimeoutsEnabled" : true,
+        "targetForVariableExpansion" : {
+          "containerPath" : "container:rBUM.xcodeproj",
+          "identifier" : "rBUM",
+          "name" : "rBUM"
+        }
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : {
+      "targets" : [
+        {
+          "containerPath" : "container:rBUM.xcodeproj",
+          "identifier" : "rBUM",
+          "name" : "rBUM"
+        }
+      ]
+    },
+    "environmentVariableEntries" : [
+      {
+        "key" : "SWIFT_TESTING_ENABLE",
+        "value" : "1"
+      }
+    ],
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:rBUM.xcodeproj",
+      "identifier" : "rBUM",
+      "name" : "rBUM"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "rBUMTests",
+        "name" : "rBUMTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "rBUMUITests",
+        "name" : "rBUMUITests"
+      }
+    },
+    {
+      "enabled" : false,
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "rBUMPerformanceTests",
+        "name" : "rBUMPerformanceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

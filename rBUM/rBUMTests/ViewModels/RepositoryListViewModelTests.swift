@@ -102,74 +102,67 @@ final class RepositoryListViewModelTests: XCTestCase {
 // MARK: - Mock Classes
 
 final class MockRepositoryStorage: RepositoryStorageProtocol {
-    func store(_ repository: rBUM.Repository) throws {
-        <#code#>
-    }
-    
-    func retrieve(forId id: UUID) throws -> rBUM.Repository? {
-        <#code#>
-    }
-    
-    func list() throws -> [rBUM.Repository] {
-        <#code#>
-    }
-    
-    func delete(forId id: UUID) throws {
-        <#code#>
-    }
-    
-    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool {
-        <#code#>
-    }
-    
     var listResult: [Repository] = []
     var listError: Error?
     var deleteError: Error?
     
-    func list() async throws -> [Repository] {
+    func store(_ repository: Repository) throws {
+        // Not needed for these tests
+    }
+    
+    func retrieve(forId id: UUID) throws -> Repository? {
+        // Not needed for these tests
+        return nil
+    }
+    
+    func list() throws -> [Repository] {
         if let error = listError {
             throw error
         }
         return listResult
     }
     
-    func delete(forId id: UUID) async throws {
+    func delete(forId id: UUID) throws {
         if let error = deleteError {
             throw error
         }
     }
     
-    func store(_ repository: Repository) async throws {
-        // Not needed for these tests
-    }
-    
-    func retrieve(forId id: UUID) async throws -> Repository? {
-        // Not needed for these tests
-        return nil
-    }
-    
-    func exists(atPath path: URL, excludingId: UUID?) async throws -> Bool {
+    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool {
         // Not needed for these tests
         return false
     }
 }
 
 final class MockResticCommandService: ResticCommandServiceProtocol {
-    func createBackup(paths: [URL], to repository: rBUM.Repository, credentials: rBUM.RepositoryCredentials, tags: [String]?, onProgress: ((rBUM.BackupProgress) -> Void)?, onStatusChange: ((rBUM.BackupStatus) -> Void)?) async throws {
-        <#code#>
-    }
-    
     func initializeRepository(at path: URL, password: String) async throws {}
     
     func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
     
-    func createBackup(paths: [URL], to repository: Repository, credentials: RepositoryCredentials, tags: [String]?) async throws {}
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        credentials: RepositoryCredentials,
+        tags: [String]?,
+        onProgress: ((BackupProgress) -> Void)?,
+        onStatusChange: ((BackupStatus) -> Void)?
+    ) async throws {
+        // Not needed for these tests
+    }
     
     func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot] {
         return []
     }
     
-    func pruneSnapshots(in repository: Repository, credentials: RepositoryCredentials, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {}
+    func pruneSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials,
+        keepLast: Int?,
+        keepDaily: Int?,
+        keepWeekly: Int?,
+        keepMonthly: Int?,
+        keepYearly: Int?
+    ) async throws {}
 }
 
 final class MockRepositoryCreationService: RepositoryCreationServiceProtocol {

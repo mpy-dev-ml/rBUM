@@ -103,8 +103,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         
         // Set up output handling
         let outputHandle = outputPipe.fileHandleForReading
-        outputHandle.readabilityHandler = { [weak self] handle in
-            guard let self = self else { return }
+        outputHandle.readabilityHandler = { handle in
             let data = handle.availableData
             if !data.isEmpty {
                 Task {

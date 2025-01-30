@@ -66,18 +66,103 @@ For Restic-specific questions or issues, please refer to:
 - Clearly indicate which features are provided by Restic vs. rBUM
 - Use British English in all user-facing text
 
-## Testing
+## Testing Guidelines
 
-- Write unit tests for new functionality
-- Ensure all tests pass before submitting PR
-- Use XCTest framework
-- Include UI tests for new views
-- Ensure all tests pass with multiple Restic versions
-- Verify compatibility with different repository types
-- Test error handling for Restic command failures
-- Validate security-related functionality thoroughly
-- Check proper handling of Restic output formats
-- Verify localisation works correctly
+### Framework Usage
+
+We use a hybrid testing approach:
+
+1. **Swift Testing Framework** (Primary for Unit Tests)
+   - All new unit tests should use Swift Testing
+   - Use `@Test` attribute with descriptive names
+   - Implement tags for test organisation
+   - Use `#expect` for assertions
+   - Leverage parameterized testing where applicable
+
+   Example:
+   ```swift
+   @Test("Repository creation with valid credentials", 
+         .tags(.repository, .security))
+   func testRepositoryCreation() async throws {
+       // Given
+       let credentials = RepositoryCredentials(...)
+       
+       // When
+       let result = try await repositoryService.create(with: credentials)
+       
+       // Then
+       #expect(result.isSuccess)
+   }
+   ```
+
+2. **XCTest Framework** (UI and Performance Tests)
+   - Use for UI automation tests
+   - Use for performance measurements
+   - Follow XCTest patterns for these specific cases
+
+### Test Organisation
+
+1. **Directory Structure**
+   ```
+   rBUM/Tests/
+   ├── UnitTests/        # Swift Testing
+   ├── UITests/          # XCTest
+   └── PerformanceTests/ # XCTest
+   ```
+
+2. **Test Plans**
+   - Use appropriate test plan for your changes:
+     - `UnitTests.xctestplan` for Swift Testing tests
+     - `UITests.xctestplan` for UI tests
+     - `PerformanceTests.xctestplan` for performance tests
+
+3. **Tags**
+   Use appropriate tags for test organisation:
+   - `.core` - Core functionality
+   - `.security` - Security-related tests
+   - `.storage` - Storage-related tests
+   - `.ui` - UI-related tests
+   - `.network` - Network-dependent tests
+   - `.performance` - Performance-sensitive tests
+   - `.integration` - Integration tests
+   - `.unit` - Unit tests
+
+### Test Writing Guidelines
+
+1. **Naming Conventions**
+   - Use British English in test names and descriptions
+   - Follow the pattern: `test[Feature][Scenario][ExpectedResult]`
+   - Make test names descriptive and specific
+
+2. **Structure**
+   - Use Given-When-Then pattern
+   - Keep tests focused and atomic
+   - Use appropriate mocks and test doubles
+   - Handle async operations properly
+
+3. **Coverage Requirements**
+   - Models: 95% coverage
+   - Services: 90% coverage
+   - ViewModels: 85% coverage
+   - UI Components: 75% coverage
+
+4. **Performance Tests**
+   - Include baseline measurements
+   - Test with various data sizes
+   - Document performance expectations
+   - Use appropriate metrics for measurement
+
+### Running Tests
+
+1. **Local Development**
+   - Run relevant test plan before submitting PR
+   - Ensure all tests pass in both Debug and Release
+   - Check code coverage requirements are met
+
+2. **CI/CD Pipeline**
+   - All tests must pass in CI
+   - Coverage reports will be generated
+   - Performance tests will be compared to baselines
 
 ## Git Workflow
 

@@ -10,15 +10,19 @@ import Foundation
 
 enum TestMocks {
     final class MockRepositoryStorage: RepositoryStorageProtocol {
-        func list() throws -> [rBUM.Repository] {
-            <#code#>
-        }
-        
         var repositories: [Repository] = []
         var storeError: Error?
         var retrieveError: Error?
         var deleteError: Error?
-        var updateError: Error?
+        var existsError: Error?
+        var existsResult: Bool = false
+        
+        func list() throws -> [Repository] {
+            if let error = retrieveError {
+                throw error
+            }
+            return repositories
+        }
         
         func store(_ repository: Repository) throws {
             if let error = storeError {
@@ -34,13 +38,6 @@ enum TestMocks {
             return repositories.first { $0.id == id }
         }
         
-        func retrieveAll() throws -> [Repository] {
-            if let error = retrieveError {
-                throw error
-            }
-            return repositories
-        }
-        
         func delete(forId id: UUID) throws {
             if let error = deleteError {
                 throw error
@@ -48,19 +45,11 @@ enum TestMocks {
             repositories.removeAll { $0.id == id }
         }
         
-        func update(_ repository: Repository) throws {
-            if let error = updateError {
+        func exists(atPath path: URL, excludingId: UUID?) throws -> Bool {
+            if let error = existsError {
                 throw error
             }
-            if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
-                repositories[index] = repository
-            }
-        }
-        
-        func exists(atPath path: URL, excludingId: UUID?) throws -> Bool {
-            repositories.contains { repository in
-                repository.path == path && repository.id != excludingId
-            }
+            return existsResult
         }
     }
     

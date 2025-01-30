@@ -19,6 +19,7 @@ struct RepositoryCredentialsTests {
         // When
         let credentials = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path
         )
         
@@ -40,6 +41,7 @@ struct RepositoryCredentialsTests {
         // When
         let credentials = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path,
             keyFileName: keyFile
         )
@@ -55,6 +57,7 @@ struct RepositoryCredentialsTests {
         let path = "/test/path"
         let credentials = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path
         )
         
@@ -72,6 +75,7 @@ struct RepositoryCredentialsTests {
         let path = "/test/path"
         let credentials = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path
         )
         
@@ -89,14 +93,17 @@ struct RepositoryCredentialsTests {
         let path = "/test/path"
         let credentials1 = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path
         )
         let credentials2 = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path
         )
         let credentials3 = RepositoryCredentials(
             repositoryId: UUID(),
+            password: "test-password",
             repositoryPath: path
         )
         
@@ -113,6 +120,7 @@ struct RepositoryCredentialsTests {
         let keyFile = "key.txt"
         let credentials = RepositoryCredentials(
             repositoryId: id,
+            password: "test-password",
             repositoryPath: path,
             keyFileName: keyFile
         )
