@@ -14,60 +14,65 @@ enum ResticError: Error {
     case repositoryNotFound
     case backupFailed(String)
     case restoreFailed(String)
+    case credentialsNotFound
 }
 
-class ResticCommandService {
+final class ResticCommandService {
     private let fileManager = FileManager.default
     private let resticPath: String
+    private let credentialsManager: CredentialsManagerProtocol
+    private let processExecutor: ProcessExecutorProtocol
     
-    init() {
+    init(credentialsManager: CredentialsManagerProtocol, processExecutor: ProcessExecutorProtocol) {
         // TODO: Make this configurable in settings
-        self.resticPath = "/usr/local/bin/restic"
+        self.resticPath = "restic"
+        self.credentialsManager = credentialsManager
+        self.processExecutor = processExecutor
     }
     
-    private func executeCommand(_ arguments: [String]) async throws -> String {
-        let process = Process()
-        let pipe = Pipe()
-        
-        process.executableURL = URL(fileURLWithPath: resticPath)
-        process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = pipe
-        
-        try process.run()
-        let data = try pipe.fileHandleForReading.readToEnd() ?? Data()
-        process.waitUntilExit()
-        
-        if process.terminationStatus != 0 {
-            throw ResticError.commandFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
+    @discardableResult
+    private func executeCommand(_ arguments: [String], password: String? = nil, repository: Repository? = nil) async throws -> String {
+        var environment: [String: String] = [:]
+        if let password = password {
+            environment["RESTIC_PASSWORD"] = password
+        }
+        if let repository = repository {
+            environment["RESTIC_REPOSITORY"] = repository.path.path
         }
         
-        return String(data: data, encoding: .utf8) ?? ""
+        let result = try await processExecutor.execute(command: resticPath, arguments: arguments, environment: environment)
+        
+        if result.exitCode != 0 {
+            throw ResticError.commandFailed(result.error)
+        }
+        
+        return result.output
     }
     
-    func initializeRepository(at path: URL, password: String) async throws {
-        let arguments = [
-            "init",
-            "--repo", path.path,
-            "--password-file", "-"
-        ]
-        
-        // TODO: Implement password handling
-        try await executeCommand(arguments)
+    func initializeRepository(_ repository: Repository, password: String) async throws {
+        let arguments = ["init"]
+        try await executeCommand(arguments, password: password, repository: repository)
+        try await credentialsManager.storeCredentials(password, for: repository.credentials)
     }
     
-    func checkRepository(at path: URL, password: String) async throws -> Bool {
-        let arguments = [
-            "check",
-            "--repo", path.path,
-            "--password-file", "-"
-        ]
+    func checkRepository(_ repository: Repository) async throws -> Bool {
+        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
         
+        let arguments = ["check"]
         do {
-            _ = try await executeCommand(arguments)
+            _ = try await executeCommand(arguments, password: password, repository: repository)
             return true
-        } catch {
+        } catch ResticError.commandFailed {
             return false
         }
+    }
+    
+    func createBackup(for repository: Repository, paths: [String]) async throws {
+        let password = try await credentialsManager.retrievePassword(for: repository.credentials)
+        
+        var arguments = ["backup", "--json"]
+        arguments.append(contentsOf: paths)
+        
+        try await executeCommand(arguments, password: password, repository: repository)
     }
 }
