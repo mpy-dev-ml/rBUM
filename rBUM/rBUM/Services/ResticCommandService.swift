@@ -17,7 +17,15 @@ enum ResticError: Error {
     case credentialsNotFound
 }
 
-final class ResticCommandService {
+/// Protocol defining the ResticCommandService interface
+protocol ResticCommandServiceProtocol {
+    func initializeRepository(_ repository: Repository, password: String) async throws
+    func checkRepository(_ repository: Repository) async throws -> Bool
+    func createBackup(for repository: Repository, paths: [String]) async throws
+}
+
+/// Service for executing Restic commands
+final class ResticCommandService: ResticCommandServiceProtocol {
     private let fileManager = FileManager.default
     private let resticPath: String
     private let credentialsManager: CredentialsManagerProtocol

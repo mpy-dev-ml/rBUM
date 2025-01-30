@@ -12,14 +12,33 @@ private let logger = Logging.logger(for: .app)
 
 @main
 struct rBUMApp: App {
+    private let repositoryStorage: RepositoryStorageProtocol
+    private let repositoryCreationService: RepositoryCreationServiceProtocol
+    private let resticService: ResticCommandServiceProtocol
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    
+    init() {
+        let storage = RepositoryStorage()
+        let resticService = ResticCommandService(credentialsManager: <#any CredentialsManagerProtocol#>, processExecutor: <#any ProcessExecutorProtocol#>)
+        
+        self.repositoryStorage = storage
+        self.repositoryCreationService = RepositoryCreationService(
+            resticService: resticService,
+            repositoryStorage: storage
+        )
+        self.resticService = resticService
+    }
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(
+                repositoryStorage: repositoryStorage,
+                repositoryCreationService: repositoryCreationService,
+                resticService: resticService
+            )
                 .onAppear {
-                    logger.infoMessage("ContentView appeared")
-                }
+                logger.infoMessage("ContentView appeared")
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 900, height: 600)
@@ -31,6 +50,7 @@ struct rBUMApp: App {
                     // TODO: Implement update check
                 }
             }
+            SidebarCommands()
         }
         
         #if os(macOS)
