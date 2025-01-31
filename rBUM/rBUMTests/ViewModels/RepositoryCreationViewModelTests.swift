@@ -5,171 +5,194 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import XCTest
+import Testing
 @testable import rBUM
 
 @MainActor
-final class RepositoryCreationViewModelTests: XCTestCase {
-    var creationService: TestMocks.MockRepositoryCreationService!
-    var sut: RepositoryCreationViewModel!
+struct RepositoryCreationViewModelTests {
+    // MARK: - Test Setup
     
-    override func setUpWithError() throws {
-        creationService = TestMocks.MockRepositoryCreationService()
-        sut = RepositoryCreationViewModel(creationService: creationService)
-    }
-    
-    override func tearDownWithError() throws {
-        creationService = nil
-        sut = nil
-    }
-    
-    func test_isValid_emptyName() {
-        // Given
-        sut.name = ""
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.confirmPassword = "test-password"
-        sut.mode = .create
+    struct TestContext {
+        let creationService: TestMocks.MockRepositoryCreationService
+        let viewModel: RepositoryCreationViewModel
         
-        // Then
-        XCTAssertFalse(sut.isValid)
-    }
-    
-    func test_isValid_emptyPath() {
-        // Given
-        sut.name = "Test Repo"
-        sut.path = ""
-        sut.password = "test-password"
-        sut.confirmPassword = "test-password"
-        sut.mode = .create
-        
-        // Then
-        XCTAssertFalse(sut.isValid)
-    }
-    
-    func test_isValid_emptyPassword() {
-        // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = ""
-        sut.confirmPassword = ""
-        sut.mode = .create
-        
-        // Then
-        XCTAssertFalse(sut.isValid)
-    }
-    
-    func test_isValid_passwordMismatch() {
-        // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.confirmPassword = "different-password"
-        sut.mode = .create
-        
-        // Then
-        XCTAssertFalse(sut.isValid)
-    }
-    
-    func test_isValid_importMode() {
-        // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.confirmPassword = "different-password" // Should be ignored in import mode
-        sut.mode = .import
-        
-        // Then
-        XCTAssertTrue(sut.isValid)
-    }
-    
-    func test_createOrImport_create_success() async {
-        // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.confirmPassword = "test-password"
-        sut.mode = .create
-        
-        let expectedRepo = Repository(name: sut.name, path: URL(fileURLWithPath: sut.path))
-        creationService.createResult = expectedRepo
-        
-        // When
-        await sut.createOrImport()
-        
-        // Then
-        if case .success(let repository) = sut.state {
-            XCTAssertEqual(repository.id, expectedRepo.id)
-            XCTAssertEqual(repository.name, expectedRepo.name)
-            XCTAssertEqual(repository.path, expectedRepo.path)
-        } else {
-            XCTFail("Expected success state with repository")
+        init() {
+            self.creationService = TestMocks.MockRepositoryCreationService()
+            self.viewModel = RepositoryCreationViewModel(creationService: creationService)
         }
     }
     
-    func test_createOrImport_create_failure() async {
+    // MARK: - Validation Tests
+    
+    @Test("Validate repository creation with empty name", tags: ["validation", "model"])
+    func testValidationEmptyName() throws {
         // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.confirmPassword = "test-password"
-        sut.mode = .create
+        let context = TestContext()
+        context.viewModel.name = ""
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "test-password"
+        context.viewModel.mode = .create
+        
+        // Then
+        #expect(!context.viewModel.isValid)
+    }
+    
+    @Test("Validate repository creation with empty path", tags: ["validation", "model"])
+    func testValidationEmptyPath() throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = ""
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "test-password"
+        context.viewModel.mode = .create
+        
+        // Then
+        #expect(!context.viewModel.isValid)
+    }
+    
+    @Test("Validate repository creation with empty password", tags: ["validation", "model"])
+    func testValidationEmptyPassword() throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = ""
+        context.viewModel.confirmPassword = ""
+        context.viewModel.mode = .create
+        
+        // Then
+        #expect(!context.viewModel.isValid)
+    }
+    
+    @Test("Validate repository creation with mismatched passwords", tags: ["validation", "model"])
+    func testValidationPasswordMismatch() throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "different-password"
+        context.viewModel.mode = .create
+        
+        // Then
+        #expect(!context.viewModel.isValid)
+    }
+    
+    @Test("Validate repository import mode", tags: ["validation", "model"])
+    func testValidationImportMode() throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "different-password" // Should be ignored in import mode
+        context.viewModel.mode = .import
+        
+        // Then
+        #expect(context.viewModel.isValid)
+    }
+    
+    // MARK: - Creation Tests
+    
+    @Test("Create new repository successfully", tags: ["creation", "model"])
+    func testCreateSuccess() async throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "test-password"
+        context.viewModel.mode = .create
+        
+        let expectedRepo = Repository(name: context.viewModel.name, path: URL(fileURLWithPath: context.viewModel.path))
+        context.creationService.createResult = expectedRepo
+        
+        // When
+        await context.viewModel.createOrImport()
+        
+        // Then
+        if case .success(let repository) = context.viewModel.state {
+            #expect(repository.id == expectedRepo.id)
+            #expect(repository.name == expectedRepo.name)
+            #expect(repository.path == expectedRepo.path)
+        } else {
+            #expect(false, "Expected success state with repository")
+        }
+    }
+    
+    @Test("Handle repository creation failure", tags: ["creation", "model", "error"])
+    func testCreateFailure() async throws {
+        // Given
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.confirmPassword = "test-password"
+        context.viewModel.mode = .create
         
         let expectedError = RepositoryCreationError.invalidPath("Test error")
-        creationService.createError = expectedError
+        context.creationService.createError = expectedError
         
         // When
-        await sut.createOrImport()
+        await context.viewModel.createOrImport()
         
         // Then
-        if case .error(let error as RepositoryCreationError) = sut.state {
-            XCTAssertEqual(error.localizedDescription, expectedError.localizedDescription)
+        if case .error(let error as RepositoryCreationError) = context.viewModel.state {
+            #expect(error.localizedDescription == expectedError.localizedDescription)
         } else {
-            XCTFail("Expected error state")
+            #expect(false, "Expected error state")
         }
     }
     
-    func test_createOrImport_import_success() async {
+    // MARK: - Import Tests
+    
+    @Test("Import existing repository successfully", tags: ["import", "model"])
+    func testImportSuccess() async throws {
         // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.mode = .import
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.mode = .import
         
-        let expectedRepo = Repository(name: sut.name, path: URL(fileURLWithPath: sut.path))
-        creationService.importResult = expectedRepo
+        let expectedRepo = Repository(name: context.viewModel.name, path: URL(fileURLWithPath: context.viewModel.path))
+        context.creationService.importResult = expectedRepo
         
         // When
-        await sut.createOrImport()
+        await context.viewModel.createOrImport()
         
         // Then
-        if case .success(let repository) = sut.state {
-            XCTAssertEqual(repository.id, expectedRepo.id)
-            XCTAssertEqual(repository.name, expectedRepo.name)
-            XCTAssertEqual(repository.path, expectedRepo.path)
+        if case .success(let repository) = context.viewModel.state {
+            #expect(repository.id == expectedRepo.id)
+            #expect(repository.name == expectedRepo.name)
+            #expect(repository.path == expectedRepo.path)
         } else {
-            XCTFail("Expected success state with repository")
+            #expect(false, "Expected success state with repository")
         }
     }
     
-    func test_createOrImport_import_failure() async {
+    @Test("Handle repository import failure", tags: ["import", "model", "error"])
+    func testImportFailure() async throws {
         // Given
-        sut.name = "Test Repo"
-        sut.path = "/test/path"
-        sut.password = "test-password"
-        sut.mode = .import
+        let context = TestContext()
+        context.viewModel.name = "Test Repo"
+        context.viewModel.path = "/test/path"
+        context.viewModel.password = "test-password"
+        context.viewModel.mode = .import
         
         let expectedError = RepositoryCreationError.invalidPath("Test error")
-        creationService.importError = expectedError
+        context.creationService.importError = expectedError
         
         // When
-        await sut.createOrImport()
+        await context.viewModel.createOrImport()
         
         // Then
-        if case .error(let error as RepositoryCreationError) = sut.state {
-            XCTAssertEqual(error.localizedDescription, expectedError.localizedDescription)
+        if case .error(let error as RepositoryCreationError) = context.viewModel.state {
+            #expect(error.localizedDescription == expectedError.localizedDescription)
         } else {
-            XCTFail("Expected error state")
+            #expect(false, "Expected error state")
         }
     }
 }

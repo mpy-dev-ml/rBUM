@@ -1,137 +1,142 @@
-//
-//  BackupViewModelTests.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
-import XCTest
+import Testing
 @testable import rBUM
 
 @MainActor
-final class BackupViewModelTests: XCTestCase {
-    var resticService: TestMocks.MockResticCommandService!
-    var credentialsManager: TestMocks.MockCredentialsManager!
-    var viewModel: BackupViewModel!
-    var repository: Repository!
+struct BackupViewModelTests {
+    // MARK: - Test Setup
     
-    override func setUp() async throws {
-        try await super.setUp()
-        resticService = TestMocks.MockResticCommandService()
-        credentialsManager = TestMocks.MockCredentialsManager()
-        repository = Repository(name: "Test Repo", path: URL(fileURLWithPath: "/test/repo"))
-        viewModel = BackupViewModel(
-            repository: repository,
-            resticService: resticService,
-            credentialsManager: credentialsManager
-        )
+    struct TestContext {
+        let resticService: TestMocks.MockResticCommandService
+        let credentialsManager: TestMocks.MockCredentialsManager
+        let repository: Repository
+        let viewModel: BackupViewModel
+        
+        init() {
+            self.resticService = TestMocks.MockResticCommandService()
+            self.credentialsManager = TestMocks.MockCredentialsManager()
+            self.repository = Repository(name: "Test Repo", path: URL(fileURLWithPath: "/test/repo"))
+            self.viewModel = BackupViewModel(
+                repository: repository,
+                resticService: resticService,
+                credentialsManager: credentialsManager
+            )
+        }
     }
     
-    override func tearDown() async throws {
-        resticService = nil
-        credentialsManager = nil
-        viewModel = nil
-        repository = nil
-        try await super.tearDown()
-    }
+    // MARK: - Basic Tests
     
-    func testInitialState() async {
-        XCTAssertEqual(viewModel.state, .idle)
-        XCTAssertTrue(viewModel.selectedPaths.isEmpty)
-        XCTAssertFalse(viewModel.showError)
-        XCTAssertNil(viewModel.currentStatus)
-        XCTAssertNil(viewModel.currentProgress)
-        XCTAssertEqual(viewModel.progressMessage, "Ready to start backup")
-        XCTAssertEqual(viewModel.progressPercentage, 0)
-    }
-    
-    func testBackupProgress() async {
+    @Test("Verify initial state of backup view model", tags: ["basic", "model"])
+    func testInitialState() async throws {
         // Given
-        let paths = [URL(fileURLWithPath: "/test/file1")]
-        viewModel.selectedPaths = paths
-        let credentials = credentialsManager.createCredentials(
-            id: repository.id,
-            path: repository.path.path,
-            password: "testPassword"
-        )
-        try? await credentialsManager.store(credentials)
-        
-        // When
-        let progressExpectation = expectation(description: "Progress update received")
-        let statusExpectation = expectation(description: "Status update received")
-        
-        // Start backup and wait for completion
-        await viewModel.startBackup()
+        let context = TestContext()
         
         // Then
-        XCTAssertNotNil(viewModel.currentProgress)
-        if case .inProgress(let progress) = viewModel.state {
-            XCTAssertEqual(progress.totalFiles, 10)
-            XCTAssertEqual(progress.processedFiles, 5)
-            XCTAssertEqual(progress.totalBytes, 1024)
-            XCTAssertEqual(progress.processedBytes, 512)
-            XCTAssertEqual(progress.currentFile, "/test/file.txt")
-            XCTAssertEqual(progress.estimatedSecondsRemaining, 10)
-            progressExpectation.fulfill()
+        #expect(context.viewModel.state == .idle)
+        #expect(context.viewModel.selectedPaths.isEmpty)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.currentStatus == nil)
+        #expect(context.viewModel.currentProgress == nil)
+        #expect(context.viewModel.progressMessage == "Ready to start backup")
+        #expect(context.viewModel.progressPercentage == 0)
+    }
+    
+    // MARK: - Backup Tests
+    
+    @Test("Handle backup progress updates", tags: ["model", "backup"])
+    func testBackupProgress() async throws {
+        // Given
+        let context = TestContext()
+        let paths = [URL(fileURLWithPath: "/test/file1")]
+        context.viewModel.selectedPaths = paths
+        
+        let credentials = context.credentialsManager.createCredentials(
+            id: context.repository.id,
+            path: context.repository.path.path,
+            password: "testPassword"
+        )
+        try await context.credentialsManager.store(credentials)
+        
+        // When
+        await context.viewModel.startBackup()
+        
+        // Then
+        #expect(context.viewModel.currentProgress != nil)
+        
+        if case .inProgress(let progress) = context.viewModel.state {
+            #expect(progress.totalFiles == 10)
+            #expect(progress.processedFiles == 5)
+            #expect(progress.totalBytes == 1024)
+            #expect(progress.processedBytes == 512)
+            #expect(progress.currentFile == "/test/file.txt")
+            #expect(progress.estimatedSecondsRemaining == 10)
+        } else {
+            #expect(false, "Expected .inProgress state")
         }
         
-        if let status = viewModel.currentStatus {
-            XCTAssertEqual(status, .completed)
-            statusExpectation.fulfill()
+        if let status = context.viewModel.currentStatus {
+            #expect(status == .completed)
+        } else {
+            #expect(false, "Expected status to be .completed")
         }
-        
-        await waitForExpectations(timeout: 5)
         
         // Verify final state
-        XCTAssertEqual(viewModel.state, .completed)
-        XCTAssertEqual(viewModel.progressPercentage, 100)
-        XCTAssertEqual(viewModel.progressMessage, "Backup completed successfully")
+        #expect(context.viewModel.state == .completed)
+        #expect(context.viewModel.progressPercentage == 100)
+        #expect(context.viewModel.progressMessage == "Backup completed successfully")
     }
     
-    func testBackupFailure() async {
+    @Test("Handle backup failure", tags: ["model", "backup", "error"])
+    func testBackupFailure() async throws {
         // Given
+        let context = TestContext()
         let paths = [URL(fileURLWithPath: "/test/file1")]
-        viewModel.selectedPaths = paths
-        let credentials = credentialsManager.createCredentials(
-            id: repository.id,
-            path: repository.path.path,
+        context.viewModel.selectedPaths = paths
+        
+        let credentials = context.credentialsManager.createCredentials(
+            id: context.repository.id,
+            path: context.repository.path.path,
             password: "testPassword"
         )
-        try? await credentialsManager.store(credentials)
+        try await context.credentialsManager.store(credentials)
         
         let testError = ResticError.backupFailed("Test error")
-        resticService.backupError = testError
+        context.resticService.backupError = testError
         
         // When
-        await viewModel.startBackup()
+        await context.viewModel.startBackup()
         
         // Then
-        if case let .failed(error) = viewModel.state,
+        if case let .failed(error) = context.viewModel.state,
            let resticError = error as? ResticError {
-            XCTAssertEqual(resticError, testError)
+            #expect(resticError == testError)
         } else {
-            XCTFail("Expected .failed state with ResticError")
+            #expect(false, "Expected .failed state with ResticError")
         }
-        XCTAssertTrue(viewModel.showError)
-        XCTAssertEqual(viewModel.progressPercentage, 0)
-        XCTAssertEqual(viewModel.progressMessage, "Backup failed: \(testError.localizedDescription)")
+        
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.progressPercentage == 0)
+        #expect(context.viewModel.progressMessage == "Backup failed: \(testError.localizedDescription)")
     }
     
-    func testReset() async {
+    // MARK: - Reset Tests
+    
+    @Test("Reset backup view model state", tags: ["model", "reset"])
+    func testReset() async throws {
         // Given
-        viewModel.selectedPaths = [URL(fileURLWithPath: "/test/file1")]
-        viewModel.showError = true
+        let context = TestContext()
+        context.viewModel.selectedPaths = [URL(fileURLWithPath: "/test/file1")]
+        context.viewModel.showError = true
         
         // When
-        await viewModel.reset()
+        await context.viewModel.reset()
         
         // Then
-        XCTAssertEqual(viewModel.state, .idle)
-        XCTAssertTrue(viewModel.selectedPaths.isEmpty)
-        XCTAssertFalse(viewModel.showError)
-        XCTAssertNil(viewModel.currentStatus)
-        XCTAssertNil(viewModel.currentProgress)
-        XCTAssertEqual(viewModel.progressMessage, "Ready to start backup")
-        XCTAssertEqual(viewModel.progressPercentage, 0)
+        #expect(context.viewModel.state == .idle)
+        #expect(context.viewModel.selectedPaths.isEmpty)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.currentStatus == nil)
+        #expect(context.viewModel.currentProgress == nil)
+        #expect(context.viewModel.progressMessage == "Ready to start backup")
+        #expect(context.viewModel.progressPercentage == 0)
     }
 }

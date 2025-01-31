@@ -361,7 +361,6 @@ Features that could be deferred if needed:
 ## Resource Requirements
 - macOS Sonoma (14.0) or later
 - Xcode 16.0
-- macOS Ventura (13.0) or later
 - Swift 5.9.2
 - Restic
 - Test environments with various data sizes

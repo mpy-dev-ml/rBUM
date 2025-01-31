@@ -1,101 +1,101 @@
-//
-//  RepositoryListViewModelTests.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
-import XCTest
+import Testing
 @testable import rBUM
 
 @MainActor
-final class RepositoryListViewModelTests: XCTestCase {
-    static let repositoryStorage = MockRepositoryStorage()
-    static let resticService = MockResticCommandService()
-    static let repositoryCreationService = MockRepositoryCreationService()
-    var sut: RepositoryListViewModel!
+struct RepositoryListViewModelTests {
+    // MARK: - Test Setup
     
-    override class func setUp() {
-        super.setUp()
+    struct TestContext {
+        let repositoryStorage: MockRepositoryStorage
+        let resticService: MockResticCommandService
+        let repositoryCreationService: MockRepositoryCreationService
+        let viewModel: RepositoryListViewModel
+        
+        init() {
+            self.repositoryStorage = MockRepositoryStorage()
+            self.resticService = MockResticCommandService()
+            self.repositoryCreationService = MockRepositoryCreationService()
+            self.viewModel = RepositoryListViewModel(
+                resticService: resticService,
+                repositoryStorage: repositoryStorage,
+                repositoryCreationService: repositoryCreationService
+            )
+        }
     }
     
-    override class func tearDown() {
-        super.tearDown()
-    }
+    // MARK: - Repository Loading Tests
     
-    override func setUp() async throws {
-        sut = RepositoryListViewModel(
-            resticService: Self.resticService,
-            repositoryStorage: Self.repositoryStorage,
-            repositoryCreationService: Self.repositoryCreationService
-        )
-    }
-    
-    override func tearDown() async throws {
-        sut = nil
-    }
-    
-    func test_loadRepositories_success() async throws {
+    @Test("Load repositories successfully", tags: ["loading", "model"])
+    func testLoadRepositoriesSuccess() async throws {
         // Given
+        let context = TestContext()
         let repositories = [
             Repository(name: "Test1", path: URL(fileURLWithPath: "/test1")),
             Repository(name: "Test2", path: URL(fileURLWithPath: "/test2"))
         ]
-        Self.repositoryStorage.listResult = repositories
+        context.repositoryStorage.listResult = repositories
         
         // When
-        await sut.loadRepositories()
+        await context.viewModel.loadRepositories()
         
         // Then
-        XCTAssertEqual(sut.repositories, repositories)
-        XCTAssertFalse(sut.showError)
-        XCTAssertNil(sut.error)
+        #expect(context.viewModel.repositories == repositories)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
     }
     
-    func test_loadRepositories_failure() async throws {
+    @Test("Handle repository loading failure", tags: ["loading", "model", "error"])
+    func testLoadRepositoriesFailure() async throws {
         // Given
+        let context = TestContext()
         let expectedError = NSError(domain: "test", code: 1)
-        Self.repositoryStorage.listError = expectedError
+        context.repositoryStorage.listError = expectedError
         
         // When
-        await sut.loadRepositories()
+        await context.viewModel.loadRepositories()
         
         // Then
-        XCTAssertTrue(sut.repositories.isEmpty)
-        XCTAssertTrue(sut.showError)
-        XCTAssertNotNil(sut.error)
+        #expect(context.viewModel.repositories.isEmpty)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error != nil)
     }
     
-    func test_deleteRepository_success() async throws {
+    // MARK: - Repository Deletion Tests
+    
+    @Test("Delete repository successfully", tags: ["deletion", "model"])
+    func testDeleteRepositorySuccess() async throws {
         // Given
+        let context = TestContext()
         let repository = Repository(name: "Test", path: URL(fileURLWithPath: "/test"))
-        Self.repositoryStorage.listResult = [repository]
-        await sut.loadRepositories()
+        context.repositoryStorage.listResult = [repository]
+        await context.viewModel.loadRepositories()
         
         // When
-        await sut.deleteRepository(repository)
+        await context.viewModel.deleteRepository(repository)
         
         // Then
-        XCTAssertTrue(sut.repositories.isEmpty)
-        XCTAssertFalse(sut.showError)
-        XCTAssertNil(sut.error)
+        #expect(context.viewModel.repositories.isEmpty)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
     }
     
-    func test_deleteRepository_failure() async throws {
+    @Test("Handle repository deletion failure", tags: ["deletion", "model", "error"])
+    func testDeleteRepositoryFailure() async throws {
         // Given
+        let context = TestContext()
         let repository = Repository(name: "Test", path: URL(fileURLWithPath: "/test"))
         let expectedError = NSError(domain: "test", code: 1)
-        Self.repositoryStorage.deleteError = expectedError
-        Self.repositoryStorage.listResult = [repository]
-        await sut.loadRepositories()
+        context.repositoryStorage.deleteError = expectedError
+        context.repositoryStorage.listResult = [repository]
+        await context.viewModel.loadRepositories()
         
         // When
-        await sut.deleteRepository(repository)
+        await context.viewModel.deleteRepository(repository)
         
         // Then
-        XCTAssertEqual(sut.repositories.count, 1)
-        XCTAssertTrue(sut.showError)
-        XCTAssertNotNil(sut.error)
+        #expect(context.viewModel.repositories.count == 1)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error != nil)
     }
 }
 
