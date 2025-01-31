@@ -92,13 +92,26 @@ protocol ResticCommandServiceProtocol {
 /// Restic command execution service
 class ResticCommandService: ResticCommandServiceProtocol {
     private let fileManager: FileManager
-    private let logger: Logger
+    private let logger: os.Logger
     private let resticPath: String
     
-    init(fileManager: FileManager = .default, logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "ResticCommand"), resticPath: String = "/usr/local/bin/restic") {
+    init(
+        fileManager: FileManager = .default,
+        logger: os.Logger = Logging.logger(for: .repository)
+    ) {
         self.fileManager = fileManager
         self.logger = logger
-        self.resticPath = resticPath
+        
+        // Find restic in PATH or use default location
+        if let path = ProcessInfo.processInfo.environment["PATH"]?.components(separatedBy: ":").first(where: { path in
+            let resticPath = (path as NSString).appendingPathComponent("restic")
+            return fileManager.fileExists(atPath: resticPath)
+        }) {
+            self.resticPath = (path as NSString).appendingPathComponent("restic")
+        } else {
+            // Default to /usr/local/bin/restic if not found in PATH
+            self.resticPath = "/usr/local/bin/restic"
+        }
     }
     
     /// Execute a restic command with the given arguments
