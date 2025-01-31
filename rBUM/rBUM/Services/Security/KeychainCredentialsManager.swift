@@ -13,12 +13,12 @@ import Security
 final class KeychainCredentialsManager: CredentialsManagerProtocol {
     private let keychainService: KeychainServiceProtocol
     private let credentialsStorage: CredentialsStorageProtocol
-    private let logger: Logger
+    private let logger: os.Logger
     
     init(
         keychainService: KeychainServiceProtocol = KeychainService(),
         credentialsStorage: CredentialsStorageProtocol = CredentialsStorage(),
-        logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "Keychain")
+        logger: os.Logger = Logging.logger(for: .keychain)
     ) {
         self.keychainService = keychainService
         self.credentialsStorage = credentialsStorage

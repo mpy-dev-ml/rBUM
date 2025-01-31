@@ -58,23 +58,28 @@ enum CredentialsStorageError: LocalizedError {
 /// File-based implementation of CredentialsStorageProtocol
 final class CredentialsStorage: CredentialsStorageProtocol {
     private let fileManager: FileManager
-    private let logger: Logger
+    private let logger: os.Logger
     private let credentialsDirectory: URL
     
-    init(fileManager: FileManager = .default, logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "Storage")) {
+    init(
+        fileManager: FileManager = .default,
+        logger: os.Logger = Logging.logger(for: .storage)
+    ) {
         self.fileManager = fileManager
         self.logger = logger
         
-        // Get the application support directory
-        guard let appSupportDir = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        // Get Application Support directory
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             fatalError("Could not access Application Support directory")
         }
         
-        // Create the credentials directory path
-        self.credentialsDirectory = appSupportDir.appendingPathComponent("rBUM/Credentials", isDirectory: true)
+        // Create credentials directory path
+        self.credentialsDirectory = appSupport
+            .appendingPathComponent("dev.mpy.rBUM", isDirectory: true)
+            .appendingPathComponent("Credentials", isDirectory: true)
         
-        // Ensure the directory exists
-        try? self.createCredentialsDirectoryIfNeeded()
+        // Create directory if needed
+        try? createCredentialsDirectoryIfNeeded()
     }
     
     func store(_ credentials: RepositoryCredentials) throws {
