@@ -21,19 +21,15 @@ struct BackupView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            if case .inProgress(let progress) = viewModel.state {
+            if case .backing(let progress) = viewModel.state {
                 VStack(spacing: 8) {
-                    ProgressView(value: progress.overallProgress, total: 100) {
+                    ProgressView(value: progress.byteProgress, total: 100) {
                         Text(viewModel.progressMessage)
                             .font(.headline)
                     }
                     .progressViewStyle(.linear)
                     
-                    Text(progress.formattedTimeRemaining)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    Text(progress.formattedElapsedTime)
+                    Text("Elapsed time: \(Int(progress.updatedAt.timeIntervalSince(progress.startTime))) seconds")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -49,66 +45,61 @@ struct BackupView: View {
                 }
                 .padding()
             } else {
-                // Path selection
-                if viewModel.selectedPaths.isEmpty {
-                    ContentUnavailableView(
-                        "No Files Selected",
-                        systemImage: "folder.badge.plus",
-                        description: Text("Select files and folders to back up")
-                    )
-                } else {
-                    List {
-                        Section("Selected Items") {
-                            ForEach(viewModel.selectedPaths, id: \.self) { path in
-                                HStack {
-                                    Image(systemName: path.hasDirectoryPath ? "folder.fill" : "doc.fill")
-                                        .foregroundStyle(.secondary)
-                                    
-                                    Text(path.lastPathComponent)
-                                        .lineLimit(1)
-                                    
-                                    Spacer()
-                                    
-                                    if let resources = try? path.resourceValues(forKeys: [.fileSizeKey]),
-                                       let size = resources.fileSize {
-                                        Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
-                                            .foregroundStyle(.secondary)
-                                            .font(.caption)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Action buttons
-                HStack {
-                    Button {
-                        viewModel.selectPaths()
-                    } label: {
-                        Label("Select Files", systemImage: "folder.badge.plus")
-                    }
-                    .buttonStyle(.bordered)
+                VStack(spacing: 12) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.blue)
                     
-                    if !viewModel.selectedPaths.isEmpty {
-                        Button {
-                            Task {
-                                await viewModel.startBackup()
-                            }
-                        } label: {
-                            Label("Start Backup", systemImage: "arrow.up.doc")
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
+                    Text("Select Files to Back Up")
+                        .font(.headline)
                 }
                 .padding()
             }
-        }
-        .navigationTitle("Create Backup")
-        .alert("Backup Failed", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.reset()
+            
+            Spacer()
+            
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+                
+                Spacer()
+                
+                if case .backing = viewModel.state {
+                    Button("Cancel Backup") {
+                        Task {
+                            await viewModel.cancelBackup()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                } else if case .completed = viewModel.state {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button("Select Files") {
+                        Task {
+                            await viewModel.selectPaths()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Start Backup") {
+                        Task {
+                            await viewModel.startBackup()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.selectedPaths.isEmpty)
+                }
             }
+            .padding()
+        }
+        .frame(width: 400, height: 300)
+        .alert("Backup Failed", isPresented: $viewModel.showError) {
+            Button("OK") { }
         } message: {
             if case .failed(let error) = viewModel.state {
                 Text(error.localizedDescription)
@@ -117,49 +108,34 @@ struct BackupView: View {
     }
 }
 
-// MARK: - Preview Helpers
-
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
-    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
-        // Return mock status for preview
-        return RepositoryStatus(
-            isValid: true,
-            packsValid: true,
-            indexValid: true,
-            snapshotsValid: true,
-            errors: [],
-            stats: .init(
-                totalSize: 1024 * 1024 * 100,  // 100 MB
-                packFiles: 10,
-                snapshots: 5
-            )
-        )
+    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
+        return []
     }
     
     func initializeRepository(at path: URL, password: String) async throws {}
     
-    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
+    func check(_ repository: ResticRepository) async throws {}
     
     func createBackup(
         paths: [URL],
-        to repository: Repository,
-        credentials: RepositoryCredentials,
-        tags: [String]?,
-        onProgress: ((BackupProgress) -> Void)?,
-        onStatusChange: ((BackupStatus) -> Void)?
+        to repository: ResticRepository,
+        tags: [String]? = nil,
+        onProgress: ((ResticBackupProgress) -> Void)? = nil,
+        onStatusChange: ((ResticBackupStatus) -> Void)? = nil
     ) async throws {
         // Simulate backup progress
         onStatusChange?(.preparing)
         
         // Simulate progress updates
-        let progress = BackupProgress(
+        let progress = ResticBackupProgress(
             totalFiles: 100,
             processedFiles: 50,
             totalBytes: 1024 * 1024,
             processedBytes: 512 * 1024,
             currentFile: "/test/file.txt",
-            estimatedSecondsRemaining: 30,
-            startTime: Date()
+            startTime: Date(),
+            updatedAt: Date()
         )
         onProgress?(progress)
         onStatusChange?(.backing(progress))
@@ -169,13 +145,8 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         onStatusChange?(.completed)
     }
     
-    func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot] {
-        []
-    }
-    
     func pruneSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials,
+        in repository: ResticRepository,
         keepLast: Int?,
         keepDaily: Int?,
         keepWeekly: Int?,
@@ -185,25 +156,37 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
 }
 
 private final class PreviewCredentialsManager: CredentialsManagerProtocol {
-    func store(_ credentials: RepositoryCredentials) async throws {}
-    
-    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
-        createCredentials(id: id, path: "/test/repo", password: "test-password")
+    func store(_ credentials: RepositoryCredentials) async throws {
+        <#code#>
     }
     
-    func delete(forId id: UUID) async throws {}
+    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+        <#code#>
+    }
+    
+    func delete(forId id: UUID) async throws {
+        <#code#>
+    }
     
     func getPassword(forRepositoryId id: UUID) async throws -> String {
-        "test-password"
+        <#code#>
     }
     
     func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
+        <#code#>
+    }
+    
+    func getCredentials(for repository: Repository) throws -> RepositoryCredentials {
         RepositoryCredentials(
-            repositoryId: id,
-            password: password,
-            repositoryPath: path
+            repositoryId: repository.id,
+            password: "test",
+            repositoryPath: repository.path.path
         )
     }
+    
+    func storeCredentials(_ credentials: RepositoryCredentials) throws {}
+    
+    func deleteCredentials(forRepositoryId repositoryId: UUID) throws {}
 }
 
 // MARK: - Preview

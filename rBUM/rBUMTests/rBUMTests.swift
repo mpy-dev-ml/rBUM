@@ -104,26 +104,26 @@ extension rBUMTests {
         
         func createBackup(
             paths: [URL],
-            to repository: Repository,
-            credentials: RepositoryCredentials,
+            to repository: rBUM.Repository,
+            credentials: rBUM.RepositoryCredentials,
             tags: [String]?,
-            onProgress: ((BackupProgress) -> Void)?,
-            onStatusChange: ((BackupStatus) -> Void)?
+            onProgress: ((rBUM.BackupProgress) -> Void)?,
+            onStatusChange: ((rBUM.BackupStatus) -> Void)?
         ) async throws {
             if let error = error { throw error }
             
             // Simulate backup progress
             onStatusChange?(.preparing)
-            onProgress?(BackupProgress(totalFiles: 100, processedFiles: 0, totalBytes: 1024 * 1024, processedBytes: 0))
+            onProgress?(rBUM.BackupProgress(totalFiles: 100, processedFiles: 0, totalBytes: 1024 * 1024, processedBytes: 0))
             
             // Simulate backup completion
             onStatusChange?(.completed)
-            onProgress?(BackupProgress(totalFiles: 100, processedFiles: 100, totalBytes: 1024 * 1024, processedBytes: 1024 * 1024))
+            onProgress?(rBUM.BackupProgress(totalFiles: 100, processedFiles: 100, totalBytes: 1024 * 1024, processedBytes: 1024 * 1024))
         }
     }
     
     final class MockRepositoryService: RepositoryServiceProtocol {
-        private var repositories: [Repository] = []
+        private var repositories: [rBUM.Repository] = []
         private var error: Error?
         
         func reset() {
@@ -135,7 +135,7 @@ extension rBUMTests {
             self.error = error
         }
         
-        func store(_ repository: Repository) async throws {
+        func store(_ repository: rBUM.Repository) async throws {
             if let error = error { throw error }
             if let existing = repositories.firstIndex(where: { $0.id == repository.id }) {
                 repositories[existing] = repository
@@ -144,7 +144,7 @@ extension rBUMTests {
             }
         }
         
-        func list() async throws -> [Repository] {
+        func list() async throws -> [rBUM.Repository] {
             if let error = error { throw error }
             return repositories
         }
@@ -235,7 +235,7 @@ extension rBUMTests {
     }
     
     final class MockCredentialsManager: CredentialsManagerProtocol {
-        private var credentials: [RepositoryCredentials] = []
+        private var credentials: [rBUM.RepositoryCredentials] = []
         private var error: Error?
         
         func reset() {
@@ -247,12 +247,12 @@ extension rBUMTests {
             self.error = error
         }
         
-        func store(_ credentials: RepositoryCredentials) async throws {
+        func store(_ credentials: rBUM.RepositoryCredentials) async throws {
             if let error = error { throw error }
             self.credentials.append(credentials)
         }
         
-        func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+        func retrieve(forId id: UUID) async throws -> rBUM.RepositoryCredentials {
             if let error = error { throw error }
             guard let credentials = credentials.first(where: { $0.repositoryId == id }) else {
                 throw CredentialsError.notFound
@@ -260,7 +260,7 @@ extension rBUMTests {
             return credentials
         }
         
-        func update(_ credentials: RepositoryCredentials) async throws {
+        func update(_ credentials: rBUM.RepositoryCredentials) async throws {
             if let error = error { throw error }
             guard let index = self.credentials.firstIndex(where: { $0.repositoryId == credentials.repositoryId }) else {
                 throw CredentialsError.notFound
@@ -284,8 +284,8 @@ extension rBUMTests {
             return credentials.password
         }
         
-        func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
-            RepositoryCredentials(
+        func createCredentials(id: UUID, path: String, password: String) -> rBUM.RepositoryCredentials {
+            rBUM.RepositoryCredentials(
                 repositoryId: id,
                 password: password,
                 repositoryPath: path

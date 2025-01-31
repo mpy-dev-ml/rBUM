@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import os
+import os.log
 
 /// Errors that can occur during Restic operations
 enum ResticError: LocalizedError, Equatable {
@@ -69,167 +71,170 @@ enum ResticError: LocalizedError, Equatable {
     }
 }
 
-/// Handles Restic command execution and error handling
+/// Protocol defining the interface for interacting with the restic command-line tool
 protocol ResticCommandServiceProtocol {
     /// Initialize a new repository
     func initializeRepository(at path: URL, password: String) async throws
     
     /// List all snapshots in a repository
-    func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot]
+    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot]
     
     /// Create a new backup
-    func createBackup(paths: [URL], to repository: Repository, credentials: RepositoryCredentials, tags: [String]?, onProgress: ((BackupProgress) -> Void)?, onStatusChange: ((BackupStatus) -> Void)?) async throws
+    func createBackup(paths: [URL], to repository: ResticRepository, tags: [String]?, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws
     
     /// Prune old snapshots from a repository
-    func pruneSnapshots(in repository: Repository, credentials: RepositoryCredentials, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws
+    func pruneSnapshots(in repository: ResticRepository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws
     
-    /// Check repository integrity and return its status
-    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus
+    /// Check repository integrity
+    func check(_ repository: ResticRepository) async throws
 }
 
 /// Restic command execution service
-final class ResticCommandService: ResticCommandServiceProtocol {
-    private let fileManager = FileManager.default
+class ResticCommandService: ResticCommandServiceProtocol {
+    private let fileManager: FileManager
+    private let logger: Logger
     private let resticPath: String
-    private let credentialsManager: CredentialsManagerProtocol
-    private let processExecutor: ProcessExecutorProtocol
-    private let logger = Logging.logger(for: .repository)
     
-    init(
-        resticPath: String = "/opt/homebrew/bin/restic",
-        credentialsManager: CredentialsManagerProtocol,
-        processExecutor: ProcessExecutorProtocol
-    ) {
+    init(fileManager: FileManager = .default, logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "ResticCommand"), resticPath: String = "/usr/local/bin/restic") {
+        self.fileManager = fileManager
+        self.logger = logger
         self.resticPath = resticPath
-        self.credentialsManager = credentialsManager
-        self.processExecutor = processExecutor
     }
     
-    @discardableResult
+    /// Execute a restic command with the given arguments
     private func executeCommand(
         _ arguments: [String],
         credentials: RepositoryCredentials,
         onOutput: ((String) -> Void)? = nil
     ) async throws -> String {
-        var environment: [String: String] = [:]
+        var allArguments = arguments
         
-        // Set password and repository path from credentials
+        // Add repository path
+        allArguments.insert(credentials.repositoryPath.path, at: 0)
+        allArguments.insert("--repo", at: 0)
+        
+        // Create process
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: resticPath)
+        process.arguments = allArguments
+        
+        // Set up environment
+        var environment = ProcessInfo.processInfo.environment
         environment["RESTIC_PASSWORD"] = credentials.password
-        environment["RESTIC_REPOSITORY"] = credentials.repositoryPath
+        process.environment = environment
         
-        let result = try await processExecutor.execute(
-            command: resticPath,
-            arguments: arguments,
-            environment: environment,
-            onOutput: onOutput
-        )
+        // Set up pipes
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
         
-        if result.exitCode != 0 {
-            throw ResticError.commandFailed(result.error)
+        // Start process
+        do {
+            try process.run()
+        } catch {
+            throw ResticError.commandError("Failed to start restic: \(error.localizedDescription)")
         }
         
-        return result.output
+        // Handle output asynchronously
+        var output = ""
+        for try await line in outputPipe.fileHandleForReading.bytes.lines {
+            output += line + "\n"
+            onOutput?(line)
+        }
+        
+        // Wait for process to complete
+        let status = await withCheckedContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume(returning: process.terminationStatus)
+            }
+        }
+        
+        // Check for errors
+        if status != 0 {
+            let errorOutput = try errorPipe.fileHandleForReading.readToEnd().flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            throw ResticError.commandError("restic failed with status \(status): \(errorOutput)")
+        }
+        
+        return output
     }
     
-    private func parseBackupOutput(
-        _ line: String,
-        startTime: Date,
-        onProgress: ((BackupProgress) -> Void)?,
-        onStatusChange: ((BackupStatus) -> Void)?
-    ) {
-        guard let data = line.data(using: .utf8) else { return }
+    private func parseBackupProgress(_ line: String) -> ResticBackupProgress? {
+        guard let data = line.data(using: .utf8) else { return nil }
         
         do {
-            let status = try JSONDecoder().decode(ResticBackupStatus.self, from: data)
-            
-            // Handle different message types
-            switch status.messageType {
-            case "status":
-                if let progress = status.toBackupProgress(startTime: startTime) {
-                    onProgress?(progress)
-                    onStatusChange?(.backing(progress))
-                }
-            case "summary":
-                onStatusChange?(.finalising)
-            default:
-                break
-            }
+            let response = try JSONDecoder().decode(ResticBackupResponse.self, from: data)
+            return response.toBackupProgress(startTime: Date())
         } catch {
-            // Not all lines will be valid JSON status updates, ignore those
-            logger.debugMessage("Failed to parse backup status: \(error.localizedDescription)")
+            self.logger.debug("Failed to parse backup progress: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    private func parseBackupStatus(_ line: String) -> ResticBackupStatus? {
+        guard let data = line.data(using: .utf8) else { return nil }
+        
+        do {
+            return try JSONDecoder().decode(ResticBackupStatus.self, from: data)
+        } catch {
+            self.logger.debug("Failed to parse backup status: \(error.localizedDescription)")
+            return nil
         }
     }
     
     func initializeRepository(at path: URL, password: String) async throws {
         let arguments = ["init"]
+        
         let credentials = RepositoryCredentials(
             repositoryId: UUID(),
             password: password,
-            repositoryPath: path.path
+            repositoryPath: path
         )
+        
         try await executeCommand(arguments, credentials: credentials)
     }
     
-    func listSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials
-    ) async throws -> [Snapshot] {
+    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
         let arguments = ["snapshots", "--json"]
         
-        let output = try await executeCommand(arguments, credentials: credentials)
+        let output = try await executeCommand(arguments, credentials: repository.credentials)
         
-        return try JSONDecoder().decode([Snapshot].self, from: Data(output.utf8))
+        return try JSONDecoder().decode([ResticSnapshot].self, from: Data(output.utf8))
     }
     
-    func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        credentials: RepositoryCredentials,
-        tags: [String]?,
-        onProgress: ((BackupProgress) -> Void)?,
-        onStatusChange: ((BackupStatus) -> Void)?
-    ) async throws {
+    func createBackup(paths: [URL], to repository: ResticRepository, tags: [String]? = nil, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
         guard !paths.isEmpty else {
             throw ResticError.invalidArgument("No paths specified for backup")
         }
         
-        // Validate all paths exist
-        for path in paths {
-            guard fileManager.fileExists(atPath: path.path) else {
-                throw ResticError.invalidArgument("Path does not exist: \(path.path)")
-            }
-        }
-        
         var arguments = ["backup"]
-        arguments.append(contentsOf: paths.map { $0.path })
         
-        // Add standard flags
-        arguments.append("--json")  // Get JSON output for progress
-        arguments.append("--verbose")  // Get detailed output
+        // Add paths to backup
+        arguments.append(contentsOf: paths.map { $0.path })
         
         // Add tags if specified
         if let tags = tags {
             for tag in tags {
-                arguments.append("--tag")
-                arguments.append(tag)
+                arguments.append(contentsOf: ["--tag", tag])
             }
         }
         
-        // Track start time for progress calculation
-        let startTime = Date()
+        // Add JSON output flag
+        arguments.append("--json")
+        
         onStatusChange?(.preparing)
         
         do {
             try await executeCommand(
                 arguments,
-                credentials: credentials,
+                credentials: repository.credentials,
                 onOutput: { line in
-                    self.parseBackupOutput(
-                        line,
-                        startTime: startTime,
-                        onProgress: onProgress,
-                        onStatusChange: onStatusChange
-                    )
+                    if let progress = self.parseBackupProgress(line) {
+                        onProgress?(progress)
+                        onStatusChange?(.backing(progress))
+                    } else if let status = self.parseBackupStatus(line) {
+                        onStatusChange?(status)
+                    }
                 }
             )
             onStatusChange?(.completed)
@@ -239,75 +244,46 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         }
     }
     
-    func pruneSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
-    ) async throws {
+    func pruneSnapshots(in repository: ResticRepository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
         var arguments = ["forget", "--prune"]
         
         if let keepLast = keepLast {
             arguments.append("--keep-last")
-            arguments.append("\(keepLast)")
+            arguments.append(String(keepLast))
         }
         
         if let keepDaily = keepDaily {
             arguments.append("--keep-daily")
-            arguments.append("\(keepDaily)")
+            arguments.append(String(keepDaily))
         }
         
         if let keepWeekly = keepWeekly {
             arguments.append("--keep-weekly")
-            arguments.append("\(keepWeekly)")
+            arguments.append(String(keepWeekly))
         }
         
         if let keepMonthly = keepMonthly {
             arguments.append("--keep-monthly")
-            arguments.append("\(keepMonthly)")
+            arguments.append(String(keepMonthly))
         }
         
         if let keepYearly = keepYearly {
             arguments.append("--keep-yearly")
-            arguments.append("\(keepYearly)")
+            arguments.append(String(keepYearly))
         }
         
-        try await executeCommand(arguments, credentials: credentials)
+        try await executeCommand(arguments, credentials: repository.credentials)
     }
     
-    /// Check repository integrity and return its status
-    /// - Parameters:
-    ///   - repository: URL of the repository to check
-    ///   - password: Repository password
-    /// - Returns: Repository status including integrity check results
-    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
+    func check(_ repository: ResticRepository) async throws {
         let arguments = [
             "check",
-            "--json",
-            "--repository", repository.path,
-            "--password", password
+            "--json"
         ]
         
-        let credentials = RepositoryCredentials(
-            repositoryId: UUID(),  // Generate new UUID since this is a one-time check
-            password: password,
-            repositoryPath: repository.path
-        )
-        
-        let output = try await executeCommand(arguments, credentials: credentials)
+        let output = try await executeCommand(arguments, credentials: repository.credentials)
         guard let outputData = output.data(using: String.Encoding.utf8) else {
             throw ResticError.commandError("Invalid output format")
-        }
-        
-        let decoder = JSONDecoder()
-        do {
-            let status = try decoder.decode(RepositoryStatus.self, from: outputData)
-            return status
-        } catch {
-            throw ResticError.commandError("Failed to parse repository status: \(error.localizedDescription)")
         }
     }
 }

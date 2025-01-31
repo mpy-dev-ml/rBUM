@@ -6,20 +6,23 @@
 //
 
 import Foundation
+import os
 import Security
 
 /// Implementation of CredentialsManagerProtocol that uses the macOS Keychain for secure storage
 final class KeychainCredentialsManager: CredentialsManagerProtocol {
     private let keychainService: KeychainServiceProtocol
     private let credentialsStorage: CredentialsStorageProtocol
-    private let logger = Logging.logger(for: .keychain)
+    private let logger: Logger
     
     init(
         keychainService: KeychainServiceProtocol = KeychainService(),
-        credentialsStorage: CredentialsStorageProtocol = CredentialsStorage()
+        credentialsStorage: CredentialsStorageProtocol = CredentialsStorage(),
+        logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "Keychain")
     ) {
         self.keychainService = keychainService
         self.credentialsStorage = credentialsStorage
+        self.logger = logger
     }
     
     func store(_ credentials: RepositoryCredentials) async throws {
@@ -30,13 +33,14 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
                 service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
+            logger.info("Successfully saved password to keychain")
             
             // Store credentials metadata
             try credentialsStorage.store(credentials)
             
-            logger.infoMessage("Stored credentials for repository: \(credentials.repositoryId)")
+            logger.info("Stored credentials for repository: \(credentials.repositoryId)")
         } catch {
-            logger.errorMessage("Failed to store credentials: \(error.localizedDescription)")
+            logger.error("Failed to store credentials: \(error.localizedDescription)")
             throw error
         }
     }
@@ -53,6 +57,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
                 service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
+            logger.info("Successfully retrieved password from keychain")
             
             // Create new credentials with retrieved password
             return RepositoryCredentials(
@@ -62,7 +67,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
                 keyFileName: credentials.keyFileName
             )
         } catch {
-            logger.errorMessage("Failed to retrieve credentials: \(error.localizedDescription)")
+            logger.error("Failed to retrieve credentials: \(error.localizedDescription)")
             throw error
         }
     }
@@ -80,13 +85,14 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
                 service: existingCredentials.keychainService,
                 account: existingCredentials.keychainAccount
             )
+            logger.info("Successfully updated password in keychain")
             
             // Update credentials metadata
             try credentialsStorage.update(credentials)
             
-            logger.infoMessage("Updated credentials for repository: \(credentials.repositoryId)")
+            logger.info("Updated credentials for repository: \(credentials.repositoryId)")
         } catch {
-            logger.errorMessage("Failed to update credentials: \(error.localizedDescription)")
+            logger.error("Failed to update credentials: \(error.localizedDescription)")
             throw error
         }
     }
@@ -103,13 +109,14 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
                 service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
+            logger.info("Successfully deleted password from keychain")
             
             // Delete credentials metadata
             try credentialsStorage.delete(forRepositoryId: id)
             
-            logger.infoMessage("Deleted credentials for repository: \(id)")
+            logger.info("Deleted credentials for repository: \(id)")
         } catch {
-            logger.errorMessage("Failed to delete credentials: \(error.localizedDescription)")
+            logger.error("Failed to delete credentials: \(error.localizedDescription)")
             throw error
         }
     }

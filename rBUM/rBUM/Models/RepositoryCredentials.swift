@@ -8,36 +8,36 @@
 import Foundation
 
 /// Represents the credentials for a Restic repository
-struct RepositoryCredentials: Codable {
+public struct RepositoryCredentials: Codable {
     /// Unique identifier for the repository these credentials belong to
-    let repositoryId: UUID
+    public let repositoryId: UUID
     
     /// Repository password used for encryption
-    var password: String
+    public var password: String
     
     /// Path to the repository, used as the account identifier in Keychain
-    let repositoryPath: String
+    public let repositoryPath: String
     
     /// Optional name of the key file if using key-based authentication
-    var keyFileName: String?
+    public var keyFileName: String?
     
     /// Creation date of these credentials
-    let createdAt: Date
+    public let createdAt: Date
     
     /// Last time these credentials were modified
-    var modifiedAt: Date
+    public var modifiedAt: Date
     
     /// Service name used for Keychain storage
-    var keychainService: String {
+    public var keychainService: String {
         "dev.mpy.rBUM.repository.\(repositoryId.uuidString)"
     }
     
     /// Account name used for Keychain storage
-    var keychainAccount: String {
+    public var keychainAccount: String {
         repositoryPath
     }
     
-    init(
+    public init(
         repositoryId: UUID,
         password: String,
         repositoryPath: String,
@@ -51,7 +51,7 @@ struct RepositoryCredentials: Codable {
         self.modifiedAt = Date()
     }
     
-    mutating func updatePassword(_ newPassword: String) {
+    public mutating func updatePassword(_ newPassword: String) {
         password = newPassword
         modifiedAt = Date()
     }
@@ -59,7 +59,7 @@ struct RepositoryCredentials: Codable {
 
 // MARK: - Equatable
 extension RepositoryCredentials: Equatable {
-    static func == (lhs: RepositoryCredentials, rhs: RepositoryCredentials) -> Bool {
+    public static func == (lhs: RepositoryCredentials, rhs: RepositoryCredentials) -> Bool {
         // Only compare the identifying properties, not timestamps
         lhs.repositoryId == rhs.repositoryId &&
         lhs.password == rhs.password &&

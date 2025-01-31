@@ -31,6 +31,7 @@ enum RepositoryStorageError: LocalizedError, Equatable {
     case invalidData(String)
     case repositoryNotFound(UUID)
     case repositoryAlreadyExists
+    case saveFailed(Error)
     
     var errorDescription: String? {
         switch self {
@@ -42,6 +43,8 @@ enum RepositoryStorageError: LocalizedError, Equatable {
             return "Repository not found with ID: \(id)"
         case .repositoryAlreadyExists:
             return "Repository already exists at this location"
+        case .saveFailed(let error):
+            return "Failed to save repository: \(error.localizedDescription)"
         }
     }
     
@@ -55,6 +58,8 @@ enum RepositoryStorageError: LocalizedError, Equatable {
             return lhsId == rhsId
         case (.repositoryAlreadyExists, .repositoryAlreadyExists):
             return true
+        case (.saveFailed(let lhsError), .saveFailed(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
         default:
             return false
         }
@@ -63,6 +68,18 @@ enum RepositoryStorageError: LocalizedError, Equatable {
 
 /// Manages repository metadata persistence
 final class RepositoryStorage: RepositoryStorageProtocol {
+    func store(_ repository: Repository) throws {
+        <#code#>
+    }
+    
+    func list() throws -> [Repository] {
+        <#code#>
+    }
+    
+    func delete(forId id: UUID) throws {
+        <#code#>
+    }
+    
     private let fileManager: FileManager
     private let logger = Logging.logger(for: .repository)
     private let customStorageURL: URL?  // Optional custom storage location
@@ -116,7 +133,7 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         }
     }
     
-    func store(_ repository: Repository) throws {
+    public func save(_ repository: Repository) throws {
         var existingRepositories = try list()
         
         // Check if a repository already exists at this path (excluding current repository)
@@ -137,19 +154,17 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         do {
             let data = try encoder.encode(existingRepositories)
             try data.write(to: storageURL, options: .atomic)
-            logger.infoMessage("Stored repository: \(repository.id)")
         } catch {
-            logger.errorMessage("Failed to store repository: \(error.localizedDescription)")
-            throw RepositoryStorageError.fileOperationFailed("write")
+            throw RepositoryStorageError.saveFailed(error)
         }
     }
     
-    func retrieve(forId id: UUID) throws -> Repository? {
+    public func retrieve(forId id: UUID) throws -> Repository? {
         let repositories = try list()
         return repositories.first { $0.id == id }
     }
     
-    func list() throws -> [Repository] {
+    public func loadAll() throws -> [ResticRepository] {
         guard fileManager.fileExists(atPath: storageURL.path) else {
             return []
         }
@@ -158,16 +173,16 @@ final class RepositoryStorage: RepositoryStorageProtocol {
             let data = try Data(contentsOf: storageURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode([Repository].self, from: data)
+            return try decoder.decode([ResticRepository].self, from: data)
         } catch {
             logger.errorMessage("Failed to read repositories: \(error.localizedDescription)")
             throw RepositoryStorageError.fileOperationFailed("read")
         }
     }
     
-    func delete(forId id: UUID) throws {
+    public func delete(_ repository: ResticRepository) throws {
         var repositories = try list()
-        repositories.removeAll { $0.id == id }
+        repositories.removeAll { $0.id == repository.id }
         
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -175,7 +190,7 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         do {
             let data = try encoder.encode(repositories)
             try data.write(to: storageURL, options: .atomic)
-            logger.infoMessage("Deleted repository: \(id)")
+            logger.infoMessage("Deleted repository: \(repository.id)")
         } catch {
             logger.errorMessage("Failed to delete repository: \(error.localizedDescription)")
             throw RepositoryStorageError.fileOperationFailed("delete")

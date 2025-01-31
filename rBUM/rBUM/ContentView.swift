@@ -94,6 +94,51 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
+    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
+        return []
+    }
+    
+    func initializeRepository(at path: URL, password: String) async throws {}
+    
+    func check(_ repository: ResticRepository) async throws {}
+    
+    func createBackup(
+        paths: [URL],
+        to repository: ResticRepository,
+        tags: [String]? = nil,
+        onProgress: ((ResticBackupProgress) -> Void)? = nil,
+        onStatusChange: ((ResticBackupStatus) -> Void)? = nil
+    ) async throws {
+        // Simulate backup progress
+        onStatusChange?(.preparing)
+        
+        // Simulate progress updates
+        let progress = ResticBackupProgress(
+            totalFiles: 100,
+            processedFiles: 50,
+            totalBytes: 1024 * 1024,
+            processedBytes: 512 * 1024,
+            currentFile: "/test/file.txt",
+            startTime: Date(),
+            updatedAt: Date()
+        )
+        onProgress?(progress)
+        onStatusChange?(.backing(progress))
+        
+        // Simulate completion
+        try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
+        onStatusChange?(.completed)
+    }
+    
+    func pruneSnapshots(
+        in repository: ResticRepository,
+        keepLast: Int?,
+        keepDaily: Int?,
+        keepWeekly: Int?,
+        keepMonthly: Int?,
+        keepYearly: Int?
+    ) async throws {}
+    
     func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
         // Return mock status for preview
         return RepositoryStatus(
@@ -109,8 +154,6 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
             )
         )
     }
-    
-    func initializeRepository(at path: URL, password: String) async throws {}
     
     func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
     
@@ -172,8 +215,8 @@ class ContentViewModel: ObservableObject {
         self.credentialsManager = credentialsManager
         self.repositoryStorage = RepositoryStorage()
         self.resticService = ResticCommandService(
-            credentialsManager: credentialsManager,
-            processExecutor: ProcessExecutor()
+            fileManager: .default,
+            logger: Logger(subsystem: "dev.mpy.rBUM", category: "ResticCommand")
         )
         self.repositoryCreationService = RepositoryCreationService(
             resticService: resticService,

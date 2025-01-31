@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import OSLog
+import os
 
 /// Centralized logging configuration for rBUM
 enum Logging {
@@ -26,83 +26,68 @@ enum Logging {
         case storage = "Storage"
         
         /// Get a logger configured for this category
-        var logger: Logger {
-            Logger(subsystem: Logging.subsystem, category: rawValue)
+        var logger: os.Logger {
+            os.Logger(subsystem: Logging.subsystem, category: rawValue)
         }
     }
     
     /// Get a logger for a specific category
-    static func logger(for category: Category) -> Logger {
+    static func logger(for category: Category) -> os.Logger {
         category.logger
     }
     
     /// Get a logger with a custom category name
-    static func logger(category: String) -> Logger {
-        Logger(subsystem: subsystem, category: category)
+    static func logger(category: String) -> os.Logger {
+        os.Logger(subsystem: Logging.subsystem, category: category)
     }
 }
 
 // MARK: - Convenience Extensions
 
-extension Logger {
+extension os.Logger {
     /// Log a message at the debug level
     func debugMessage(_ message: String) {
-        debug("\(message)")
+        log(level: .debug, "\(message)")
     }
     
     /// Log a sensitive message at the debug level
     func debugSensitive(_ message: String) {
-        debug("\(message, privacy: .private)")
+        log(level: .debug, "\(message, privacy: .private)")
     }
     
     /// Log a message at the info level
     func infoMessage(_ message: String) {
-        info("\(message)")
+        log(level: .info, "\(message)")
     }
     
     /// Log a sensitive message at the info level
     func infoSensitive(_ message: String) {
-        info("\(message, privacy: .private)")
-    }
-    
-    /// Log a message at the notice level
-    func noticeMessage(_ message: String) {
-        notice("\(message)")
-    }
-    
-    /// Log a sensitive message at the notice level
-    func noticeSensitive(_ message: String) {
-        notice("\(message, privacy: .private)")
+        log(level: .info, "\(message, privacy: .private)")
     }
     
     /// Log a message at the error level
     func errorMessage(_ message: String) {
-        error("\(message)")
+        log(level: .error, "\(message)")
     }
     
     /// Log a sensitive message at the error level
     func errorSensitive(_ message: String) {
-        error("\(message, privacy: .private)")
+        log(level: .error, "\(message, privacy: .private)")
     }
     
     /// Log a message at the fault level
     func faultMessage(_ message: String) {
-        fault("\(message)")
+        log(level: .fault, "\(message)")
     }
     
     /// Log a sensitive message at the fault level
     func faultSensitive(_ message: String) {
-        fault("\(message, privacy: .private)")
+        log(level: .fault, "\(message, privacy: .private)")
     }
     
     /// Log an error with optional context
     func logError(_ error: Error, context: String? = nil) {
-        let message: String
-        if let context = context {
-            message = "\(context): \(error.localizedDescription)"
-        } else {
-            message = error.localizedDescription
-        }
+        let message = context.map { "\($0): \(error.localizedDescription)" } ?? error.localizedDescription
         errorMessage(message)
     }
 }

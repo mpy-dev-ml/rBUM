@@ -8,11 +8,11 @@
 import Foundation
 
 /// Represents the current status of a backup operation
-enum BackupStatus {
+public enum ResticBackupStatus: Codable {
     /// Backup is being prepared (scanning files, calculating sizes)
     case preparing
     /// Backup is actively processing files
-    case backing(BackupProgress)
+    case backing(ResticBackupProgress)
     /// Backup is finalising (creating snapshot, cleaning up)
     case finalising
     /// Backup completed successfully
@@ -22,7 +22,7 @@ enum BackupStatus {
     /// Backup was cancelled by the user
     case cancelled
     
-    var isActive: Bool {
+    public var isActive: Bool {
         switch self {
         case .preparing, .backing, .finalising:
             return true
@@ -30,11 +30,63 @@ enum BackupStatus {
             return false
         }
     }
+    
+    // MARK: - Codable Implementation
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case progress
+        case error
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        
+        switch type {
+        case "preparing":
+            self = .preparing
+        case "backing":
+            let progress = try container.decode(ResticBackupProgress.self, forKey: .progress)
+            self = .backing(progress)
+        case "finalising":
+            self = .finalising
+        case "completed":
+            self = .completed
+        case "failed":
+            let errorMessage = try container.decode(String.self, forKey: .error)
+            self = .failed(NSError(domain: "ResticBackup", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMessage]))
+        case "cancelled":
+            self = .cancelled
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid status type")
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        switch self {
+        case .preparing:
+            try container.encode("preparing", forKey: .type)
+        case .backing(let progress):
+            try container.encode("backing", forKey: .type)
+            try container.encode(progress, forKey: .progress)
+        case .finalising:
+            try container.encode("finalising", forKey: .type)
+        case .completed:
+            try container.encode("completed", forKey: .type)
+        case .failed(let error):
+            try container.encode("failed", forKey: .type)
+            try container.encode(error.localizedDescription, forKey: .error)
+        case .cancelled:
+            try container.encode("cancelled", forKey: .type)
+        }
+    }
 }
 
-// MARK: - BackupStatus Equatable
-extension BackupStatus: Equatable {
-    static func == (lhs: BackupStatus, rhs: BackupStatus) -> Bool {
+// MARK: - ResticBackupStatus Equatable
+extension ResticBackupStatus: Equatable {
+    public static func == (lhs: ResticBackupStatus, rhs: ResticBackupStatus) -> Bool {
         switch (lhs, rhs) {
         case (.preparing, .preparing):
             return true
@@ -45,7 +97,6 @@ extension BackupStatus: Equatable {
         case (.completed, .completed):
             return true
         case (.failed(let lhsError), .failed(let rhsError)):
-            // Compare error descriptions since Error doesn't conform to Equatable
             return lhsError.localizedDescription == rhsError.localizedDescription
         case (.cancelled, .cancelled):
             return true
@@ -56,149 +107,163 @@ extension BackupStatus: Equatable {
 }
 
 /// Represents the progress of a backup operation
-struct BackupProgress: Equatable {
+public struct ResticBackupProgress: Codable, Equatable {
     /// Total number of files to backup
-    let totalFiles: Int
+    public let totalFiles: Int
     /// Number of files processed so far
-    let processedFiles: Int
-    /// Total bytes to backup
-    let totalBytes: Int64
+    public let processedFiles: Int
+    /// Total data size to backup in bytes
+    public let totalBytes: Int64
     /// Number of bytes processed so far
-    let processedBytes: Int64
-    /// Currently processing file
-    let currentFile: String?
-    /// Estimated seconds remaining
-    let estimatedSecondsRemaining: TimeInterval?
-    /// Time when backup started
-    let startTime: Date
+    public let processedBytes: Int64
+    /// Current file being processed
+    public let currentFile: String?
+    /// Time when the backup started
+    public let startTime: Date
+    /// Time when the progress was last updated
+    public let updatedAt: Date
     
-    /// Progress as percentage of files processed (0-100)
-    var fileProgress: Double {
-        totalFiles > 0 ? (Double(processedFiles) / Double(totalFiles)) * 100 : 0
+    /// Percentage of files processed (0-100)
+    public var fileProgress: Double {
+        guard totalFiles > 0 else { return 0 }
+        return Double(processedFiles) / Double(totalFiles) * 100
     }
     
-    /// Progress as percentage of bytes processed (0-100)
-    var byteProgress: Double {
-        totalBytes > 0 ? (Double(processedBytes) / Double(totalBytes)) * 100 : 0
+    /// Percentage of bytes processed (0-100)
+    public var byteProgress: Double {
+        guard totalBytes > 0 else { return 0 }
+        return Double(processedBytes) / Double(totalBytes) * 100
     }
     
-    /// Overall progress as percentage of files processed (0-100)
-    var overallProgress: Double {
-        fileProgress
+    /// Average speed in bytes per second
+    public var averageSpeed: Double {
+        let duration = updatedAt.timeIntervalSince(startTime)
+        guard duration > 0 else { return 0 }
+        return Double(processedBytes) / duration
     }
     
-    /// Formatted string for time remaining
-    var formattedTimeRemaining: String {
-        guard let seconds = estimatedSecondsRemaining else {
-            return "Calculating..."
-        }
-        return formatDuration(seconds: Int(seconds))
+    /// Estimated time remaining in seconds
+    public var estimatedTimeRemaining: TimeInterval? {
+        guard averageSpeed > 0 else { return nil }
+        let remainingBytes = Double(totalBytes - processedBytes)
+        return remainingBytes / averageSpeed
     }
     
-    /// Formatted string for elapsed time
-    var formattedElapsedTime: String {
-        let elapsed = -startTime.timeIntervalSinceNow
-        if elapsed < 1 {
-            return "Just started"
-        }
-        return formatDuration(seconds: Int(elapsed))
+    public init(
+        totalFiles: Int,
+        processedFiles: Int,
+        totalBytes: Int64,
+        processedBytes: Int64,
+        currentFile: String?,
+        startTime: Date,
+        updatedAt: Date
+    ) {
+        self.totalFiles = totalFiles
+        self.processedFiles = processedFiles
+        self.totalBytes = totalBytes
+        self.processedBytes = processedBytes
+        self.currentFile = currentFile
+        self.startTime = startTime
+        self.updatedAt = updatedAt
     }
     
-    /// Format progress as a string with file and byte counts
-    func formattedProgress() -> String {
-        let byteFormatter = ByteCountFormatter()
-        byteFormatter.countStyle = .file
+    // MARK: - Codable Implementation
+    private enum CodingKeys: String, CodingKey {
+        case totalFiles
+        case processedFiles
+        case totalBytes
+        case processedBytes
+        case currentFile
+        case startTime
+        case updatedAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        let processedBytesStr = byteFormatter.string(fromByteCount: processedBytes)
-        let totalBytesStr = byteFormatter.string(fromByteCount: totalBytes)
-        
-        return String(
-            format: "%.1f%% (%d/%d files, %@/%@)",
-            overallProgress,
-            processedFiles,
-            totalFiles,
-            processedBytesStr,
-            totalBytesStr
-        )
+        totalFiles = try container.decode(Int.self, forKey: .totalFiles)
+        processedFiles = try container.decode(Int.self, forKey: .processedFiles)
+        totalBytes = try container.decode(Int64.self, forKey: .totalBytes)
+        processedBytes = try container.decode(Int64.self, forKey: .processedBytes)
+        currentFile = try container.decodeIfPresent(String.self, forKey: .currentFile)
+        startTime = try container.decode(Date.self, forKey: .startTime)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
     
-    /// Format duration in seconds to human-readable string
-    private func formatDuration(seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
         
-        var parts: [String] = []
-        if hours > 0 {
-            parts.append("\(hours) hour\(hours == 1 ? "" : "s")")
-        }
-        if minutes > 0 {
-            parts.append("\(minutes) minute\(minutes == 1 ? "" : "s")")
-        }
-        if parts.isEmpty {
-            return "Less than a minute"
-        }
-        return parts.joined(separator: ", ")
+        try container.encode(totalFiles, forKey: .totalFiles)
+        try container.encode(processedFiles, forKey: .processedFiles)
+        try container.encode(totalBytes, forKey: .totalBytes)
+        try container.encode(processedBytes, forKey: .processedBytes)
+        try container.encodeIfPresent(currentFile, forKey: .currentFile)
+        try container.encode(startTime, forKey: .startTime)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
-    
-    static func == (lhs: BackupProgress, rhs: BackupProgress) -> Bool {
+}
+
+// MARK: - ResticBackupProgress Equatable
+extension ResticBackupProgress {
+    public static func == (lhs: ResticBackupProgress, rhs: ResticBackupProgress) -> Bool {
         lhs.totalFiles == rhs.totalFiles &&
         lhs.processedFiles == rhs.processedFiles &&
         lhs.totalBytes == rhs.totalBytes &&
         lhs.processedBytes == rhs.processedBytes &&
         lhs.currentFile == rhs.currentFile &&
-        lhs.estimatedSecondsRemaining == rhs.estimatedSecondsRemaining &&
-        lhs.startTime == rhs.startTime
+        lhs.startTime == rhs.startTime &&
+        lhs.updatedAt == rhs.updatedAt
     }
 }
 
-/// Represents a line of JSON output from the restic backup command
-struct ResticBackupStatus: Codable {
-    /// Message type from restic
+/// JSON response from restic backup command
+public struct ResticBackupResponse: Codable {
     let messageType: String
-    /// Total number of files
-    let totalFiles: Int?
-    /// Files processed
-    let filesProcessed: Int?
-    /// Total bytes
-    let totalBytes: Int64?
-    /// Bytes processed
-    let bytesProcessed: Int64?
-    /// Current file being processed
+    let filesNew: Int?
+    let filesChanged: Int?
+    let filesUnmodified: Int?
+    let dirsNew: Int?
+    let dirsChanged: Int?
+    let dirsUnmodified: Int?
+    let dataBlobs: Int?
+    let treeBlobs: Int?
+    let dataMiBs: Double?
+    let treeMiBs: Double?
+    let totalFilesProcessed: Int?
+    let totalBytesProcessed: Int64?
     let currentFile: String?
-    /// Seconds elapsed
-    let secondsElapsed: Double?
-    /// Seconds remaining (estimated)
-    let secondsRemaining: Double?
     
     enum CodingKeys: String, CodingKey {
         case messageType = "message_type"
-        case totalFiles = "total_files"
-        case filesProcessed = "files_done"
-        case totalBytes = "total_bytes"
-        case bytesProcessed = "bytes_done"
+        case filesNew = "files_new"
+        case filesChanged = "files_changed"
+        case filesUnmodified = "files_unmodified"
+        case dirsNew = "dirs_new"
+        case dirsChanged = "dirs_changed"
+        case dirsUnmodified = "dirs_unmodified"
+        case dataBlobs = "data_blobs"
+        case treeBlobs = "tree_blobs"
+        case dataMiBs = "data_added"
+        case treeMiBs = "total_files_processed"
+        case totalFilesProcessed = "total_bytes_processed"
+        case totalBytesProcessed = "bytes_processed"
         case currentFile = "current_file"
-        case secondsElapsed = "seconds_elapsed"
-        case secondsRemaining = "seconds_remaining"
     }
     
-    /// Convert restic status to backup progress
-    func toBackupProgress(startTime: Date) -> BackupProgress? {
-        guard messageType == "status",
-              let totalFiles = totalFiles,
-              let filesProcessed = filesProcessed,
-              let totalBytes = totalBytes,
-              let bytesProcessed = bytesProcessed else {
-            return nil
-        }
+    func toBackupProgress(startTime: Date) -> ResticBackupProgress {
+        let totalFiles = (filesNew ?? 0) + (filesChanged ?? 0) + (filesUnmodified ?? 0)
+        let processedFiles = totalFilesProcessed ?? 0
+        let totalBytes = Int64((dataMiBs ?? 0) * 1024 * 1024)
+        let processedBytes = totalBytesProcessed ?? 0
         
-        return BackupProgress(
+        return ResticBackupProgress(
             totalFiles: totalFiles,
-            processedFiles: filesProcessed,
+            processedFiles: processedFiles,
             totalBytes: totalBytes,
-            processedBytes: bytesProcessed,
+            processedBytes: processedBytes,
             currentFile: currentFile,
-            estimatedSecondsRemaining: secondsRemaining,
-            startTime: startTime
+            startTime: startTime,
+            updatedAt: Date()
         )
     }
 }

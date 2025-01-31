@@ -8,30 +8,32 @@
 import Foundation
 
 /// Represents a Restic backup repository
-struct Repository: Identifiable, Codable, Hashable {
-    let id: UUID
-    var name: String        // Repository display name
-    var path: URL          // Local path to repository
-    var lastBackup: Date?  // Most recent backup date
-    var backupCount: Int   // Number of backups
-    var totalSize: Int64   // Total size in bytes
-    var createdAt: Date    // Creation timestamp
-    var modifiedAt: Date   // Last modified timestamp
+public struct ResticRepository: Identifiable, Codable, Hashable {
+    public let id: UUID
+    public var name: String        // Repository display name
+    public var path: URL          // Local path to repository
+    public var lastBackup: Date?  // Most recent backup date
+    public var backupCount: Int   // Number of backups
+    public var totalSize: Int64   // Total size in bytes
+    public var createdAt: Date    // Creation timestamp
+    public var modifiedAt: Date   // Last modified timestamp
+    public let credentials: RepositoryCredentials  // Repository credentials
     
     /// Keychain service name for repository credentials
-    var keychainService: String {
+    public var keychainService: String {
         "dev.mpy.rBUM.repository.\(id.uuidString)"
     }
     
     /// Keychain account name for repository credentials
-    var keychainAccount: String {
+    public var keychainAccount: String {
         path.path
     }
     
-    init(id: UUID = UUID(), name: String, path: URL) {
+    public init(id: UUID = UUID(), name: String, path: URL, credentials: RepositoryCredentials) {
         self.id = id
         self.name = name
         self.path = path
+        self.credentials = credentials
         self.backupCount = 0
         self.totalSize = 0
         self.createdAt = Date()
@@ -39,25 +41,25 @@ struct Repository: Identifiable, Codable, Hashable {
     }
     
     // MARK: - Hashable
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
     
-    static func == (lhs: Repository, rhs: Repository) -> Bool {
+    public static func == (lhs: ResticRepository, rhs: ResticRepository) -> Bool {
         lhs.id == rhs.id
     }
 }
 
 // MARK: - Repository Storage
-extension Repository {
+extension ResticRepository {
     /// The default directory for storing repositories
-    static var defaultStorageDirectory: URL {
+    public static var defaultStorageDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Repositories", isDirectory: true)
     }
     
     /// The directory for this repository's data
-    var storageDirectory: URL {
+    public var storageDirectory: URL {
         Self.defaultStorageDirectory.appendingPathComponent(id.uuidString, isDirectory: true)
     }
 }

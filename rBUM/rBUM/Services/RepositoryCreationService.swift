@@ -164,14 +164,29 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
             path: path
         )
         
+        // Create credentials
+        let credentials = RepositoryCredentials(
+            repositoryId: repository.id,
+            password: password,
+            repositoryPath: path.path,
+            keyFileName: nil
+        )
+        
+        // Create restic repository
+        let resticRepository = ResticRepository(
+            name: name,
+            path: path,
+            credentials: credentials
+        )
+        
         do {
             // Verify repository with restic
-            try await resticService.checkRepository(path, withPassword: password)
+            try await resticService.check(resticRepository)
             
             // Store repository metadata
             try repositoryStorage.store(repository)
             
-            logger.infoMessage("Imported repository: \(repository.id) from \(path.path)")
+            logger.info("Imported repository: \(repository.id) from \(path.path)")
             return repository
         } catch ResticError.invalidRepository {
             throw RepositoryCreationError.invalidRepository

@@ -6,9 +6,9 @@
 //
 
 import SwiftUI
-import OSLog
+import os
 
-private let logger = Logging.logger(for: .app)
+private let logger = Logger(subsystem: "dev.mpy.rBUM", category: "App")
 
 @main
 struct rBUMApp: App {
@@ -26,8 +26,8 @@ struct rBUMApp: App {
         let storage = RepositoryStorage()
         self.repositoryStorage = storage
         self.resticService = ResticCommandService(
-            credentialsManager: credentialsManager,
-            processExecutor: processExecutor
+            fileManager: .default,
+            logger: Logger(subsystem: "dev.mpy.rBUM", category: "ResticCommand")
         )
         self.repositoryCreationService = RepositoryCreationService(
             resticService: resticService,
@@ -39,7 +39,7 @@ struct rBUMApp: App {
         WindowGroup {
             ContentView(credentialsManager: credentialsManager)
             .onAppear {
-                logger.infoMessage("ContentView appeared")
+                logger.info("ContentView appeared")
             }
         }
         .windowStyle(.hiddenTitleBar)
@@ -48,7 +48,7 @@ struct rBUMApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates...") {
-                    logger.infoMessage("Check for updates requested")
+                    logger.info("Check for updates requested")
                     // TODO: Implement update check
                 }
             }
@@ -65,10 +65,10 @@ struct rBUMApp: App {
 
 // MARK: - App Delegate
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let logger = Logging.logger(for: .appDelegate)
+    private let logger = Logger(subsystem: "dev.mpy.rBUM", category: "AppDelegate")
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.infoMessage("Application did finish launching")
+        logger.info("Application did finish launching")
         
         // Register for sleep/wake notifications
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -87,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        logger.infoMessage("Application will terminate")
+        logger.info("Application will terminate")
         
         // Unregister observers
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -95,17 +95,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // TODO: Check for any ongoing operations before allowing termination
-        logger.infoMessage("Application requested to terminate")
+        logger.info("Application requested to terminate")
         return .terminateNow
     }
     
     @objc private func handleSleepNotification(_ notification: Notification) {
-        logger.infoMessage("System is going to sleep")
+        logger.info("System is going to sleep")
         // TODO: Handle sleep state
     }
     
     @objc private func handleWakeNotification(_ notification: Notification) {
-        logger.infoMessage("System woke from sleep")
+        logger.info("System woke from sleep")
         // TODO: Handle wake state
     }
 }

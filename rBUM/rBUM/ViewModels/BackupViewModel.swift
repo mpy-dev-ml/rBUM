@@ -10,30 +10,7 @@ import SwiftUI
 
 @MainActor
 final class BackupViewModel: ObservableObject {
-    enum BackupState: Equatable {
-        case idle
-        case selecting
-        case inProgress(BackupProgress)
-        case completed
-        case failed(Error)
-        
-        static func == (lhs: BackupState, rhs: BackupState) -> Bool {
-            switch (lhs, rhs) {
-            case (.idle, .idle),
-                (.selecting, .selecting),
-                (.completed, .completed):
-                return true
-            case let (.inProgress(lhsProgress), .inProgress(rhsProgress)):
-                return lhsProgress == rhsProgress
-            case let (.failed(lhsError), .failed(rhsError)):
-                return lhsError.localizedDescription == rhsError.localizedDescription
-            default:
-                return false
-            }
-        }
-    }
-    
-    @Published private(set) var state: BackupState = .idle
+    @Published private(set) var state: ResticBackupStatus = .preparing
     @Published var selectedPaths: [URL] = []
     @Published var showError = false
     @Published private(set) var currentStatus: BackupStatus?
@@ -54,22 +31,21 @@ final class BackupViewModel: ObservableObject {
         self.credentialsManager = credentialsManager
     }
     
-    func selectPaths() {
-        state = .selecting
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = true
-        panel.canCreateDirectories = false
-        panel.message = "Select files and folders to back up"
-        panel.prompt = "Back Up"
-        
-        if panel.runModal() == .OK {
-            selectedPaths = panel.urls
-            logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
+    func selectPaths() async {
+        await MainActor.run {
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = true
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = true
+            panel.canCreateDirectories = false
+            panel.message = "Select files and folders to back up"
+            panel.prompt = "Back Up"
+            
+            if panel.runModal() == .OK {
+                selectedPaths = panel.urls
+                logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
+            }
         }
-        
-        state = .idle
     }
     
     func startBackup() async {
@@ -79,41 +55,71 @@ final class BackupViewModel: ObservableObject {
             // Reset state
             currentStatus = nil
             currentProgress = nil
-            state = .idle
             
-            // Create credentials for backup
-            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
+            // Get repository credentials
+            guard let credentials = try? credentialsManager.getCredentials(for: repository) else {
+                state = .failed(ResticError.credentialsNotFound)
+                return
+            }
+            
+            // Create ResticRepository
+            let resticRepo = ResticRepository(
+                name: repository.name,
+                path: repository.path,
+                credentials: credentials
             )
             
-            // Start backup with progress reporting
+            // Start backup
             try await resticService.createBackup(
                 paths: selectedPaths,
-                to: repository,
-                credentials: credentials,
+                to: resticRepo,
                 tags: nil,
                 onProgress: { [weak self] progress in
-                    Task { @MainActor in
-                        self?.currentProgress = progress
-                        self?.state = .inProgress(progress)
+                    guard let self = self else { return }
+                    if case .backing = self.state {
+                        // Only update progress if we're already in backing state
+                        self.state = .backing(progress)
                     }
                 },
                 onStatusChange: { [weak self] status in
-                    Task { @MainActor in
-                        self?.currentStatus = status
-                        if case .completed = status {
-                            self?.handleBackupCompleted()
-                        } else if case .failed(let error) = status {
-                            self?.handleBackupFailed(error)
-                        }
-                    }
+                    self?.state = status
                 }
             )
         } catch {
-            handleBackupFailed(error)
+            state = .failed(error)
+            showError = true
+        }
+    }
+    
+    func cancelBackup() async {
+        state = .cancelled
+    }
+    
+    var progressMessage: String {
+        switch state {
+        case .preparing:
+            return "Preparing backup..."
+        case .backing(let progress):
+            return "Backing up \(progress.processedFiles)/\(progress.totalFiles) files (\(Int(progress.byteProgress))%)"
+        case .finalising:
+            return "Finalizing backup..."
+        case .completed:
+            return "Backup completed"
+        case .failed(let error):
+            return "Backup failed: \(error.localizedDescription)"
+        case .cancelled:
+            return "Backup cancelled"
+        }
+    }
+    
+    var progressPercentage: Double {
+        switch state {
+        case .backing(let progress):
+            return progress.byteProgress
+        case .completed:
+            return 100
+        default:
+            return 0
         }
     }
     
@@ -135,38 +141,10 @@ final class BackupViewModel: ObservableObject {
     }
     
     func reset() {
-        state = .idle
+        state = .preparing
         selectedPaths = []
         showError = false
         currentStatus = nil
         currentProgress = nil
-    }
-    
-    // MARK: - Progress Formatting
-    
-    var progressMessage: String {
-        switch state {
-        case .idle:
-            return "Ready to start backup"
-        case .selecting:
-            return "Selecting files..."
-        case .inProgress(let progress):
-            return "Backing up: \(progress.formattedProgress())"
-        case .completed:
-            return "Backup completed successfully"
-        case .failed(let error):
-            return "Backup failed: \(error.localizedDescription)"
-        }
-    }
-    
-    var progressPercentage: Double {
-        switch state {
-        case .inProgress(let progress):
-            return progress.overallProgress
-        case .completed:
-            return 100
-        default:
-            return 0
-        }
     }
 }

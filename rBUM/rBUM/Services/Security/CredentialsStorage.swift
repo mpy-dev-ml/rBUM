@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// Protocol defining the interface for storing repository credentials metadata
 protocol CredentialsStorageProtocol {
@@ -57,61 +58,74 @@ enum CredentialsStorageError: LocalizedError {
 /// File-based implementation of CredentialsStorageProtocol
 final class CredentialsStorage: CredentialsStorageProtocol {
     private let fileManager: FileManager
-    private let logger = Logging.logger(for: .storage)
+    private let logger: Logger
+    private let credentialsDirectory: URL
     
-    /// Directory where credentials metadata is stored
-    private var credentialsDirectory: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("dev.mpy.rBUM/credentials", isDirectory: true)
-    }
-    
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, logger: Logger = Logger(subsystem: "dev.mpy.rBUM", category: "Storage")) {
         self.fileManager = fileManager
-        try? createCredentialsDirectory()
+        self.logger = logger
+        
+        // Get the application support directory
+        guard let appSupportDir = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Could not access Application Support directory")
+        }
+        
+        // Create the credentials directory path
+        self.credentialsDirectory = appSupportDir.appendingPathComponent("rBUM/Credentials", isDirectory: true)
+        
+        // Ensure the directory exists
+        try? self.createCredentialsDirectoryIfNeeded()
     }
     
     func store(_ credentials: RepositoryCredentials) throws {
-        try createCredentialsDirectory()
+        try createCredentialsDirectoryIfNeeded()
         let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
         let data = try JSONEncoder().encode(credentials)
         try data.write(to: url)
-        logger.infoMessage("Stored credentials metadata for repository: \(credentials.repositoryId)")
+        self.logger.log("Saved credentials for repository: \(credentials.repositoryId)")
     }
     
     func update(_ credentials: RepositoryCredentials) throws {
-        try createCredentialsDirectory()
+        try createCredentialsDirectoryIfNeeded()
         let url = credentialsDirectory.appendingPathComponent("\(credentials.repositoryId.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             throw CredentialsStorageError.credentialsNotFound
         }
         let data = try JSONEncoder().encode(credentials)
         try data.write(to: url)
-        logger.infoMessage("Updated credentials metadata for repository: \(credentials.repositoryId)")
+        self.logger.log("Updated credentials for repository: \(credentials.repositoryId)")
     }
     
     func retrieve(forRepositoryId id: UUID) throws -> RepositoryCredentials? {
-        try createCredentialsDirectory()
+        try createCredentialsDirectoryIfNeeded()
         let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             return nil
         }
         let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode(RepositoryCredentials.self, from: data)
+        let credentials = try JSONDecoder().decode(RepositoryCredentials.self, from: data)
+        self.logger.log("Loaded credentials for repository: \(id)")
+        return credentials
     }
     
     func delete(forRepositoryId id: UUID) throws {
-        try createCredentialsDirectory()
+        try createCredentialsDirectoryIfNeeded()
         let url = credentialsDirectory.appendingPathComponent("\(id.uuidString).json")
         guard fileManager.fileExists(atPath: url.path) else {
             throw CredentialsStorageError.credentialsNotFound
         }
-        try fileManager.removeItem(at: url)
-        logger.infoMessage("Deleted credentials metadata for repository: \(id)")
+        do {
+            try fileManager.removeItem(at: url)
+            self.logger.log("Deleted credentials for repository: \(id)")
+        } catch {
+            self.logger.log("Failed to delete credentials: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     func list() throws -> [RepositoryCredentials] {
         // Create directory if it doesn't exist
-        try createCredentialsDirectory()
+        try createCredentialsDirectoryIfNeeded()
         
         // Get directory contents
         let contents = try fileManager.contentsOfDirectory(
@@ -129,16 +143,17 @@ final class CredentialsStorage: CredentialsStorageProtocol {
                     credentials.append(credential)
                 }
             } catch {
-                logger.errorMessage("Failed to load credentials from \(url.lastPathComponent): \(error.localizedDescription)")
+                self.logger.log("Failed to load credentials from \(url.lastPathComponent): \(error.localizedDescription)")
                 continue
             }
         }
+        self.logger.log("Loaded all credentials")
         return credentials
     }
     
     // MARK: - Private Methods
     
-    private func createCredentialsDirectory() throws {
+    private func createCredentialsDirectoryIfNeeded() throws {
         var isDirectory: ObjCBool = false
         if !fileManager.fileExists(atPath: credentialsDirectory.path, isDirectory: &isDirectory) {
             try fileManager.createDirectory(
@@ -146,7 +161,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
                 withIntermediateDirectories: true,
                 attributes: nil
             )
-            logger.infoMessage("Created credentials directory at: \(credentialsDirectory.path)")
+            self.logger.log("Created credentials directory at: \(self.credentialsDirectory.path)")
         } else if !isDirectory.boolValue {
             // If path exists but is not a directory, remove it and create directory
             try fileManager.removeItem(at: credentialsDirectory)
@@ -155,7 +170,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
                 withIntermediateDirectories: true,
                 attributes: nil
             )
-            logger.infoMessage("Replaced file with directory at: \(credentialsDirectory.path)")
+            self.logger.log("Replaced file with directory at: \(self.credentialsDirectory.path)")
         }
     }
 }
