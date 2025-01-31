@@ -49,40 +49,59 @@ enum KeychainError: LocalizedError, Equatable {
     }
 }
 
-/// Protocol defining the interface for keychain operations
+/// Protocol for secure storage in macOS Keychain
 protocol KeychainServiceProtocol {
+    /// Store data in Keychain
+    func store(_ data: Data, service: String, account: String) async throws
+    
+    /// Retrieve data from Keychain
+    func retrieve(service: String, account: String) async throws -> Data
+    
+    /// Update existing data in Keychain
+    func update(_ data: Data, service: String, account: String) async throws
+    
+    /// Delete data from Keychain
+    func delete(service: String, account: String) async throws
+    
     /// Store a password in the keychain
-    /// - Parameters:
-    ///   - password: The password to store
-    ///   - service: The service identifier (e.g., repository ID)
-    ///   - account: The account identifier (e.g., repository path)
-    func storePassword(_ password: String, forService service: String, account: String) async throws
+    func storePassword(_ password: String, service: String, account: String) async throws
     
     /// Retrieve a password from the keychain
-    /// - Parameters:
-    ///   - service: The service identifier
-    ///   - account: The account identifier
-    /// - Returns: The stored password
-    func retrievePassword(forService service: String, account: String) async throws -> String
+    func retrievePassword(service: String, account: String) async throws -> String
     
-    /// Update an existing password in the keychain
-    /// - Parameters:
-    ///   - password: The new password
-    ///   - service: The service identifier
-    ///   - account: The account identifier
-    func updatePassword(_ password: String, forService service: String, account: String) async throws
+    /// Update a password in the keychain
+    func updatePassword(_ password: String, service: String, account: String) async throws
     
     /// Delete a password from the keychain
-    /// - Parameters:
-    ///   - service: The service identifier
-    ///   - account: The account identifier
-    func deletePassword(forService service: String, account: String) async throws
+    func deletePassword(service: String, account: String) async throws
 }
 
-/// Service for managing secure storage of passwords in the macOS Keychain
+/// Manages secure storage using macOS Keychain
 final class KeychainService: KeychainServiceProtocol {
-    private let accessGroup: String?
-    private let isTest: Bool
+    func update(_ data: Data, service: String, account: String) async throws {
+        // First verify the item exists
+        if !(try await itemExists(forService: service, account: account)) {
+            throw KeychainError.itemNotFound
+        }
+        
+        let query = baseQuery(forService: service, account: account)
+        let attributes: [String: Any] = [kSecValueData as String: data]
+        
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        try handleKeychainStatus(status, operation: "update")
+    }
+    
+    func delete(service: String, account: String) async throws {
+        // First verify the item exists
+        if !(try await itemExists(forService: service, account: account)) {
+            throw KeychainError.itemNotFound
+        }
+        
+        forceDelete(forService: service, account: account)
+    }
+    
+    private let accessGroup: String?  // Optional Keychain access group
+    private let isTest: Bool          // Test mode flag
     
     init(accessGroup: String? = nil, isTest: Bool = false) {
         self.accessGroup = accessGroup
@@ -147,22 +166,18 @@ final class KeychainService: KeychainServiceProtocol {
         _ = SecItemDelete(query as CFDictionary)
     }
     
-    func storePassword(_ password: String, forService service: String, account: String) async throws {
+    func store(_ data: Data, service: String, account: String) async throws {
         // First try to delete any existing item
         forceDelete(forService: service, account: account)
         
-        guard let passwordData = password.data(using: .utf8) else {
-            throw KeychainError.dataConversionError
-        }
-        
         var addQuery = baseQuery(forService: service, account: account)
-        addQuery[kSecValueData as String] = passwordData
+        addQuery[kSecValueData as String] = data
         
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         try handleKeychainStatus(status, operation: "store")
     }
     
-    func retrievePassword(forService service: String, account: String) async throws -> String {
+    func retrieve(service: String, account: String) async throws -> Data {
         var query = baseQuery(forService: service, account: account)
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecReturnData as String] = true
@@ -171,37 +186,109 @@ final class KeychainService: KeychainServiceProtocol {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         try handleKeychainStatus(status, operation: "retrieve")
         
-        guard let passwordData = result as? Data,
-              let password = String(data: passwordData, encoding: .utf8) else {
+        guard let data = result as? Data else {
             throw KeychainError.unexpectedItemData
         }
         
-        return password
+        return data
     }
     
-    func updatePassword(_ password: String, forService service: String, account: String) async throws {
-        // First verify the item exists
-        if !(try await itemExists(forService: service, account: account)) {
-            throw KeychainError.itemNotFound
-        }
-        
-        guard let passwordData = password.data(using: .utf8) else {
+    func storePassword(_ password: String, service: String, account: String) async throws {
+        guard let data = password.data(using: .utf8) else {
             throw KeychainError.dataConversionError
         }
         
-        let query = baseQuery(forService: service, account: account)
-        let attributes: [String: Any] = [kSecValueData as String: passwordData]
-        
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        try handleKeychainStatus(status, operation: "update")
+        // Keychain operations can be slow, so we run them in a background task
+        return try await Task.detached(priority: .userInitiated) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecValueData as String: data
+            ]
+            
+            let status = SecItemAdd(query as CFDictionary, nil)
+            guard status == errSecSuccess else {
+                if status == errSecDuplicateItem {
+                    throw KeychainError.duplicateItem
+                }
+                throw KeychainError.unexpectedStatus(status)
+            }
+        }.value
     }
     
-    func deletePassword(forService service: String, account: String) async throws {
-        // First verify the item exists
-        if !(try await itemExists(forService: service, account: account)) {
-            throw KeychainError.itemNotFound
+    func retrievePassword(service: String, account: String) async throws -> String {
+        // Keychain operations can be slow, so we run them in a background task
+        return try await Task.detached(priority: .userInitiated) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+                kSecReturnData as String: true
+            ]
+            
+            var item: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &item)
+            guard status == errSecSuccess else {
+                if status == errSecItemNotFound {
+                    throw KeychainError.itemNotFound
+                }
+                throw KeychainError.unexpectedStatus(status)
+            }
+            
+            guard let data = item as? Data,
+                  let password = String(data: data, encoding: .utf8) else {
+                throw KeychainError.dataConversionError
+            }
+            
+            return password
+        }.value
+    }
+    
+    func updatePassword(_ password: String, service: String, account: String) async throws {
+        guard let data = password.data(using: .utf8) else {
+            throw KeychainError.dataConversionError
         }
         
-        forceDelete(forService: service, account: account)
+        // Keychain operations can be slow, so we run them in a background task
+        return try await Task.detached(priority: .userInitiated) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+            
+            let attributes: [String: Any] = [
+                kSecValueData as String: data
+            ]
+            
+            let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+            guard status == errSecSuccess else {
+                if status == errSecItemNotFound {
+                    throw KeychainError.itemNotFound
+                }
+                throw KeychainError.unexpectedStatus(status)
+            }
+        }.value
+    }
+    
+    func deletePassword(service: String, account: String) async throws {
+        // Keychain operations can be slow, so we run them in a background task
+        return try await Task.detached(priority: .userInitiated) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+            
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess else {
+                if status == errSecItemNotFound {
+                    throw KeychainError.itemNotFound
+                }
+                throw KeychainError.unexpectedStatus(status)
+            }
+        }.value
     }
 }

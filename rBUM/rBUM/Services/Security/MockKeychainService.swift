@@ -7,36 +7,79 @@
 
 import Foundation
 
-/// Mock implementation of KeychainService for previews and testing
+/// Mock implementation of KeychainService for testing
 final class MockKeychainService: KeychainServiceProtocol {
-    private var passwords: [String: [String: String]] = [:]
-    
-    func storePassword(_ password: String, forService service: String, account: String) async throws {
-        if passwords[service]?[account] != nil {
-            throw KeychainError.duplicateItem
+    /// Store a password in mock storage
+    func storePassword(_ password: String, service: String, account: String) async throws {
+        if let error = error { throw error }
+        guard let data = password.data(using: .utf8) else {
+            throw KeychainError.dataConversionError
         }
-        passwords[service] = passwords[service] ?? [:]
-        passwords[service]?[account] = password
+        try await store(data, service: service, account: account)
     }
     
-    func retrievePassword(forService service: String, account: String) async throws -> String {
-        guard let password = passwords[service]?[account] else {
-            throw KeychainError.itemNotFound
+    /// Retrieve a password from mock storage
+    func retrievePassword(service: String, account: String) async throws -> String {
+        if let error = error { throw error }
+        let data = try await retrieve(service: service, account: account)
+        guard let password = String(data: data, encoding: .utf8) else {
+            throw KeychainError.dataConversionError
         }
         return password
     }
     
-    func updatePassword(_ password: String, forService service: String, account: String) async throws {
-        guard passwords[service]?[account] != nil else {
-            throw KeychainError.itemNotFound
+    /// Update a password in mock storage
+    func updatePassword(_ password: String, service: String, account: String) async throws {
+        if let error = error { throw error }
+        guard let data = password.data(using: .utf8) else {
+            throw KeychainError.dataConversionError
         }
-        passwords[service]?[account] = password
+        try await update(data, service: service, account: account)
     }
     
-    func deletePassword(forService service: String, account: String) async throws {
-        guard passwords[service]?[account] != nil else {
+    /// Delete a password from mock storage
+    func deletePassword(service: String, account: String) async throws {
+        if let error = error { throw error }
+        try await delete(service: service, account: account)
+    }
+    
+    private var storage: [String: Data] = [:]  // In-memory storage
+    var error: Error?                          // Simulated error
+    
+    /// Store data in mock storage
+    func store(_ data: Data, service: String, account: String) async throws {
+        if let error = error { throw error }
+        let key = "\(service):\(account)"
+        storage[key] = data
+    }
+    
+    /// Retrieve data from mock storage
+    func retrieve(service: String, account: String) async throws -> Data {
+        if let error = error { throw error }
+        let key = "\(service):\(account)"
+        guard let data = storage[key] else {
             throw KeychainError.itemNotFound
         }
-        passwords[service]?[account] = nil
+        return data
+    }
+    
+    /// Update data in mock storage
+    func update(_ data: Data, service: String, account: String) async throws {
+        if let error = error { throw error }
+        let key = "\(service):\(account)"
+        guard storage[key] != nil else {
+            throw KeychainError.itemNotFound
+        }
+        storage[key] = data
+    }
+    
+    /// Delete data from mock storage
+    func delete(service: String, account: String) async throws {
+        if let error = error { throw error }
+        let key = "\(service):\(account)"
+        guard storage[key] != nil else {
+            throw KeychainError.itemNotFound
+        }
+        storage.removeValue(forKey: key)
     }
 }

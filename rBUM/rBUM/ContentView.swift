@@ -94,6 +94,22 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
+    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
+        // Return mock status for preview
+        return RepositoryStatus(
+            isValid: true,
+            packsValid: true,
+            indexValid: true,
+            snapshotsValid: true,
+            errors: [],
+            stats: .init(
+                totalSize: 1024 * 1024 * 100,  // 100 MB
+                packFiles: 10,
+                snapshots: 5
+            )
+        )
+    }
+    
     func initializeRepository(at path: URL, password: String) async throws {}
     
     func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}

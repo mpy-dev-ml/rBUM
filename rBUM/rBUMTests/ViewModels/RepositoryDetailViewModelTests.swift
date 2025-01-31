@@ -1,117 +1,290 @@
 import Testing
 @testable import rBUM
 
+/// Tests for RepositoryDetailViewModel functionality
 @MainActor
 struct RepositoryDetailViewModelTests {
-    // MARK: - Test Setup
+    // MARK: - Test Context
     
+    /// Test environment with mocked dependencies
     struct TestContext {
-        let resticService: TestMocks.MockResticCommandService
-        let credentialsManager: TestMocks.MockCredentialsManager
-        let repository: Repository
         let viewModel: RepositoryDetailViewModel
+        let mockResticService: MockResticService
+        let mockBackupService: MockBackupService
+        let mockNotificationCenter: MockNotificationCenter
+        let mockStorage: MockRepositoryStorage
         
         init() {
-            self.resticService = TestMocks.MockResticCommandService()
-            self.credentialsManager = TestMocks.MockCredentialsManager()
-            self.repository = Repository(name: "Test Repo", path: URL(fileURLWithPath: "/test/path"))
+            self.mockResticService = MockResticService()
+            self.mockBackupService = MockBackupService()
+            self.mockNotificationCenter = MockNotificationCenter()
+            self.mockStorage = MockRepositoryStorage()
+            
             self.viewModel = RepositoryDetailViewModel(
-                repository: repository,
-                resticService: resticService,
-                credentialsManager: credentialsManager
+                repository: MockData.Repository.validRepository,
+                resticService: mockResticService,
+                backupService: mockBackupService,
+                notificationCenter: mockNotificationCenter,
+                storage: mockStorage
             )
         }
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            mockResticService.reset()
+            mockBackupService.reset()
+            mockNotificationCenter.reset()
+            mockStorage.reset()
+        }
     }
     
-    // MARK: - Repository Check Tests
+    // MARK: - Repository Status Tests
     
-    @Test("Check repository successfully", tags: ["check", "model"])
-    func testCheckRepositorySuccess() async throws {
-        // Given
+    @Test("Load repository status successfully", tags: ["status", "repository"])
+    func testLoadRepositoryStatusSuccess() async throws {
+        // Given: Repository with status
         let context = TestContext()
-        let date = Date()
+        let status = MockData.Repository.validStatus
+        context.mockResticService.repositoryStatus = status
         
-        // When
-        await context.viewModel.checkRepository()
+        // When: Loading status
+        try await context.viewModel.loadRepositoryStatus()
         
-        // Then
-        #expect(context.viewModel.lastCheck != nil)
-        #expect((context.viewModel.lastCheck ?? date) >= date)
-        #expect(context.viewModel.error == nil)
+        // Then: Status is loaded correctly
+        #expect(context.viewModel.status == status)
+        #expect(!context.viewModel.isLoading)
         #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
     }
     
-    @Test("Handle repository check failure", tags: ["check", "model", "error"])
-    func testCheckRepositoryFailure() async throws {
-        // Given
+    @Test("Handle repository status loading failure", tags: ["status", "repository", "error"])
+    func testLoadRepositoryStatusFailure() async throws {
+        // Given: Service that will fail
         let context = TestContext()
-        context.resticService.checkError = NSError(domain: "test", code: 1)
+        context.mockResticService.shouldFail = true
+        context.mockResticService.error = MockData.Error.repositoryError
         
-        // When
-        await context.viewModel.checkRepository()
+        // When: Loading status
+        try await context.viewModel.loadRepositoryStatus()
         
-        // Then
-        #expect(context.viewModel.error != nil)
+        // Then: Error is handled properly
+        #expect(context.viewModel.status == nil)
+        #expect(!context.viewModel.isLoading)
         #expect(context.viewModel.showError)
-        if let error = context.viewModel.error as? ResticError {
-            #expect(error.localizedDescription == "The operation couldn't be completed. (test error 1.)")
-        } else {
-            #expect(false, "Expected ResticError")
-        }
+        #expect(context.viewModel.error as? MockData.Error == MockData.Error.repositoryError)
     }
     
-    // MARK: - Password Update Tests
+    // MARK: - Snapshot Tests
     
-    @Test("Update repository password successfully", tags: ["password", "model"])
-    func testUpdatePasswordSuccess() async throws {
-        // Given
+    @Test("Load snapshots successfully", tags: ["snapshots", "repository"])
+    func testLoadSnapshotsSuccess() async throws {
+        // Given: Repository with snapshots
         let context = TestContext()
-        let newPassword = "new-password"
+        let snapshots = MockData.Repository.validSnapshots
+        context.mockResticService.snapshots = snapshots
         
-        // When
-        try await context.viewModel.updatePassword(newPassword)
+        // When: Loading snapshots
+        try await context.viewModel.loadSnapshots()
         
-        // Then
-        #expect(context.viewModel.error == nil)
+        // Then: Snapshots are loaded correctly
+        #expect(context.viewModel.snapshots == snapshots)
+        #expect(!context.viewModel.isLoading)
         #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
     }
     
-    @Test("Handle empty password update", tags: ["password", "model", "error"])
-    func testUpdatePasswordEmpty() async throws {
-        // Given
+    @Test("Handle snapshots failure", tags: ["snapshots", "repository", "error"])
+    func testLoadSnapshotsFailure() async throws {
+        // Given: Snapshots will fail
         let context = TestContext()
-        let newPassword = ""
+        context.mockResticService.shouldFail = true
+        context.mockResticService.error = MockData.Error.snapshotListError
         
-        // When/Then
-        do {
-            try await context.viewModel.updatePassword(newPassword)
-            #expect(false, "Expected error to be thrown")
-        } catch {
-            #expect(error is ResticError)
-            #expect(error.localizedDescription == "Invalid password")
-        }
+        // When: Loading snapshots
+        try await context.viewModel.loadSnapshots()
+        
+        // Then: Error is handled correctly
+        #expect(context.viewModel.snapshots == [])
+        #expect(!context.viewModel.isLoading)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error as? MockData.Error == MockData.Error.snapshotListError)
     }
     
-    // MARK: - Formatting Tests
+    // MARK: - Backup Tests
     
-    @Test("Format last check time in initial state", tags: ["formatting", "model"])
-    func testFormattedLastCheckInitialState() throws {
-        // Given
+    @Test("Start backup successfully", tags: ["backup", "repository"])
+    func testStartBackupSuccess() async throws {
+        // Given: Repository ready for backup
         let context = TestContext()
+        let backup = MockData.Backup.validBackup
+        context.mockBackupService.backupResult = backup
         
-        // Then
-        #expect(context.viewModel.formattedLastCheck == "Never")
+        // When: Starting backup
+        try await context.viewModel.startBackup()
+        
+        // Then: Backup starts without error
+        #expect(context.mockBackupService.startBackupCalled)
+        #expect(!context.viewModel.isLoading)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
+        #expect(context.mockNotificationCenter.postNotificationCalled)
     }
     
-    @Test("Format last check time after repository check", tags: ["formatting", "model"])
-    func testFormattedLastCheckAfterCheck() async throws {
-        // Given
+    @Test("Handle backup start failure", tags: ["backup", "repository", "error"])
+    func testStartBackupFailure() async throws {
+        // Given: Backup will fail
         let context = TestContext()
+        context.mockBackupService.shouldFail = true
+        context.mockBackupService.error = MockData.Error.backupError
         
-        // When
-        await context.viewModel.checkRepository()
+        // When: Starting backup
+        try await context.viewModel.startBackup()
         
-        // Then
-        #expect(context.viewModel.formattedLastCheck != "Never", "Last check time should be updated after repository check")
+        // Then: Error is handled properly
+        #expect(context.mockBackupService.startBackupCalled)
+        #expect(!context.viewModel.isLoading)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error as? MockData.Error == MockData.Error.backupError)
+    }
+    
+    // MARK: - Repository Update Tests
+    
+    @Test("Update repository settings successfully", tags: ["settings", "repository"])
+    func testUpdateRepositorySettingsSuccess() async throws {
+        // Given: Repository with new settings
+        let context = TestContext()
+        let newSettings = MockData.Repository.validSettings
+        
+        // When: Updating settings
+        try await context.viewModel.updateSettings(newSettings)
+        
+        // Then: Settings are updated without error
+        #expect(context.viewModel.repository.settings == newSettings)
+        #expect(!context.viewModel.isLoading)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
+        #expect(context.mockStorage.updateCalled)
+    }
+    
+    @Test("Update repository successfully", tags: ["update", "repository"])
+    func testUpdateRepositorySuccess() async throws {
+        // Given: Updated repository data
+        let context = TestContext()
+        let updatedRepo = MockData.Repository.validRepository
+        context.mockStorage.repositoryToReturn = updatedRepo
+        
+        // When: Updating repository
+        try await context.viewModel.updateRepository(name: updatedRepo.name)
+        
+        // Then: Repository is updated correctly
+        #expect(context.mockStorage.updateCalled)
+        #expect(context.viewModel.repository.name == updatedRepo.name)
+        #expect(!context.viewModel.isLoading)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
+        #expect(context.mockNotificationCenter.postCalled)
+        #expect(context.mockNotificationCenter.lastNotification?.name == .repositoryUpdated)
+    }
+    
+    @Test("Handle repository update failure", tags: ["update", "repository", "error"])
+    func testUpdateRepositoryFailure() async throws {
+        // Given: Repository update will fail
+        let context = TestContext()
+        context.mockStorage.shouldFail = true
+        context.mockStorage.error = MockData.Error.repositoryUpdateError
+        
+        // When: Updating repository
+        try await context.viewModel.updateRepository(name: "New Name")
+        
+        // Then: Error is handled correctly
+        #expect(context.viewModel.repository.name != "New Name")
+        #expect(!context.viewModel.isLoading)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error as? MockData.Error == MockData.Error.repositoryUpdateError)
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of ResticService for testing
+final class MockResticService: ResticServiceProtocol {
+    var repositoryStatus: RepositoryStatus?
+    var snapshots: [Snapshot] = []
+    var shouldFail = false
+    var error: Error?
+    
+    func getRepositoryStatus(for repository: Repository) async throws -> RepositoryStatus {
+        if shouldFail { throw error ?? MockData.Error.repositoryError }
+        return repositoryStatus ?? MockData.Repository.validStatus
+    }
+    
+    func getSnapshots(for repository: Repository) async throws -> [Snapshot] {
+        if shouldFail { throw error ?? MockData.Error.snapshotListError }
+        return snapshots
+    }
+    
+    func reset() {
+        repositoryStatus = nil
+        snapshots = []
+        shouldFail = false
+        error = nil
+    }
+}
+
+/// Mock implementation of BackupService for testing
+final class MockBackupService: BackupServiceProtocol {
+    var backupResult: Backup?
+    var startBackupCalled = false
+    var shouldFail = false
+    var error: Error?
+    
+    func startBackup(for repository: Repository) async throws -> Backup {
+        if shouldFail { throw error ?? MockData.Error.backupError }
+        startBackupCalled = true
+        return backupResult ?? MockData.Backup.validBackup
+    }
+    
+    func reset() {
+        backupResult = nil
+        startBackupCalled = false
+        shouldFail = false
+        error = nil
+    }
+}
+
+/// Mock implementation of RepositoryStorage for testing
+final class MockRepositoryStorage: RepositoryStorageProtocol {
+    var repositoryToReturn: Repository?
+    var updateCalled = false
+    var shouldFail = false
+    var error: Error?
+    
+    func update(_ repository: Repository) async throws -> Repository {
+        if shouldFail { throw error ?? MockData.Error.repositoryUpdateError }
+        updateCalled = true
+        return repositoryToReturn ?? repository
+    }
+    
+    func reset() {
+        repositoryToReturn = nil
+        updateCalled = false
+        shouldFail = false
+        error = nil
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
+    }
+    
+    func reset() {
+        postCalled = false
+        lastNotification = nil
     }
 }

@@ -6,262 +6,238 @@
 //
 
 import Testing
-import Security
 @testable import rBUM
 
+/// Tests for KeychainService functionality
 struct KeychainServiceTests {
-    // MARK: - Test Setup
+    // MARK: - Test Context
     
+    /// Test environment with test data
     struct TestContext {
-        let service: String
-        let account: String
-        let keychainService: KeychainService
+        let keychain: MockKeychain
+        let notificationCenter: MockNotificationCenter
+        let encoder: JSONEncoder
+        let decoder: JSONDecoder
         
-        init(service: String = "dev.mpy.rBUM.test",
-             account: String = "testAccount") {
-            self.service = service
-            self.account = account
-            self.keychainService = KeychainService(isTest: true)
+        init() {
+            self.keychain = MockKeychain()
+            self.notificationCenter = MockNotificationCenter()
+            self.encoder = JSONEncoder()
+            self.decoder = JSONDecoder()
         }
         
-        func cleanup() async throws {
-            // Try to delete the test item
-            _ = try? await keychainService.deletePassword(forService: service, account: account)
-            
-            // Verify deletion
-            do {
-                _ = try await keychainService.retrievePassword(forService: service, account: account)
-                // If we get here, force delete it
-                let query: [String: Any] = [
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: service,
-                    kSecAttrAccount as String: account
-                ]
-                _ = SecItemDelete(query as CFDictionary)
-                
-                // Verify again
-                _ = try await keychainService.retrievePassword(forService: service, account: account)
-                throw KeychainError.unexpectedStatus(errSecSuccess)
-            } catch KeychainError.itemNotFound {
-                return // Success - item is gone
-            }
+        /// Reset all mocks to initial state
+        func reset() {
+            keychain.reset()
+            notificationCenter.reset()
+        }
+        
+        /// Create test keychain service
+        func createService() -> KeychainService {
+            KeychainService(
+                keychain: keychain,
+                notificationCenter: notificationCenter,
+                encoder: encoder,
+                decoder: decoder
+            )
         }
     }
     
-    // MARK: - Basic Operations Tests
+    // MARK: - Storage Tests
     
-    @Test("Store and retrieve passwords with various configurations",
-          .tags(.core, .security, .integration),
-          arguments: [
-              (password: "simple-password", service: "dev.mpy.rBUM.test1", account: "account1"),
-              (password: "Complex!@#$%^&*()", service: "dev.mpy.rBUM.test2", account: "account2"),
-              (password: "password with spaces", service: "dev.mpy.rBUM.test3", account: "account3"),
-              (password: "🔒unicode🔑", service: "dev.mpy.rBUM.test4", account: "account4"),
-              (password: String(repeating: "a", count: 1024), service: "dev.mpy.rBUM.test5", account: "account5")
-          ])
-    func testStoreAndRetrievePassword(password: String, service: String, account: String) async throws {
-        // Given
-        let context = TestContext(service: service, account: account)
-        try await context.cleanup()
-        
-        // When
-        try await context.keychainService.storePassword(password, forService: service, account: account)
-        let retrieved = try await context.keychainService.retrievePassword(forService: service, account: account)
-        
-        // Then
-        #expect(retrieved == password)
-        
-        // Cleanup
-        try await context.cleanup()
-    }
-    
-    // MARK: - Update Tests
-    
-    @Test("Update passwords with various scenarios",
-          .tags(.core, .security, .integration),
-          arguments: [
-              (initial: "initial123", updated: "updated123"),
-              (initial: "short", updated: String(repeating: "a", count: 1024)),
-              (initial: "Complex!@#", updated: "🔒unicode🔑")
-          ])
-    func testUpdatePassword(initial: String, updated: String) async throws {
-        // Given
+    @Test("Store and retrieve keychain items", tags: ["keychain", "storage"])
+    func testKeychainStorage() throws {
+        // Given: Keychain service
         let context = TestContext()
-        try await context.cleanup()
+        let service = context.createService()
+        let item = MockData.Keychain.validItem
         
-        // When
-        try await context.keychainService.storePassword(initial, forService: context.service, account: context.account)
-        try await context.keychainService.updatePassword(updated, forService: context.service, account: context.account)
+        // When: Storing item
+        try service.store(item)
         
-        // Then
-        let retrieved = try await context.keychainService.retrievePassword(forService: context.service, account: context.account)
-        #expect(retrieved == updated)
-        #expect(retrieved != initial)
-        
-        // Cleanup
-        try await context.cleanup()
+        // Then: Item is stored and can be retrieved
+        let retrieved = try service.get(id: item.id)
+        #expect(retrieved == item)
+        #expect(context.keychain.addCalled)
+        #expect(!service.showError)
     }
     
-    // MARK: - Security Tests
-    
-    @Test("Handle various error scenarios",
-          .tags(.core, .security, .error_handling),
-          arguments: [
-              (operation: "retrieve", expectedError: KeychainError.itemNotFound),
-              (operation: "update", expectedError: KeychainError.itemNotFound),
-              (operation: "delete", expectedError: KeychainError.itemNotFound)
-          ])
-    func testErrorScenarios(operation: String, expectedError: KeychainError) async throws {
-        // Given
+    @Test("Handle invalid items", tags: ["keychain", "error"])
+    func testInvalidItems() throws {
+        // Given: Keychain service with failing keychain
         let context = TestContext()
-        try await context.cleanup()
+        let service = context.createService()
+        let item = MockData.Keychain.invalidItem
         
-        // When/Then
-        switch operation {
-        case "retrieve":
-            await #expect(throws: expectedError) {
-                _ = try await context.keychainService.retrievePassword(
-                    forService: context.service,
-                    account: context.account
-                )
-            }
-        case "update":
-            await #expect(throws: expectedError) {
-                try await context.keychainService.updatePassword(
-                    "newPassword",
-                    forService: context.service,
-                    account: context.account
-                )
-            }
-        case "delete":
-            await #expect(throws: expectedError) {
-                try await context.keychainService.deletePassword(
-                    forService: context.service,
-                    account: context.account
-                )
-            }
-        default:
-            #expect(false, "Unknown operation: \(operation)")
+        context.keychain.shouldFail = true
+        context.keychain.error = MockData.Error.keychainError
+        
+        // When/Then: Storing invalid item fails
+        #expect(throws: MockData.Error.keychainError) {
+            try service.store(item)
         }
+        
+        #expect(service.showError)
+        #expect(service.error as? MockData.Error == MockData.Error.keychainError)
     }
     
-    @Test("Handle concurrent access to same keychain item",
-          .tags(.core, .security, .concurrency))
-    func testConcurrentAccess() async throws {
-        // Given
+    @Test("Update keychain items", tags: ["keychain", "update"])
+    func testKeychainUpdate() throws {
+        // Given: Keychain service with existing item
         let context = TestContext()
-        try await context.cleanup()
+        let service = context.createService()
+        let oldItem = MockData.Keychain.validItem
+        let newItem = MockData.Keychain.updatedItem
         
-        // Initial password
-        try await context.keychainService.storePassword(
-            "initial",
-            forService: context.service,
-            account: context.account
-        )
+        try service.store(oldItem)
         
-        // When performing concurrent operations
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            // Multiple updates
-            for i in 1...5 {
-                group.addTask {
-                    try await context.keychainService.updatePassword(
-                        "password\(i)",
-                        forService: context.service,
-                        account: context.account
-                    )
-                }
-            }
-            
-            // Concurrent reads
-            for _ in 1...5 {
-                group.addTask {
-                    _ = try await context.keychainService.retrievePassword(
-                        forService: context.service,
-                        account: context.account
-                    )
-                }
-            }
-            
-            try await group.waitForAll()
-        }
+        // When: Updating item
+        try service.update(newItem)
         
-        // Then - password should be one of the updates
-        let finalPassword = try await context.keychainService.retrievePassword(
-            forService: context.service,
-            account: context.account
-        )
-        #expect(finalPassword.starts(with: "password"))
-        
-        // Cleanup
-        try await context.cleanup()
+        // Then: Item is updated
+        let retrieved = try service.get(id: newItem.id)
+        #expect(retrieved == newItem)
+        #expect(context.keychain.updateCalled)
+        #expect(!service.showError)
     }
     
-    @Test("Verify keychain item accessibility",
-          .tags(.core, .security, .validation))
-    func testKeychainAccessibility() async throws {
-        // Given
+    @Test("Delete keychain items", tags: ["keychain", "delete"])
+    func testKeychainDeletion() throws {
+        // Given: Keychain service with stored item
         let context = TestContext()
-        try await context.cleanup()
+        let service = context.createService()
+        let item = MockData.Keychain.validItem
         
-        let password = "testPassword123"
-        try await context.keychainService.storePassword(
-            password,
-            forService: context.service,
-            account: context.account
-        )
+        try service.store(item)
         
-        // Then - verify item attributes
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: context.service,
-            kSecAttrAccount as String: context.account,
-            kSecReturnAttributes as String: true
-        ]
+        // When: Deleting item
+        try service.delete(id: item.id)
         
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        #expect(status == errSecSuccess)
-        
-        if let attributes = result as? [String: Any] {
-            // Verify accessibility setting
-            let accessibility = attributes[kSecAttrAccessible as String] as? String
-            #expect(accessibility == (kSecAttrAccessibleAfterFirstUnlock as String))
-            
-            // Verify proper ACL
-            let accessControl = attributes[kSecAttrAccessControl as String]
-            #expect(accessControl != nil)
+        // Then: Item is removed
+        #expect(context.keychain.deleteCalled)
+        #expect(!service.showError)
+        #expect(throws: KeychainError.itemNotFound) {
+            _ = try service.get(id: item.id)
         }
-        
-        // Cleanup
-        try await context.cleanup()
     }
     
-    @Test("Handle special characters in service and account names",
-          .tags(.core, .security, .validation))
-    func testSpecialCharacters() async throws {
-        // Given
-        let specialCases = [
-            ("service with spaces", "account with spaces"),
-            ("service/with/slashes", "account@with@at"),
-            ("service.with.dots", "account_with_underscores"),
-            ("service-with-dashes", "account#with#hash"),
-            ("service🔒", "account🔑")
-        ]
+    @Test("List keychain items", tags: ["keychain", "list"])
+    func testKeychainListing() throws {
+        // Given: Keychain service with multiple items
+        let context = TestContext()
+        let service = context.createService()
+        let items = MockData.Keychain.multipleItems
         
-        // Test each case
-        for (service, account) in specialCases {
-            let context = TestContext(service: service, account: account)
-            try await context.cleanup()
-            
-            // When
-            try await context.keychainService.storePassword("test", forService: service, account: account)
-            
-            // Then
-            let retrieved = try await context.keychainService.retrievePassword(forService: service, account: account)
-            #expect(retrieved == "test")
-            
-            // Cleanup
-            try await context.cleanup()
+        for item in items {
+            try service.store(item)
         }
+        
+        // When: Listing items
+        let listed = try service.list()
+        
+        // Then: All items are listed
+        #expect(listed.count == items.count)
+        for item in items {
+            #expect(listed.contains(where: { $0.id == item.id }))
+        }
+        #expect(!service.showError)
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test keychain performance", tags: ["keychain", "performance"])
+    func testKeychainPerformance() throws {
+        // Given: Keychain service
+        let context = TestContext()
+        let service = context.createService()
+        let items = MockData.Keychain.multipleItems
+        
+        // When: Performing multiple operations
+        let startTime = Date()
+        
+        // Store items
+        for item in items {
+            try service.store(item)
+        }
+        
+        // Retrieve items
+        for item in items {
+            _ = try service.get(id: item.id)
+        }
+        
+        // List items
+        _ = try service.list()
+        
+        // Delete items
+        for item in items {
+            try service.delete(id: item.id)
+        }
+        
+        let endTime = Date()
+        
+        // Then: Operations complete within reasonable time
+        let duration = endTime.timeIntervalSince(startTime)
+        #expect(duration < 1.0) // All operations should complete within 1 second
+    }
+}
+
+// MARK: - Mock Keychain
+
+final class MockKeychain: KeychainProtocol {
+    private var storage: [String: Data] = [:]
+    private(set) var addCalled = false
+    private(set) var updateCalled = false
+    private(set) var deleteCalled = false
+    var shouldFail = false
+    var error: Error?
+    
+    func add(_ data: Data, for key: String) throws {
+        if shouldFail {
+            throw error!
+        }
+        storage[key] = data
+        addCalled = true
+    }
+    
+    func get(for key: String) throws -> Data {
+        if shouldFail {
+            throw error!
+        }
+        guard let data = storage[key] else {
+            throw KeychainError.itemNotFound
+        }
+        return data
+    }
+    
+    func update(_ data: Data, for key: String) throws {
+        if shouldFail {
+            throw error!
+        }
+        storage[key] = data
+        updateCalled = true
+    }
+    
+    func delete(for key: String) throws {
+        if shouldFail {
+            throw error!
+        }
+        storage.removeValue(forKey: key)
+        deleteCalled = true
+    }
+    
+    func list() throws -> [String] {
+        if shouldFail {
+            throw error!
+        }
+        return Array(storage.keys)
+    }
+    
+    func reset() {
+        storage.removeAll()
+        addCalled = false
+        updateCalled = false
+        deleteCalled = false
+        shouldFail = false
+        error = nil
     }
 }

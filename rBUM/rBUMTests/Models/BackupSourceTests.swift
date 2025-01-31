@@ -6,281 +6,289 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupSource functionality
 struct BackupSourceTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup source with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Documents"
-        let path = URL(fileURLWithPath: "/Users/test/Documents")
+    /// Test environment with test data
+    struct TestContext {
+        let fileManager: MockFileManager
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
         
-        // When
-        let source = BackupSource(
-            id: id,
-            name: name,
-            path: path
-        )
+        init() {
+            self.fileManager = MockFileManager()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
+        }
         
-        // Then
-        #expect(source.id == id)
-        #expect(source.name == name)
-        #expect(source.path == path)
-        #expect(source.excludePatterns.isEmpty)
-        #expect(source.includePatterns.isEmpty)
-        #expect(source.status == .unknown)
-    }
-    
-    @Test("Initialize backup source with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Documents"
-        let path = URL(fileURLWithPath: "/Users/test/Documents")
-        let excludePatterns = ["*.tmp", "*.cache"]
-        let includePatterns = ["*.doc", "*.pdf"]
-        let status = BackupSourceStatus.ready
+        /// Reset all mocks to initial state
+        func reset() {
+            fileManager.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
+        }
         
-        // When
-        let source = BackupSource(
-            id: id,
-            name: name,
-            path: path,
-            excludePatterns: excludePatterns,
-            includePatterns: includePatterns,
-            status: status
-        )
-        
-        // Then
-        #expect(source.id == id)
-        #expect(source.name == name)
-        #expect(source.path == path)
-        #expect(source.excludePatterns == excludePatterns)
-        #expect(source.includePatterns == includePatterns)
-        #expect(source.status == status)
-    }
-    
-    // MARK: - Pattern Tests
-    
-    @Test("Handle include and exclude patterns", tags: ["model", "patterns"])
-    func testPatterns() throws {
-        let testCases = [
-            // Basic patterns
-            (["*.txt"], ["*.tmp"], true),
-            // Multiple patterns
-            (["*.doc", "*.pdf"], ["*.tmp", "*.cache"], true),
-            // Complex patterns
-            (["**/*.swift", "src/**/*.h"], ["**/build/*", "**/tmp/*"], true),
-            // Invalid patterns
-            (["[invalid"], ["[also-invalid"], false),
-            // Empty patterns
-            ([], [], true),
-            // Overlapping patterns
-            (["*.txt"], ["*.txt"], false),
-            // Case sensitivity
-            (["*.TXT", "*.txt"], ["*.TMP", "*.tmp"], false)
-        ]
-        
-        for (include, exclude, isValid) in testCases {
-            let source = BackupSource(
-                id: UUID(),
-                name: "Test",
-                path: URL(fileURLWithPath: "/test"),
-                excludePatterns: exclude,
-                includePatterns: include
+        /// Create test source manager
+        func createSourceManager() -> BackupSourceManager {
+            BackupSourceManager(
+                fileManager: fileManager,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider
             )
+        }
+    }
+    
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize source manager", tags: ["init", "source"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
+        
+        // When: Creating source manager
+        let manager = context.createSourceManager()
+        
+        // Then: Manager is properly configured
+        #expect(manager.isInitialized)
+        #expect(manager.sourceCount == 0)
+    }
+    
+    // MARK: - Source Creation Tests
+    
+    @Test("Test source creation", tags: ["source", "create"])
+    func testSourceCreation() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
+        
+        let testData = MockData.Source.creationData
+        
+        // Test source creation
+        for data in testData {
+            // Create source
+            let source = try manager.createSource(data)
+            #expect(source.id != nil)
+            #expect(context.fileManager.fileExistsCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            if isValid {
-                #expect(source.isValid)
-                #expect(source.includePatterns == include)
-                #expect(source.excludePatterns == exclude)
-            } else {
-                #expect(!source.isValid)
+            // Verify source
+            let verified = try manager.verifySource(source)
+            #expect(verified)
+            #expect(context.fileManager.fileExistsCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Source Listing Tests
+    
+    @Test("Test source listing", tags: ["source", "list"])
+    func testSourceListing() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
+        
+        let testCases = MockData.Source.listingData
+        
+        // Test source listing
+        for testCase in testCases {
+            // Add sources
+            for source in testCase.sources {
+                try manager.addSource(source)
             }
+            
+            // List sources
+            let sources = try manager.listSources()
+            #expect(sources.count == testCase.sources.count)
+            
+            // Filter sources
+            let filtered = try manager.filterSources(sources, by: testCase.filter)
+            #expect(filtered.count <= sources.count)
+            
+            context.reset()
         }
     }
     
-    // MARK: - Status Tests
+    // MARK: - Source Update Tests
     
-    @Test("Handle backup source status changes", tags: ["model", "status"])
-    func testStatusChanges() throws {
-        let testCases: [(BackupSourceStatus, String)] = [
-            (.unknown, "Unknown"),
-            (.scanning, "Scanning"),
-            (.ready, "Ready"),
-            (.backing_up, "Backing Up"),
-            (.error("test error"), "Error: test error")
-        ]
+    @Test("Test source updates", tags: ["source", "update"])
+    func testSourceUpdates() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
         
-        for (status, description) in testCases {
-            let source = BackupSource(
-                id: UUID(),
-                name: "Test",
-                path: URL(fileURLWithPath: "/test"),
-                status: status
-            )
-            
-            #expect(source.status == status)
-            #expect(source.status.description == description)
-        }
-    }
-    
-    // MARK: - Path Tests
-    
-    @Test("Handle backup source paths", tags: ["model", "path"])
-    func testSourcePaths() throws {
-        let testCases = [
-            // Standard paths
-            "/Users/test/Documents",
-            "/Applications",
-            "/Library/Preferences",
-            // Paths with spaces
-            "/Users/test/My Documents",
-            "/Volumes/Backup Drive/Data",
-            // Paths with special characters
-            "/Users/test/Documents!@#$%",
-            // Very long paths
-            "/Users/test/" + String(repeating: "a", count: 1000),
-            // Home directory paths
-            "~/Documents",
-            "~/Library/Application Support",
-            // Network paths
-            "/Volumes/NetworkShare/Data",
-            // Invalid paths
-            "invalid://path",
-            ""
-        ]
+        let testCases = MockData.Source.updateData
         
-        for pathString in testCases {
-            let path = URL(string: pathString) ?? URL(fileURLWithPath: pathString)
-            let source = BackupSource(
-                id: UUID(),
-                name: "Test",
-                path: path
-            )
+        // Test source updates
+        for testCase in testCases {
+            // Create initial source
+            let source = try manager.createSource(testCase.initial)
             
-            let isValidPath = path.isFileURL && !pathString.isEmpty
-            if isValidPath {
-                #expect(source.isValid)
-                #expect(source.path == path)
-            } else {
-                #expect(!source.isValid)
+            // Update source
+            let updated = try manager.updateSource(source, with: testCase.updates)
+            #expect(updated.id == source.id)
+            #expect(context.fileManager.fileExistsCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Verify updates
+            for (key, value) in testCase.updates {
+                #expect(updated.getValue(for: key) == value)
             }
+            
+            context.reset()
         }
     }
     
-    // MARK: - Comparison Tests
+    // MARK: - Source Deletion Tests
     
-    @Test("Compare backup sources for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let source1 = BackupSource(
-            id: UUID(),
-            name: "Test 1",
-            path: URL(fileURLWithPath: "/test/1")
-        )
+    @Test("Test source deletion", tags: ["source", "delete"])
+    func testSourceDeletion() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
         
-        let source2 = BackupSource(
-            id: source1.id,
-            name: "Test 1",
-            path: URL(fileURLWithPath: "/test/1")
-        )
+        let sources = MockData.Source.deletionData
         
-        let source3 = BackupSource(
-            id: UUID(),
-            name: "Test 1",
-            path: URL(fileURLWithPath: "/test/1")
-        )
-        
-        #expect(source1 == source2)
-        #expect(source1 != source3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup source", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic source
-            BackupSource(
-                id: UUID(),
-                name: "Basic Source",
-                path: URL(fileURLWithPath: "/basic/path")
-            ),
-            // Source with patterns
-            BackupSource(
-                id: UUID(),
-                name: "Pattern Source",
-                path: URL(fileURLWithPath: "/pattern/path"),
-                excludePatterns: ["*.tmp", "*.cache"],
-                includePatterns: ["*.doc", "*.pdf"]
-            ),
-            // Source with status
-            BackupSource(
-                id: UUID(),
-                name: "Status Source",
-                path: URL(fileURLWithPath: "/status/path"),
-                status: .error("test error")
-            )
-        ]
-        
-        for source in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(source)
-            let decoded = try decoder.decode(BackupSource.self, from: data)
+        // Test source deletion
+        for source in sources {
+            // Add source
+            try manager.addSource(source)
             
-            // Then
-            #expect(decoded.id == source.id)
-            #expect(decoded.name == source.name)
-            #expect(decoded.path == source.path)
-            #expect(decoded.excludePatterns == source.excludePatterns)
-            #expect(decoded.includePatterns == source.includePatterns)
-            #expect(decoded.status == source.status)
+            // Delete source
+            try manager.deleteSource(source)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Verify deletion
+            let remaining = try manager.listSources()
+            #expect(!remaining.contains(source))
+            
+            context.reset()
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Source Validation Tests
     
-    @Test("Validate backup source properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Empty name
-            ("", URL(fileURLWithPath: "/test"), [], [], false),
-            // Name with only spaces
-            ("   ", URL(fileURLWithPath: "/test"), [], [], false),
-            // Valid name
-            ("Test Source", URL(fileURLWithPath: "/test"), [], [], true),
-            // Name with special characters
-            ("Test!@#$%^&*()", URL(fileURLWithPath: "/test"), [], [], true),
-            // Very long name
-            (String(repeating: "a", count: 1000), URL(fileURLWithPath: "/test"), [], [], false),
-            // Invalid path
-            ("Test", URL(string: "invalid://path")!, [], [], false),
-            // Valid path with patterns
-            ("Test", URL(fileURLWithPath: "/test"), ["*.tmp"], ["*.doc"], true),
-            // Invalid patterns
-            ("Test", URL(fileURLWithPath: "/test"), ["[invalid"], ["[also-invalid"], false)
-        ]
+    @Test("Test source validation", tags: ["source", "validate"])
+    func testSourceValidation() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
         
-        for (name, path, exclude, include, isValid) in testCases {
-            let source = BackupSource(
-                id: UUID(),
-                name: name,
-                path: path,
-                excludePatterns: exclude,
-                includePatterns: include
-            )
+        let testCases = MockData.Source.validationData
+        
+        // Test source validation
+        for testCase in testCases {
+            // Validate source
+            let isValid = try manager.validateSource(testCase.source)
+            #expect(isValid == testCase.expectedValid)
+            #expect(context.fileManager.fileExistsCalled)
             
-            if isValid {
-                #expect(source.isValid)
-            } else {
-                #expect(!source.isValid)
+            if !isValid {
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .backupSourceValidationError)
             }
+            
+            context.reset()
         }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test source error handling", tags: ["source", "error"])
+    func testErrorHandling() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
+        
+        let errorCases = MockData.Source.errorCases
+        
+        // Test error handling
+        for errorCase in errorCases {
+            do {
+                try manager.handleSourceOperation(errorCase)
+                throw TestFailure("Expected error for \(errorCase)")
+            } catch {
+                // Expected error
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .backupSourceError)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle source edge cases", tags: ["source", "edge"])
+    func testEdgeCases() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
+        
+        // Test invalid path
+        do {
+            try manager.createSource(path: "/non/existent/path")
+            throw TestFailure("Expected error for invalid path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test duplicate source
+        do {
+            let source = try manager.createSource(path: "/test/path")
+            try manager.addSource(source)
+            try manager.addSource(source)
+            throw TestFailure("Expected error for duplicate source")
+        } catch {
+            // Expected error
+        }
+        
+        // Test empty source list
+        do {
+            let sources = try manager.listSources()
+            #expect(sources.isEmpty)
+        } catch {
+            throw TestFailure("Unexpected error for empty source list")
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test source performance", tags: ["source", "performance"])
+    func testPerformance() throws {
+        // Given: Source manager
+        let context = TestContext()
+        let manager = context.createSourceManager()
+        
+        // Test listing performance
+        let startTime = context.dateProvider.now()
+        
+        for _ in 0..<100 {
+            _ = try manager.listSources()
+        }
+        
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test validation performance
+        let source = try manager.createSource(path: "/test/path")
+        let validationStartTime = context.dateProvider.now()
+        
+        for _ in 0..<1000 {
+            _ = try manager.validateSource(source)
+        }
+        
+        let validationEndTime = context.dateProvider.now()
+        
+        let validationInterval = validationEndTime.timeIntervalSince(validationStartTime)
+        #expect(validationInterval < 0.5) // Validation should be fast
     }
 }

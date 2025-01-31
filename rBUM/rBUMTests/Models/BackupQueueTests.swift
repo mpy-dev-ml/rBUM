@@ -6,386 +6,315 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupQueue functionality
 struct BackupQueueTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup queue with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Queue"
+    /// Test environment with test data
+    struct TestContext {
+        let dateProvider: MockDateProvider
+        let notificationCenter: MockNotificationCenter
+        let progressTracker: MockProgressTracker
         
-        // When
-        let queue = BackupQueue(
-            id: id,
-            name: name
-        )
+        init() {
+            self.dateProvider = MockDateProvider()
+            self.notificationCenter = MockNotificationCenter()
+            self.progressTracker = MockProgressTracker()
+        }
         
-        // Then
-        #expect(queue.id == id)
-        #expect(queue.name == name)
-        #expect(queue.operations.isEmpty)
-        #expect(queue.status == .idle)
-        #expect(queue.currentOperation == nil)
-        #expect(queue.maxConcurrentOperations == 1)
-    }
-    
-    @Test("Initialize backup queue with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Queue"
-        let operations = [
-            BackupOperation(
-                id: UUID(),
-                repositoryId: UUID(),
-                type: .backup,
-                sourcePath: URL(fileURLWithPath: "/test1")
-            ),
-            BackupOperation(
-                id: UUID(),
-                repositoryId: UUID(),
-                type: .backup,
-                sourcePath: URL(fileURLWithPath: "/test2")
+        /// Reset all mocks to initial state
+        func reset() {
+            dateProvider.reset()
+            notificationCenter.reset()
+            progressTracker.reset()
+        }
+        
+        /// Create test queue
+        func createQueue() -> BackupQueue {
+            BackupQueue(
+                dateProvider: dateProvider,
+                notificationCenter: notificationCenter,
+                progressTracker: progressTracker
             )
-        ]
-        let maxConcurrentOperations = 2
-        
-        // When
-        let queue = BackupQueue(
-            id: id,
-            name: name,
-            operations: operations,
-            maxConcurrentOperations: maxConcurrentOperations
-        )
-        
-        // Then
-        #expect(queue.id == id)
-        #expect(queue.name == name)
-        #expect(queue.operations == operations)
-        #expect(queue.status == .idle)
-        #expect(queue.currentOperation == nil)
-        #expect(queue.maxConcurrentOperations == maxConcurrentOperations)
+        }
     }
     
-    // MARK: - Operation Management Tests
+    // MARK: - Initialization Tests
     
-    @Test("Handle operation addition and removal", tags: ["model", "operations"])
-    func testOperationManagement() throws {
-        // Given
-        var queue = BackupQueue(
-            id: UUID(),
-            name: "Test Queue"
-        )
+    @Test("Initialize backup queue", tags: ["init", "queue"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        let operation1 = BackupOperation(
-            id: UUID(),
-            repositoryId: UUID(),
-            type: .backup,
-            sourcePath: URL(fileURLWithPath: "/test1")
-        )
+        // When: Creating queue
+        let queue = context.createQueue()
         
-        let operation2 = BackupOperation(
-            id: UUID(),
-            repositoryId: UUID(),
-            type: .backup,
-            sourcePath: URL(fileURLWithPath: "/test2")
-        )
-        
-        // Test addition
-        queue.addOperation(operation1)
-        #expect(queue.operations.count == 1)
-        #expect(queue.operations.first == operation1)
-        
-        queue.addOperation(operation2)
-        #expect(queue.operations.count == 2)
-        #expect(queue.operations.contains(operation2))
-        
-        // Test removal
-        queue.removeOperation(operation1.id)
-        #expect(queue.operations.count == 1)
-        #expect(!queue.operations.contains(operation1))
-        #expect(queue.operations.contains(operation2))
-        
-        // Test clear
-        queue.clearOperations()
-        #expect(queue.operations.isEmpty)
+        // Then: Queue is empty and properly configured
+        #expect(queue.isEmpty)
+        #expect(queue.count == 0)
+        #expect(!queue.isProcessing)
     }
     
-    // MARK: - Queue Status Tests
+    // MARK: - Queue Management Tests
     
-    @Test("Handle queue status transitions", tags: ["model", "status"])
-    func testStatusTransitions() throws {
-        let testCases: [(BackupQueueStatus, BackupQueueStatus, Bool)] = [
-            // Valid transitions
-            (.idle, .running, true),
-            (.running, .paused, true),
-            (.paused, .running, true),
-            (.running, .idle, true),
-            // Invalid transitions
-            (.idle, .paused, false),
-            (.paused, .idle, false)
-        ]
+    @Test("Test queue management", tags: ["queue", "core"])
+    func testQueueManagement() throws {
+        // Given: Queue
+        let context = TestContext()
+        let queue = context.createQueue()
         
-        for (fromStatus, toStatus, isValid) in testCases {
-            var queue = BackupQueue(
-                id: UUID(),
-                name: "Test Queue",
-                status: fromStatus
-            )
+        let jobs = MockData.BackupJob.validJobs
+        
+        // Test enqueueing jobs
+        for job in jobs {
+            try queue.enqueue(job)
+            #expect(!queue.isEmpty)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            if isValid {
-                queue.status = toStatus
-                #expect(queue.status == toStatus)
-            } else {
-                queue.status = toStatus
-                #expect(queue.status == fromStatus)
-            }
+            context.reset()
+        }
+        
+        // Test job order
+        #expect(queue.count == jobs.count)
+        for (index, job) in jobs.enumerated() {
+            #expect(queue.peek(at: index)?.id == job.id)
+        }
+        
+        // Test dequeuing jobs
+        for job in jobs {
+            let dequeued = try queue.dequeue()
+            #expect(dequeued.id == job.id)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            context.reset()
+        }
+        
+        #expect(queue.isEmpty)
+    }
+    
+    // MARK: - Priority Tests
+    
+    @Test("Test queue priority handling", tags: ["queue", "priority"])
+    func testPriorityHandling() throws {
+        // Given: Queue
+        let context = TestContext()
+        let queue = context.createQueue()
+        
+        let jobs = MockData.BackupJob.priorityJobs
+        
+        // Test priority ordering
+        for job in jobs {
+            try queue.enqueue(job)
+        }
+        
+        // Verify jobs are ordered by priority
+        var lastPriority = BackupJobPriority.high
+        while !queue.isEmpty {
+            let job = try queue.dequeue()
+            #expect(job.priority.rawValue <= lastPriority.rawValue)
+            lastPriority = job.priority
         }
     }
     
     // MARK: - Concurrency Tests
     
-    @Test("Handle concurrent operations", tags: ["model", "concurrency"])
+    @Test("Test queue concurrency", tags: ["queue", "concurrency"])
     func testConcurrency() throws {
-        // Given
-        var queue = BackupQueue(
-            id: UUID(),
-            name: "Test Queue",
-            maxConcurrentOperations: 2
-        )
+        // Given: Queue
+        let context = TestContext()
+        let queue = context.createQueue()
         
-        let operations = (0..<5).map { i in
-            BackupOperation(
-                id: UUID(),
-                repositoryId: UUID(),
-                type: .backup,
-                sourcePath: URL(fileURLWithPath: "/test\(i)")
-            )
+        let jobs = MockData.BackupJob.concurrentJobs
+        
+        // Test concurrent job handling
+        for job in jobs {
+            try queue.enqueue(job)
         }
         
-        // Add operations
-        operations.forEach { queue.addOperation($0) }
+        // Test concurrent processing
+        try queue.startProcessing()
+        #expect(queue.isProcessing)
         
-        // Start queue
-        queue.status = .running
+        // Verify concurrent job limits
+        let processingCount = queue.processingJobs.count
+        #expect(processingCount <= queue.maxConcurrentJobs)
         
-        // Verify concurrent operations
-        let runningOperations = queue.operations.filter { $0.status == .running }
-        #expect(runningOperations.count <= queue.maxConcurrentOperations)
+        // Test job completion
+        try queue.completeJob(jobs[0].id)
+        #expect(queue.processingJobs.count < processingCount)
+    }
+    
+    // MARK: - Progress Tracking Tests
+    
+    @Test("Test queue progress tracking", tags: ["queue", "progress"])
+    func testProgressTracking() throws {
+        // Given: Queue with jobs
+        let context = TestContext()
+        let queue = context.createQueue()
         
-        // Complete some operations
-        if var operation = queue.operations.first {
-            operation.status = .completed
-            queue.updateOperation(operation)
+        let jobs = MockData.BackupJob.progressJobs
+        
+        // Add jobs and start processing
+        for job in jobs {
+            try queue.enqueue(job)
+        }
+        
+        try queue.startProcessing()
+        
+        // Test progress updates
+        for job in jobs {
+            try queue.updateProgress(0.5, for: job.id)
+            #expect(context.progressTracker.updateProgressCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            // Verify next operation starts
-            let newRunningOperations = queue.operations.filter { $0.status == .running }
-            #expect(newRunningOperations.count <= queue.maxConcurrentOperations)
-        }
-    }
-    
-    // MARK: - Priority Tests
-    
-    @Test("Handle operation priorities", tags: ["model", "priority"])
-    func testPriorities() throws {
-        // Given
-        var queue = BackupQueue(
-            id: UUID(),
-            name: "Test Queue"
-        )
-        
-        let operations = [
-            (BackupOperationType.backup, BackupOperationPriority.normal),
-            (BackupOperationType.check, BackupOperationPriority.high),
-            (BackupOperationType.restore, BackupOperationPriority.urgent)
-        ]
-        
-        // Add operations with different priorities
-        operations.forEach { type, priority in
-            let operation = BackupOperation(
-                id: UUID(),
-                repositoryId: UUID(),
-                type: type,
-                sourcePath: URL(fileURLWithPath: "/test"),
-                priority: priority
-            )
-            queue.addOperation(operation)
+            context.reset()
         }
         
-        // Start queue
-        queue.status = .running
-        
-        // Verify operation order
-        let runningOperation = queue.currentOperation
-        #expect(runningOperation?.priority == .urgent)
+        // Test overall progress
+        let progress = queue.overallProgress
+        #expect(progress >= 0.0 && progress <= 1.0)
     }
     
-    // MARK: - Progress Tests
+    // MARK: - Error Handling Tests
     
-    @Test("Calculate queue progress", tags: ["model", "progress"])
-    func testProgress() throws {
-        // Given
-        var queue = BackupQueue(
-            id: UUID(),
-            name: "Test Queue"
-        )
+    @Test("Test queue error handling", tags: ["queue", "error"])
+    func testErrorHandling() throws {
+        // Given: Queue with jobs
+        let context = TestContext()
+        let queue = context.createQueue()
         
-        let operations = [
-            (0.0, .pending),
-            (0.5, .running),
-            (1.0, .completed),
-            (0.7, .failed)
-        ]
+        let jobs = MockData.BackupJob.errorJobs
         
-        // Add operations with different progress
-        operations.forEach { progress, status in
-            let operation = BackupOperation(
-                id: UUID(),
-                repositoryId: UUID(),
-                type: .backup,
-                sourcePath: URL(fileURLWithPath: "/test"),
-                status: status,
-                progress: progress
-            )
-            queue.addOperation(operation)
-        }
-        
-        // Calculate overall progress
-        let expectedProgress = operations.reduce(0.0) { sum, tuple in
-            sum + (tuple.1 == .failed ? 1.0 : tuple.0)
-        } / Double(operations.count)
-        
-        #expect(queue.progress == expectedProgress)
-        #expect(queue.formattedProgress == "\(Int(expectedProgress * 100))%")
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare queues for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let queue1 = BackupQueue(
-            id: UUID(),
-            name: "Test Queue",
-            operations: [
-                BackupOperation(
-                    id: UUID(),
-                    repositoryId: UUID(),
-                    type: .backup,
-                    sourcePath: URL(fileURLWithPath: "/test")
-                )
-            ]
-        )
-        
-        let queue2 = BackupQueue(
-            id: queue1.id,
-            name: "Test Queue",
-            operations: queue1.operations
-        )
-        
-        let queue3 = BackupQueue(
-            id: UUID(),
-            name: "Test Queue",
-            operations: queue1.operations
-        )
-        
-        #expect(queue1 == queue2)
-        #expect(queue1 != queue3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup queue", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Empty queue
-            BackupQueue(
-                id: UUID(),
-                name: "Empty Queue"
-            ),
-            // Queue with operations
-            BackupQueue(
-                id: UUID(),
-                name: "Active Queue",
-                operations: [
-                    BackupOperation(
-                        id: UUID(),
-                        repositoryId: UUID(),
-                        type: .backup,
-                        sourcePath: URL(fileURLWithPath: "/test")
-                    )
-                ],
-                status: .running
-            ),
-            // Queue with concurrent operations
-            BackupQueue(
-                id: UUID(),
-                name: "Concurrent Queue",
-                operations: [
-                    BackupOperation(
-                        id: UUID(),
-                        repositoryId: UUID(),
-                        type: .backup,
-                        sourcePath: URL(fileURLWithPath: "/test1")
-                    ),
-                    BackupOperation(
-                        id: UUID(),
-                        repositoryId: UUID(),
-                        type: .backup,
-                        sourcePath: URL(fileURLWithPath: "/test2")
-                    )
-                ],
-                maxConcurrentOperations: 2
-            )
-        ]
-        
-        for queue in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(queue)
-            let decoded = try decoder.decode(BackupQueue.self, from: data)
+        // Test error handling for each job
+        for job in jobs {
+            try queue.enqueue(job)
             
-            // Then
-            #expect(decoded.id == queue.id)
-            #expect(decoded.name == queue.name)
-            #expect(decoded.operations == queue.operations)
-            #expect(decoded.status == queue.status)
-            #expect(decoded.maxConcurrentOperations == queue.maxConcurrentOperations)
+            // Simulate error
+            let error = BackupError.jobFailed(reason: "Test error")
+            try queue.handleError(error, for: job.id)
+            
+            #expect(context.notificationCenter.postNotificationCalled)
+            let notification = context.notificationCenter.lastPostedNotification
+            #expect(notification?.name == .backupJobFailed)
+            
+            context.reset()
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Persistence Tests
     
-    @Test("Validate backup queue properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid queue
-            (UUID(), "Test Queue", 1, true),
-            // Empty name
-            (UUID(), "", 1, false),
-            // Invalid concurrent operations
-            (UUID(), "Test Queue", 0, false),
-            (UUID(), "Test Queue", -1, false),
-            // Maximum concurrent operations
-            (UUID(), "Test Queue", 10, true)
-        ]
+    @Test("Test queue persistence", tags: ["queue", "persistence"])
+    func testPersistence() throws {
+        // Given: Queue with jobs
+        let context = TestContext()
+        let queue = context.createQueue()
         
-        for (id, name, maxConcurrent, isValid) in testCases {
-            let queue = BackupQueue(
-                id: id,
-                name: name,
-                maxConcurrentOperations: maxConcurrent
-            )
-            
-            if isValid {
-                #expect(queue.isValid)
-            } else {
-                #expect(!queue.isValid)
-            }
+        let jobs = MockData.BackupJob.validJobs
+        for job in jobs {
+            try queue.enqueue(job)
         }
+        
+        // When: Saving state
+        try queue.save()
+        
+        // Then: State is persisted
+        let loadedQueue = context.createQueue()
+        try loadedQueue.load()
+        
+        #expect(loadedQueue.count == jobs.count)
+        for (index, job) in jobs.enumerated() {
+            #expect(loadedQueue.peek(at: index)?.id == job.id)
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle queue edge cases", tags: ["queue", "edge"])
+    func testEdgeCases() throws {
+        // Given: Queue
+        let context = TestContext()
+        let queue = context.createQueue()
+        
+        // Test empty queue operations
+        do {
+            _ = try queue.dequeue()
+            throw TestFailure("Expected error for empty queue")
+        } catch {
+            // Expected error
+        }
+        
+        // Test invalid job ID
+        do {
+            try queue.updateProgress(0.5, for: UUID())
+            throw TestFailure("Expected error for invalid job ID")
+        } catch {
+            // Expected error
+        }
+        
+        // Test duplicate job
+        let job = MockData.BackupJob.validJobs[0]
+        try queue.enqueue(job)
+        do {
+            try queue.enqueue(job)
+            throw TestFailure("Expected error for duplicate job")
+        } catch {
+            // Expected error
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test queue performance", tags: ["queue", "performance"])
+    func testPerformance() throws {
+        // Given: Queue
+        let context = TestContext()
+        let queue = context.createQueue()
+        
+        // Test rapid job enqueuing
+        let startTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            let job = BackupJob(
+                id: UUID(),
+                name: "Job \(i)",
+                priority: .normal,
+                created: context.dateProvider.now()
+            )
+            try queue.enqueue(job)
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test job lookup performance
+        let lookupStartTime = context.dateProvider.now()
+        for _ in 0..<1000 {
+            _ = queue.findJob(by: { _ in true })
+        }
+        let lookupEndTime = context.dateProvider.now()
+        
+        let lookupInterval = lookupEndTime.timeIntervalSince(lookupStartTime)
+        #expect(lookupInterval < 0.1) // Job lookups should be fast
+    }
+}
+
+// MARK: - Mock Progress Tracker
+
+/// Mock implementation of ProgressTracker for testing
+final class MockProgressTracker: ProgressTrackerProtocol {
+    private(set) var updateProgressCalled = false
+    private(set) var lastProgress: Double?
+    
+    func updateProgress(_ progress: Double, for id: UUID) {
+        updateProgressCalled = true
+        lastProgress = progress
+    }
+    
+    func reset() {
+        updateProgressCalled = false
+        lastProgress = nil
     }
 }

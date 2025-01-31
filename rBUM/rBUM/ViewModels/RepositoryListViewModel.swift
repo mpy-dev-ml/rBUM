@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 
+/// Manages the list of backup repositories
 @MainActor
 final class RepositoryListViewModel: ObservableObject {
     @Published private(set) var repositories: [Repository] = []

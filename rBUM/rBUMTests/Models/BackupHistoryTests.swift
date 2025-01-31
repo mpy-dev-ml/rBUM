@@ -6,310 +6,269 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupHistory functionality
 struct BackupHistoryTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup history with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let configId = UUID()
-        let startTime = Date()
-        let endTime = Date(timeIntervalSinceNow: 3600)
-        let status = BackupStatus.completed
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let fileManager: MockFileManager
+        let dateProvider: MockDateProvider
         
-        // When
-        let history = BackupHistory(
-            id: id,
-            configurationId: configId,
-            startTime: startTime,
-            endTime: endTime,
-            status: status
-        )
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.fileManager = MockFileManager()
+            self.dateProvider = MockDateProvider()
+        }
         
-        // Then
-        #expect(history.id == id)
-        #expect(history.configurationId == configId)
-        #expect(history.startTime == startTime)
-        #expect(history.endTime == endTime)
-        #expect(history.status == status)
-        #expect(history.error == nil)
-        #expect(history.statistics == nil)
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            fileManager.reset()
+            dateProvider.reset()
+        }
+        
+        /// Create test history entry
+        func createHistoryEntry(
+            id: String = MockData.History.validId,
+            timestamp: Date = MockData.History.validTimestamp,
+            status: BackupStatus = .completed,
+            repository: Repository = MockData.Repository.validRepository,
+            snapshot: BackupSnapshot = MockData.Snapshot.validSnapshot,
+            duration: TimeInterval = 300,
+            bytesProcessed: UInt64 = 1024 * 1024,
+            filesProcessed: UInt = 100
+        ) -> BackupHistoryEntry {
+            BackupHistoryEntry(
+                id: id,
+                timestamp: timestamp,
+                status: status,
+                repository: repository,
+                snapshot: snapshot,
+                duration: duration,
+                bytesProcessed: bytesProcessed,
+                filesProcessed: filesProcessed
+            )
+        }
     }
     
-    @Test("Initialize backup history with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let configId = UUID()
-        let startTime = Date()
-        let endTime = Date(timeIntervalSinceNow: 3600)
-        let status = BackupStatus.failed
-        let error = BackupError.repositoryNotFound
-        let stats = BackupStatistics(
-            filesChanged: 10,
-            filesNew: 5,
-            filesUnmodified: 100,
-            dataAdded: 1024 * 1024,
-            totalDuration: 3600
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize with default values", tags: ["init", "history"])
+    func testDefaultInitialization() throws {
+        // Given: Default history parameters
+        let context = TestContext()
+        
+        // When: Creating history entry
+        let entry = context.createHistoryEntry()
+        
+        // Then: Entry is configured correctly
+        #expect(entry.id == MockData.History.validId)
+        #expect(entry.timestamp == MockData.History.validTimestamp)
+        #expect(entry.status == .completed)
+        #expect(entry.repository == MockData.Repository.validRepository)
+        #expect(entry.snapshot == MockData.Snapshot.validSnapshot)
+        #expect(entry.duration == 300)
+        #expect(entry.bytesProcessed == 1024 * 1024)
+        #expect(entry.filesProcessed == 100)
+    }
+    
+    @Test("Initialize with custom values", tags: ["init", "history"])
+    func testCustomInitialization() throws {
+        // Given: Custom history parameters
+        let context = TestContext()
+        let customId = "custom-id"
+        let customTimestamp = Date()
+        let customRepository = MockData.Repository.customRepository
+        let customSnapshot = MockData.Snapshot.customSnapshot
+        
+        // When: Creating history entry
+        let entry = context.createHistoryEntry(
+            id: customId,
+            timestamp: customTimestamp,
+            status: .failed,
+            repository: customRepository,
+            snapshot: customSnapshot,
+            duration: 600,
+            bytesProcessed: 2048 * 1024,
+            filesProcessed: 200
         )
         
-        // When
-        let history = BackupHistory(
-            id: id,
-            configurationId: configId,
-            startTime: startTime,
-            endTime: endTime,
-            status: status,
-            error: error,
-            statistics: stats
+        // Then: Entry is configured correctly
+        #expect(entry.id == customId)
+        #expect(entry.timestamp == customTimestamp)
+        #expect(entry.status == .failed)
+        #expect(entry.repository == customRepository)
+        #expect(entry.snapshot == customSnapshot)
+        #expect(entry.duration == 600)
+        #expect(entry.bytesProcessed == 2048 * 1024)
+        #expect(entry.filesProcessed == 200)
+    }
+    
+    // MARK: - Persistence Tests
+    
+    @Test("Save and load history", tags: ["persistence", "history"])
+    func testPersistence() throws {
+        // Given: History entry with custom values
+        let context = TestContext()
+        let entry = context.createHistoryEntry(
+            id: "test-id",
+            status: .failed,
+            duration: 600,
+            bytesProcessed: 2048 * 1024,
+            filesProcessed: 200
         )
         
-        // Then
-        #expect(history.id == id)
-        #expect(history.configurationId == configId)
-        #expect(history.startTime == startTime)
-        #expect(history.endTime == endTime)
-        #expect(history.status == status)
-        #expect(history.error == error)
-        #expect(history.statistics == stats)
+        // When: Saving and loading history
+        entry.save(to: context.userDefaults)
+        let loaded = BackupHistoryEntry.load(from: context.userDefaults, withId: entry.id)
+        
+        // Then: Loaded entry matches original
+        #expect(loaded?.id == entry.id)
+        #expect(loaded?.timestamp == entry.timestamp)
+        #expect(loaded?.status == entry.status)
+        #expect(loaded?.repository == entry.repository)
+        #expect(loaded?.snapshot == entry.snapshot)
+        #expect(loaded?.duration == entry.duration)
+        #expect(loaded?.bytesProcessed == entry.bytesProcessed)
+        #expect(loaded?.filesProcessed == entry.filesProcessed)
     }
     
     // MARK: - Status Tests
     
-    @Test("Handle all backup status types", tags: ["model", "status"])
-    func testBackupStatus() throws {
-        let testCases = [
-            (BackupStatus.pending, "Pending backup"),
-            (BackupStatus.inProgress, "Backup in progress"),
-            (BackupStatus.completed, "Successful backup"),
-            (BackupStatus.failed, "Failed backup"),
-            (BackupStatus.cancelled, "Cancelled backup")
+    @Test("Handle backup status", tags: ["status", "history"])
+    func testStatus() throws {
+        // Given: History entries with different statuses
+        let context = TestContext()
+        let testCases: [(BackupStatus, String)] = [
+            (.completed, "Completed"),
+            (.failed, "Failed"),
+            (.inProgress, "In Progress"),
+            (.cancelled, "Cancelled"),
+            (.scheduled, "Scheduled")
         ]
         
+        // When/Then: Test status handling
         for (status, description) in testCases {
-            let history = BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: status
-            )
-            
-            #expect(history.status == status)
-            #expect(history.status.description == description)
+            let entry = context.createHistoryEntry(status: status)
+            #expect(entry.status == status)
+            #expect(entry.statusDescription == description)
         }
     }
     
-    // MARK: - Error Handling Tests
+    // MARK: - Formatting Tests
     
-    @Test("Handle various backup errors", tags: ["model", "error"])
-    func testBackupErrors() throws {
-        let testCases = [
-            BackupError.repositoryNotFound,
-            BackupError.sourcePathNotFound,
-            BackupError.insufficientPermissions,
-            BackupError.networkError,
-            BackupError.outOfSpace,
-            BackupError.repositoryLocked,
-            BackupError.invalidConfiguration,
-            BackupError.resticError("test error")
-        ]
-        
-        for error in testCases {
-            let history = BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: .failed,
-                error: error
-            )
-            
-            #expect(history.error == error)
-            #expect(history.status == .failed)
-        }
-    }
-    
-    // MARK: - Statistics Tests
-    
-    @Test("Handle backup statistics", tags: ["model", "statistics"])
-    func testBackupStatistics() throws {
-        let testCases = [
-            // Empty backup
-            BackupStatistics(
-                filesChanged: 0,
-                filesNew: 0,
-                filesUnmodified: 0,
-                dataAdded: 0,
-                totalDuration: 0
-            ),
-            // Small backup
-            BackupStatistics(
-                filesChanged: 5,
-                filesNew: 2,
-                filesUnmodified: 10,
-                dataAdded: 1024,
-                totalDuration: 60
-            ),
-            // Large backup
-            BackupStatistics(
-                filesChanged: 1000,
-                filesNew: 500,
-                filesUnmodified: 10000,
-                dataAdded: 1024 * 1024 * 1024,
-                totalDuration: 3600
-            )
-        ]
-        
-        for stats in testCases {
-            let history = BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: .completed,
-                statistics: stats
-            )
-            
-            #expect(history.statistics == stats)
-            #expect(history.statistics?.totalFiles == stats.filesChanged + stats.filesNew + stats.filesUnmodified)
-            #expect(history.statistics?.averageSpeed == Double(stats.dataAdded) / stats.totalDuration)
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare backup histories for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        // Given
-        let id = UUID()
-        let configId = UUID()
-        let startTime = Date()
-        let endTime = Date()
-        let stats = BackupStatistics(
-            filesChanged: 10,
-            filesNew: 5,
-            filesUnmodified: 100,
-            dataAdded: 1024,
-            totalDuration: 60
+    @Test("Format history values", tags: ["formatting", "history"])
+    func testFormatting() throws {
+        // Given: History entry with values to format
+        let context = TestContext()
+        let entry = context.createHistoryEntry(
+            duration: 3665, // 1 hour, 1 minute, 5 seconds
+            bytesProcessed: 1536 * 1024, // 1.5 MB
+            filesProcessed: 1234
         )
         
-        let history1 = BackupHistory(
-            id: id,
-            configurationId: configId,
-            startTime: startTime,
-            endTime: endTime,
-            status: .completed,
-            statistics: stats
-        )
-        
-        let history2 = BackupHistory(
-            id: id,
-            configurationId: configId,
-            startTime: startTime,
-            endTime: endTime,
-            status: .completed,
-            statistics: stats
-        )
-        
-        let history3 = BackupHistory(
-            id: UUID(),
-            configurationId: configId,
-            startTime: startTime,
-            endTime: endTime,
-            status: .completed,
-            statistics: stats
-        )
-        
-        // Then
-        #expect(history1 == history2)
-        #expect(history1 != history3)
+        // Then: Values are formatted correctly
+        #expect(entry.formattedDuration == "1h 1m 5s")
+        #expect(entry.formattedBytesProcessed == "1.5 MB")
+        #expect(entry.formattedFilesProcessed == "1,234 files")
     }
     
-    // MARK: - Serialization Tests
+    // MARK: - Edge Cases
     
-    @Test("Encode and decode backup history", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic history
-            BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: .completed
-            ),
-            // History with error
-            BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: .failed,
-                error: .repositoryNotFound
-            ),
-            // History with statistics
-            BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: Date(),
-                endTime: Date(),
-                status: .completed,
-                statistics: BackupStatistics(
-                    filesChanged: 10,
-                    filesNew: 5,
-                    filesUnmodified: 100,
-                    dataAdded: 1024,
-                    totalDuration: 60
-                )
-            )
-        ]
+    @Test("Handle edge cases", tags: ["edge", "history"])
+    func testEdgeCases() throws {
+        // Given: Edge case scenarios
+        let context = TestContext()
         
-        for history in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(history)
-            let decoded = try decoder.decode(BackupHistory.self, from: data)
-            
-            // Then
-            #expect(decoded.id == history.id)
-            #expect(decoded.configurationId == history.configurationId)
-            #expect(decoded.startTime == history.startTime)
-            #expect(decoded.endTime == history.endTime)
-            #expect(decoded.status == history.status)
-            #expect(decoded.error == history.error)
-            #expect(decoded.statistics == history.statistics)
+        // Test nil UserDefaults
+        let nilDefaults = MockUserDefaults()
+        nilDefaults.removeObject(forKey: BackupHistoryEntry.defaultsKey)
+        let loadedEntry = BackupHistoryEntry.load(from: nilDefaults, withId: "test-id")
+        #expect(loadedEntry == nil)
+        
+        // Test zero values
+        let zeroEntry = context.createHistoryEntry(
+            duration: 0,
+            bytesProcessed: 0,
+            filesProcessed: 0
+        )
+        #expect(zeroEntry.formattedDuration == "0s")
+        #expect(zeroEntry.formattedBytesProcessed == "0 B")
+        #expect(zeroEntry.formattedFilesProcessed == "0 files")
+        
+        // Test maximum values
+        let maxEntry = context.createHistoryEntry(
+            duration: TimeInterval.greatestFiniteMagnitude,
+            bytesProcessed: UInt64.max,
+            filesProcessed: UInt.max
+        )
+        #expect(!maxEntry.formattedDuration.isEmpty)
+        #expect(!maxEntry.formattedBytesProcessed.isEmpty)
+        #expect(!maxEntry.formattedFilesProcessed.isEmpty)
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaults {
+    var storage: [String: Any] = [:]
+    
+    override func set(_ value: Any?, forKey defaultName: String) {
+        if let value = value {
+            storage[defaultName] = value
+        } else {
+            storage.removeValue(forKey: defaultName)
         }
     }
     
-    // MARK: - Duration Tests
+    override func object(forKey defaultName: String) -> Any? {
+        storage[defaultName]
+    }
     
-    @Test("Calculate backup duration", tags: ["model", "duration"])
-    func testBackupDuration() throws {
-        let testCases = [
-            // Zero duration
-            (Date(), Date(), 0.0),
-            // One hour duration
-            (Date(), Date(timeIntervalSinceNow: 3600), 3600.0),
-            // One day duration
-            (Date(), Date(timeIntervalSinceNow: 86400), 86400.0)
-        ]
-        
-        for (startTime, endTime, expectedDuration) in testCases {
-            let history = BackupHistory(
-                id: UUID(),
-                configurationId: UUID(),
-                startTime: startTime,
-                endTime: endTime,
-                status: .completed
-            )
-            
-            #expect(abs(history.duration - expectedDuration) < 0.001)
-        }
+    override func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
+    }
+    
+    func reset() {
+        storage.removeAll()
+    }
+}
+
+/// Mock implementation of FileManager for testing
+final class MockFileManager: FileManager {
+    var files: [String: Bool] = [:]
+    
+    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
+        files[path] ?? false
+    }
+    
+    func addFile(_ path: String) {
+        files[path] = true
+    }
+    
+    func reset() {
+        files.removeAll()
+    }
+}
+
+/// Mock implementation of DateProvider for testing
+final class MockDateProvider: DateProvider {
+    var currentDate: Date = Date()
+    
+    func now() -> Date {
+        currentDate
+    }
+    
+    func setDate(_ date: Date) {
+        currentDate = date
+    }
+    
+    func reset() {
+        currentDate = Date()
     }
 }

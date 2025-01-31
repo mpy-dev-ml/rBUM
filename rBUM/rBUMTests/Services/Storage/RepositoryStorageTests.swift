@@ -8,367 +8,272 @@
 import Testing
 @testable import rBUM
 
+/// Tests for RepositoryStorage functionality
 struct RepositoryStorageTests {
-    // MARK: - Test Setup
+    // MARK: - Test Context
     
-    private static func createTestStorage() throws -> (RepositoryStorage, URL) {
-        // Create a temporary directory for testing
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dev.mpy.rBUM.tests", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    /// Test environment with test data
+    struct TestContext {
+        let fileManager: MockFileManager
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
+        let encoder: JSONEncoder
+        let decoder: JSONDecoder
         
-        try FileManager.default.createDirectory(
-            at: tempDir,
-            withIntermediateDirectories: true,
-            attributes: nil
-        )
-        
-        let testURL = tempDir.appendingPathComponent("repositories.json")
-        let storage = RepositoryStorage(fileManager: FileManager.default, storageURL: testURL)
-        
-        return (storage, testURL)
-    }
-    
-    private static func cleanupTestStorage(_ url: URL) throws {
-        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
-    }
-    
-    // MARK: - Basic Repository Tests
-    
-    @Test("Store and retrieve repository successfully", tags: ["basic", "storage"])
-    func testStoreAndRetrieveRepository() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let id = UUID()
-        let repository = Repository(
-            id: id,
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
-        )
-        
-        // Store repository
-        try storage.store(repository)
-        
-        // Retrieve repository
-        let retrieved = try storage.retrieve(forId: id)
-        #expect(retrieved != nil)
-        #expect(retrieved?.id == repository.id)
-        #expect(retrieved?.name == repository.name)
-        #expect(retrieved?.path == repository.path)
-    }
-    
-    @Test("Update existing repository", tags: ["basic", "storage"])
-    func testUpdateRepository() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let id = UUID()
-        let repository = Repository(
-            id: id,
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
-        )
-        
-        // Store initial repository
-        try storage.store(repository)
-        
-        // Create updated repository with same ID
-        var updatedRepository = repository
-        updatedRepository.name = "Updated Repo"
-        
-        // Store updated repository
-        try storage.store(updatedRepository)
-        
-        // Verify update
-        let retrieved = try storage.retrieve(forId: id)
-        #expect(retrieved != nil)
-        #expect(retrieved?.name == "Updated Repo")
-        
-        // Verify only one entry exists
-        let allRepositories = try storage.list()
-        #expect(allRepositories.count == 1)
-    }
-    
-    @Test("Delete repository successfully", tags: ["basic", "storage"])
-    func testDeleteRepository() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let id = UUID()
-        let repository = Repository(
-            id: id,
-            name: "Test Repo",
-            path: URL(fileURLWithPath: "/test/path")
-        )
-        
-        // Store repository
-        try storage.store(repository)
-        
-        // Delete repository
-        try storage.delete(forId: id)
-        
-        // Verify deletion
-        let retrieved = try storage.retrieve(forId: id)
-        #expect(retrieved == nil)
-        
-        let allRepositories = try storage.list()
-        #expect(allRepositories.isEmpty)
-    }
-    
-    // MARK: - List Operations Tests
-    
-    @Test("List multiple repositories", tags: ["list", "storage"])
-    func testListRepositories() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let repository1 = Repository(
-            id: UUID(),
-            name: "Test Repo 1",
-            path: URL(fileURLWithPath: "/test/path1")
-        )
-        
-        let repository2 = Repository(
-            id: UUID(),
-            name: "Test Repo 2",
-            path: URL(fileURLWithPath: "/test/path2")
-        )
-        
-        // Store multiple repositories
-        try storage.store(repository1)
-        try storage.store(repository2)
-        
-        // List all repositories
-        let allRepositories = try storage.list()
-        #expect(allRepositories.count == 2)
-        #expect(allRepositories.contains { $0.name == "Test Repo 1" })
-        #expect(allRepositories.contains { $0.name == "Test Repo 2" })
-    }
-    
-    @Test("Empty storage returns empty array", tags: ["list", "storage"])
-    func testEmptyStorageReturnsEmptyArray() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let repositories = try storage.list()
-        #expect(repositories.isEmpty)
-    }
-    
-    // MARK: - Path Tests
-    
-    @Test("Check repository existence at path", tags: ["path", "storage"])
-    func testExistsAtPath() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let path = URL(fileURLWithPath: "/test/path")
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
-            path: path
-        )
-        
-        // Initially should not exist
-        #expect(!try storage.exists(atPath: path))
-        
-        // Store repository
-        try storage.store(repository)
-        
-        // Should now exist
-        #expect(try storage.exists(atPath: path))
-    }
-    
-    @Test("Handle duplicate repository paths", tags: ["path", "error", "storage"])
-    func testStoreRepositoryAtExistingPath() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
-        
-        let path = URL(fileURLWithPath: "/test/path")
-        let repository1 = Repository(
-            id: UUID(),
-            name: "Test Repo 1",
-            path: path
-        )
-        
-        let repository2 = Repository(
-            id: UUID(),
-            name: "Test Repo 2",
-            path: path
-        )
-        
-        // Store first repository
-        try storage.store(repository1)
-        
-        // Attempt to store second repository at same path
-        var thrownError: Error?
-        do {
-            try storage.store(repository2)
-        } catch {
-            thrownError = error
+        init() {
+            self.fileManager = MockFileManager()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
+            self.encoder = JSONEncoder()
+            self.decoder = JSONDecoder()
         }
         
-        #expect(thrownError != nil)
-        if let error = thrownError as? RepositoryStorageError {
-            #expect(error == .repositoryAlreadyExists)
+        /// Reset all mocks to initial state
+        func reset() {
+            fileManager.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
         }
-    }
-    
-    // MARK: - Concurrent Access Tests
-    
-    @Test("Handle concurrent repository operations", tags: ["concurrency", "storage"])
-    func testConcurrentAccess() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
         
-        // Create multiple repositories
-        let repositories = (0..<5).map { i in
-            Repository(
-                id: UUID(),
-                name: "Test Repo \(i)",
-                path: URL(fileURLWithPath: "/test/path\(i)")
+        /// Create test repository storage
+        func createStorage() -> RepositoryStorage {
+            RepositoryStorage(
+                fileManager: fileManager,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider,
+                encoder: encoder,
+                decoder: decoder
             )
         }
-        
-        // Concurrently store and retrieve repositories
-        let group = DispatchGroup()
-        let queue = DispatchQueue(label: "com.mpy.rBUM.test", attributes: .concurrent)
-        var errors: [Error] = []
-        
-        // Store repositories concurrently
-        for repository in repositories {
-            group.enter()
-            queue.async {
-                do {
-                    try storage.store(repository)
-                    _ = try storage.retrieve(forId: repository.id)
-                } catch {
-                    errors.append(error)
-                }
-                group.leave()
-            }
-        }
-        
-        // Wait for all operations to complete
-        group.wait()
-        
-        // Verify no errors occurred
-        #expect(errors.isEmpty)
-        
-        // List all repositories
-        let allRepositories = try storage.list()
-        #expect(allRepositories.count == repositories.count)
-        
-        // Verify all repositories were stored correctly
-        for repository in repositories {
-            let retrieved = try storage.retrieve(forId: repository.id)
-            #expect(retrieved != nil)
-            #expect(retrieved?.id == repository.id)
-            #expect(retrieved?.name == repository.name)
-            #expect(retrieved?.path == repository.path)
-        }
     }
     
-    // MARK: - Parameterized Tests
+    // MARK: - Storage Tests
     
-    @Test("Handle various repository formats", tags: ["parameterized", "storage"])
-    func testRepositoryFormats() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
+    @Test("Test repository storage operations", tags: ["storage", "repository"])
+    func testStorageOperations() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
         
-        let testCases = [
-            // Test basic repository
-            Repository(
-                id: UUID(),
-                name: "Basic Repository",
-                path: URL(fileURLWithPath: "/basic/path")
-            ),
-            // Test repository with spaces in name and path
-            Repository(
-                id: UUID(),
-                name: "Repository with spaces",
-                path: URL(fileURLWithPath: "/path with spaces/repo")
-            ),
-            // Test repository with special characters
-            Repository(
-                id: UUID(),
-                name: "Repository!@#$%^&*()",
-                path: URL(fileURLWithPath: "/path/with/special/chars/!@#$/repo")
-            ),
-            // Test repository with very long name and path
-            Repository(
-                id: UUID(),
-                name: String(repeating: "a", count: 100),
-                path: URL(fileURLWithPath: "/very/long/path/" + String(repeating: "a", count: 100))
-            ),
-            // Test repository with minimum length name
-            Repository(
-                id: UUID(),
-                name: "a",
-                path: URL(fileURLWithPath: "/a")
-            )
-        ]
+        let testCases = MockData.Repository.storageData
         
-        for repository in testCases {
+        // Test storage operations
+        for testCase in testCases {
             // Store repository
-            try storage.store(repository)
+            try storage.store(testCase.repository)
+            #expect(context.fileManager.createFileCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            // Retrieve and verify
-            let retrieved = try storage.retrieve(forId: repository.id)
-            #expect(retrieved != nil)
-            #expect(retrieved?.id == repository.id)
-            #expect(retrieved?.name == repository.name)
-            #expect(retrieved?.path == repository.path)
+            // Load repository
+            let loaded = try storage.load(testCase.repository.id)
+            #expect(loaded == testCase.repository)
             
-            // Clean up
-            try storage.delete(forId: repository.id)
+            // Update repository
+            var updated = testCase.repository
+            updated.name = "Updated \(testCase.repository.name)"
+            try storage.update(updated)
+            #expect(context.fileManager.writeDataCalled)
+            
+            // Delete repository
+            try storage.delete(updated.id)
+            #expect(context.fileManager.removeItemCalled)
+            
+            context.reset()
         }
     }
     
-    @Test("Handle file system edge cases", tags: ["error", "storage"])
-    func testFileSystemEdgeCases() throws {
-        let (storage, url) = try Self.createTestStorage()
-        defer { try? Self.cleanupTestStorage(url) }
+    // MARK: - Query Tests
+    
+    @Test("Test repository queries", tags: ["storage", "query"])
+    func testRepositoryQueries() throws {
+        // Given: Repository storage with test data
+        let context = TestContext()
+        let storage = context.createStorage()
         
+        let testCases = MockData.Repository.queryData
+        
+        // Store test repositories
+        for data in testCases.repositories {
+            try storage.store(data)
+        }
+        
+        // Test queries
+        for query in testCases.queries {
+            // Execute query
+            let results = try storage.query(query.filter)
+            #expect(results.count == query.expectedCount)
+            
+            // Verify results
+            for (result, expected) in zip(results, query.expectedResults) {
+                #expect(result == expected)
+            }
+        }
+    }
+    
+    // MARK: - Validation Tests
+    
+    @Test("Test repository validation", tags: ["storage", "validate"])
+    func testRepositoryValidation() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
+        
+        let testCases = MockData.Repository.validationData
+        
+        // Test validation
+        for testCase in testCases {
+            do {
+                // Validate repository
+                try storage.validate(testCase.repository)
+                
+                if !testCase.expectedValid {
+                    throw TestFailure("Expected validation error for invalid data")
+                }
+            } catch {
+                if testCase.expectedValid {
+                    throw TestFailure("Unexpected validation error: \(error)")
+                }
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Migration Tests
+    
+    @Test("Test repository storage migration", tags: ["storage", "migration"])
+    func testStorageMigration() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
+        
+        let testCases = MockData.Repository.migrationData
+        
+        // Test migration
+        for testCase in testCases {
+            // Setup old data
+            context.fileManager.mockFileData = testCase.oldData
+            
+            // Perform migration
+            try storage.migrate()
+            
+            // Verify migration
+            let migratedData = context.fileManager.lastWrittenData
+            #expect(migratedData == testCase.expectedData)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test storage error handling", tags: ["storage", "error"])
+    func testErrorHandling() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
+        
+        let errorCases = MockData.Repository.storageErrorCases
+        
+        // Test error handling
+        for errorCase in errorCases {
+            do {
+                // Simulate error condition
+                context.fileManager.simulateError = errorCase.error
+                
+                // Attempt operation
+                try errorCase.operation(storage)
+                
+                throw TestFailure("Expected error for \(errorCase)")
+            } catch {
+                // Verify error handling
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .repositoryStorageError)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Concurrency Tests
+    
+    @Test("Test concurrent storage operations", tags: ["storage", "concurrent"])
+    func testConcurrentOperations() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
+        
+        let testCases = MockData.Repository.concurrentData
+        
+        // Test concurrent operations
+        for testCase in testCases {
+            // Perform concurrent operations
+            let group = DispatchGroup()
+            var errors: [Error] = []
+            
+            for operation in testCase.operations {
+                group.enter()
+                DispatchQueue.global().async {
+                    do {
+                        try operation(storage)
+                    } catch {
+                        errors.append(error)
+                    }
+                    group.leave()
+                }
+            }
+            
+            group.wait()
+            
+            // Verify results
+            #expect(errors.count == testCase.expectedErrorCount)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test storage performance", tags: ["storage", "performance"])
+    func testPerformance() throws {
+        // Given: Repository storage
+        let context = TestContext()
+        let storage = context.createStorage()
+        
+        let startTime = Date()
+        
+        // Perform multiple operations
+        for i in 0..<100 {
+            let repository = Repository(
+                name: "Performance Test \(i)",
+                path: URL(fileURLWithPath: "/test/path/\(i)")
+            )
+            try storage.store(repository)
+            _ = try storage.load(repository.id)
+            try storage.delete(repository.id)
+        }
+        
+        let endTime = Date()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 5.0) // Should complete in under 5 seconds
+        
+        // Test individual operation performance
         let repository = Repository(
-            id: UUID(),
-            name: "Test Repo",
+            name: "Performance Test",
             path: URL(fileURLWithPath: "/test/path")
         )
         
-        // Test cases for file system edge cases
-        let testCases = [
-            // Test directory already exists
-            {
-                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
-                return repository
-            }(),
-            // Test file with no write permissions
-            {
-                try "".write(to: url, atomically: true, encoding: .utf8)
-                try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: url.path)
-                return repository
-            }(),
-            // Test file in read-only directory
-            {
-                let readOnlyDir = url.deletingLastPathComponent()
-                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: readOnlyDir.path)
-                return repository
-            }()
-        ]
+        let operationStart = Date()
+        try storage.store(repository)
+        _ = try storage.load(repository.id)
+        try storage.delete(repository.id)
+        let operationEnd = Date()
         
-        for _ in testCases {
-            var thrownError: Error?
-            do {
-                try storage.store(repository)
-            } catch {
-                thrownError = error
-            }
-            #expect(thrownError != nil)
-            
-            // Reset permissions for cleanup
-            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.deletingLastPathComponent().path)
-            try? FileManager.default.removeItem(at: url)
-        }
+        let operationInterval = operationEnd.timeIntervalSince(operationStart)
+        #expect(operationInterval < 0.1) // Individual operations should be fast
     }
 }

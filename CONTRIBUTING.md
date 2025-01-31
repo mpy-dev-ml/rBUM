@@ -68,101 +68,77 @@ For Restic-specific questions or issues, please refer to:
 
 ## Testing Guidelines
 
-### Framework Usage
+### Test Infrastructure
 
-We use a hybrid testing approach:
+rBUM uses a bimodal testing strategy combining Swift Testing Framework and XCTest:
 
-1. **Swift Testing Framework** (Primary for Unit Tests)
-   - All new unit tests should use Swift Testing
-   - Use `@Test` attribute with descriptive names
-   - Implement tags for test organisation
-   - Use `#expect` for assertions
-   - Leverage parameterized testing where applicable
+1. **Swift Testing Framework**
+   - Used for unit tests (models, services, viewmodels)
+   - Provides better async/await support
+   - Enables tagged test organization
+   - Uses TestContext pattern for dependency management
+   - More readable test assertions with #expect
 
-   Example:
-   ```swift
-   @Test("Repository creation with valid credentials", 
-         .tags(.repository, .security))
-   func testRepositoryCreation() async throws {
-       // Given
-       let credentials = RepositoryCredentials(...)
-       
-       // When
-       let result = try await repositoryService.create(with: credentials)
-       
-       // Then
-       #expect(result.isSuccess)
-   }
-   ```
+2. **XCTest**
+   - Used for UI tests
+   - Used for performance tests
+   - Leverages Xcode's native testing tools
 
-2. **XCTest Framework** (UI and Performance Tests)
-   - Use for UI automation tests
-   - Use for performance measurements
-   - Follow XCTest patterns for these specific cases
+### Test Organization
 
-### Test Organisation
+- Tests are organized in separate test plans:
+  - `rBUM.xctestplan`: Main test plan
+  - `UnitTests.xctestplan`: Swift Testing-based unit tests
+  - `UITests.xctestplan`: XCTest-based UI tests
+  - `PerformanceTests.xctestplan`: XCTest-based performance tests
 
-1. **Directory Structure**
-   ```
-   rBUM/Tests/
-   ├── UnitTests/        # Swift Testing
-   ├── UITests/          # XCTest
-   └── PerformanceTests/ # XCTest
-   ```
+### Writing Tests
 
-2. **Test Plans**
-   - Use appropriate test plan for your changes:
-     - `UnitTests.xctestplan` for Swift Testing tests
-     - `UITests.xctestplan` for UI tests
-     - `PerformanceTests.xctestplan` for performance tests
+1. **Unit Tests**
+   - Use Swift Testing Framework
+   - Create a TestContext for dependency management
+   - Use descriptive test names with @Test annotation
+   - Add appropriate tags for test organization
+   - Use #expect for assertions
+   - Follow the Given-When-Then pattern
 
-3. **Tags**
-   Use appropriate tags for test organisation:
-   - `.core` - Core functionality
-   - `.security` - Security-related tests
-   - `.storage` - Storage-related tests
-   - `.ui` - UI-related tests
-   - `.network` - Network-dependent tests
-   - `.performance` - Performance-sensitive tests
-   - `.integration` - Integration tests
-   - `.unit` - Unit tests
+2. **UI Tests**
+   - Use XCTest
+   - Focus on user interaction flows
+   - Test SwiftUI view hierarchy
+   - Verify accessibility features
 
-### Test Writing Guidelines
+3. **Performance Tests**
+   - Use XCTest
+   - Set appropriate baselines
+   - Test critical operations
+   - Monitor memory and CPU usage
 
-1. **Naming Conventions**
-   - Use British English in test names and descriptions
-   - Follow the pattern: `test[Feature][Scenario][ExpectedResult]`
-   - Make test names descriptive and specific
+### Test Coverage
 
-2. **Structure**
-   - Use Given-When-Then pattern
-   - Keep tests focused and atomic
-   - Use appropriate mocks and test doubles
-   - Handle async operations properly
-
-3. **Coverage Requirements**
-   - Models: 95% coverage
-   - Services: 90% coverage
-   - ViewModels: 85% coverage
-   - UI Components: 75% coverage
-
-4. **Performance Tests**
-   - Include baseline measurements
-   - Test with various data sizes
-   - Document performance expectations
-   - Use appropriate metrics for measurement
+- Maintain high test coverage for critical paths
+- Use Xcode's coverage reporting
+- Focus on meaningful tests over coverage percentage
+- Document untested edge cases
 
 ### Running Tests
 
-1. **Local Development**
-   - Run relevant test plan before submitting PR
-   - Ensure all tests pass in both Debug and Release
-   - Check code coverage requirements are met
+1. **In Xcode**
+   - Use Product > Test (⌘U)
+   - Use Test navigator for specific tests
+   - Check coverage in Report navigator
 
-2. **CI/CD Pipeline**
-   - All tests must pass in CI
-   - Coverage reports will be generated
-   - Performance tests will be compared to baselines
+2. **Continuous Integration**
+   - All tests must pass before merging
+   - Coverage reports are generated
+   - Performance tests are tracked
+
+### Test Maintenance
+
+- Keep tests up to date with implementation
+- Regularly review and update test plans
+- Monitor and update performance baselines
+- Clean up obsolete tests
 
 ## Git Workflow
 

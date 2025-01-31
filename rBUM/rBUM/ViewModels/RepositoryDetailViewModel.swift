@@ -33,6 +33,7 @@ final class RepositoryDetailViewModel: ObservableObject {
     @Published private(set) var isChecking: Bool = false
     @Published var error: Error?
     @Published var showError: Bool = false
+    @Published private(set) var repositoryStatus: RepositoryStatus?
     
     private let resticService: ResticCommandServiceProtocol
     private let credentialsManager: CredentialsManagerProtocol
@@ -60,15 +61,9 @@ final class RepositoryDetailViewModel: ObservableObject {
         do {
             let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
             
-            // Create credentials for checking
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
-            )
-            
-            // Check repository
-            try await resticService.checkRepository(at: repository.path, credentials: credentials)
+            // Check repository and store status
+            let status = try await resticService.checkRepository(repository.path, withPassword: password)
+            self.repositoryStatus = status
             
             // Update last check time
             lastCheck = Date()

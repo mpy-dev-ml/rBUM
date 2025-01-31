@@ -7,12 +7,14 @@
 
 import SwiftUI
 
+/// Displays detailed information and controls for a repository
 struct RepositoryDetailView: View {
     @StateObject private var viewModel: RepositoryDetailViewModel
     @State private var showPasswordSheet = false
     private let resticService: ResticCommandServiceProtocol
     private let credentialsManager: CredentialsManagerProtocol
     
+    /// Creates a view to manage a specific repository
     init(
         repository: Repository,
         resticService: ResticCommandServiceProtocol = ResticCommandService(

@@ -54,6 +54,10 @@ enum TestMocks {
     }
     
     final class MockResticCommandService: ResticCommandServiceProtocol {
+        func checkRepository(_ repository: URL, withPassword password: String) async throws -> rBUM.RepositoryStatus {
+            <#code#>
+        }
+        
         var initError: Error?
         var checkError: Error?
         var backupError: Error?

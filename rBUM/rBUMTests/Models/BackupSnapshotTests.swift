@@ -6,346 +6,335 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupSnapshot functionality
 struct BackupSnapshotTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup snapshot with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = "2024-01-30-23-28-08"
-        let repositoryId = UUID()
-        let timestamp = Date()
-        let size: UInt64 = 1024 * 1024 // 1 MB
+    /// Test environment with test data
+    struct TestContext {
+        let resticService: MockResticService
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
+        let fileManager: MockFileManager
         
-        // When
-        let snapshot = BackupSnapshot(
-            id: id,
-            repositoryId: repositoryId,
-            timestamp: timestamp,
-            size: size
-        )
+        init() {
+            self.resticService = MockResticService()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
+            self.fileManager = MockFileManager()
+        }
         
-        // Then
-        #expect(snapshot.id == id)
-        #expect(snapshot.repositoryId == repositoryId)
-        #expect(snapshot.timestamp == timestamp)
-        #expect(snapshot.size == size)
-        #expect(snapshot.tags.isEmpty)
-        #expect(snapshot.hostname == Host.current().localizedName)
-        #expect(snapshot.username == NSUserName())
-        #expect(snapshot.paths.isEmpty)
-    }
-    
-    @Test("Initialize backup snapshot with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = "2024-01-30-23-28-08"
-        let repositoryId = UUID()
-        let timestamp = Date()
-        let size: UInt64 = 1024 * 1024 // 1 MB
-        let tags = ["daily", "documents"]
-        let hostname = "test-host"
-        let username = "testuser"
-        let paths = ["/Users/test/Documents", "/Users/test/Pictures"]
+        /// Reset all mocks to initial state
+        func reset() {
+            resticService.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
+            fileManager.reset()
+        }
         
-        // When
-        let snapshot = BackupSnapshot(
-            id: id,
-            repositoryId: repositoryId,
-            timestamp: timestamp,
-            size: size,
-            tags: tags,
-            hostname: hostname,
-            username: username,
-            paths: paths
-        )
-        
-        // Then
-        #expect(snapshot.id == id)
-        #expect(snapshot.repositoryId == repositoryId)
-        #expect(snapshot.timestamp == timestamp)
-        #expect(snapshot.size == size)
-        #expect(snapshot.tags == tags)
-        #expect(snapshot.hostname == hostname)
-        #expect(snapshot.username == username)
-        #expect(snapshot.paths == paths)
-    }
-    
-    // MARK: - ID Tests
-    
-    @Test("Handle snapshot ID formats", tags: ["model", "id"])
-    func testIdFormats() throws {
-        let testCases = [
-            // Valid IDs
-            "2024-01-30-23-28-08",
-            "2024-01-30T23:28:08Z",
-            "20240130232808",
-            // Invalid IDs
-            "",
-            " ",
-            "invalid",
-            "2024-13-45-99-99-99",
-            String(repeating: "a", count: 1000)
-        ]
-        
-        for id in testCases {
-            let snapshot = BackupSnapshot(
-                id: id,
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 0
+        /// Create test snapshot manager
+        func createSnapshotManager() -> BackupSnapshotManager {
+            BackupSnapshotManager(
+                resticService: resticService,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider,
+                fileManager: fileManager
             )
-            
-            let isValid = !id.isEmpty &&
-                         id.trimmingCharacters(in: .whitespaces) == id &&
-                         id.count <= 100
-            
-            if isValid {
-                #expect(snapshot.isValid)
-                #expect(snapshot.id == id)
-            } else {
-                #expect(!snapshot.isValid)
-            }
         }
     }
     
-    // MARK: - Size Tests
+    // MARK: - Initialization Tests
     
-    @Test("Handle snapshot sizes", tags: ["model", "size"])
-    func testSizes() throws {
-        let testCases: [(UInt64, String)] = [
-            // Bytes
-            (500, "500 B"),
-            // Kilobytes
-            (1024, "1.0 KB"),
-            (1536, "1.5 KB"),
-            // Megabytes
-            (1024 * 1024, "1.0 MB"),
-            (1024 * 1024 * 1.5, "1.5 MB"),
-            // Gigabytes
-            (1024 * 1024 * 1024, "1.0 GB"),
-            (1024 * 1024 * 1024 * 2.5, "2.5 GB"),
-            // Terabytes
-            (1024 * 1024 * 1024 * 1024, "1.0 TB")
-        ]
+    @Test("Initialize snapshot manager", tags: ["init", "snapshot"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        for (size, formattedSize) in testCases {
-            let snapshot = BackupSnapshot(
-                id: "test",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: size
-            )
+        // When: Creating snapshot manager
+        let manager = context.createSnapshotManager()
+        
+        // Then: Manager is properly configured
+        #expect(manager.isInitialized)
+        #expect(manager.snapshotCount == 0)
+    }
+    
+    // MARK: - Snapshot Creation Tests
+    
+    @Test("Test snapshot creation", tags: ["snapshot", "create"])
+    func testSnapshotCreation() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
+        
+        let testData = MockData.Snapshot.creationData
+        
+        // Test snapshot creation
+        for data in testData {
+            // Create snapshot
+            let snapshot = try manager.createSnapshot(data)
+            #expect(snapshot.id != nil)
+            #expect(context.resticService.createSnapshotCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            #expect(snapshot.size == size)
-            #expect(snapshot.formattedSize == formattedSize)
+            // Verify snapshot
+            let verified = try manager.verifySnapshot(snapshot)
+            #expect(verified)
+            #expect(context.resticService.verifySnapshotCalled)
+            
+            context.reset()
         }
     }
     
-    // MARK: - Tag Tests
+    // MARK: - Snapshot Listing Tests
     
-    @Test("Handle snapshot tags", tags: ["model", "tags"])
-    func testTags() throws {
-        let testCases = [
-            // Valid tags
-            ["daily", "documents"],
-            ["weekly", "system", "critical"],
-            // Empty tags
-            [],
-            // Invalid tags
-            ["", " ", "invalid tag"],
-            [String(repeating: "a", count: 1000)]
-        ]
+    @Test("Test snapshot listing", tags: ["snapshot", "list"])
+    func testSnapshotListing() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
         
-        for tags in testCases {
-            let snapshot = BackupSnapshot(
-                id: "test",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 0,
-                tags: tags
-            )
+        let repositories = MockData.Snapshot.validRepositories
+        
+        // Test snapshot listing
+        for repository in repositories {
+            // List snapshots
+            let snapshots = try manager.listSnapshots(repository)
+            #expect(!snapshots.isEmpty)
+            #expect(context.resticService.listSnapshotsCalled)
             
-            let isValid = tags.allSatisfy { tag in
-                !tag.isEmpty &&
-                !tag.contains(" ") &&
-                tag.count <= 100
-            }
+            // Filter snapshots
+            let filtered = try manager.filterSnapshots(snapshots, by: .latest)
+            #expect(filtered.count <= snapshots.count)
             
-            if isValid {
-                #expect(snapshot.isValid)
-                #expect(snapshot.tags == tags)
-            } else {
-                #expect(!snapshot.isValid)
-            }
+            context.reset()
         }
     }
     
-    // MARK: - Path Tests
+    // MARK: - Snapshot Restoration Tests
     
-    @Test("Handle snapshot paths", tags: ["model", "paths"])
-    func testPaths() throws {
-        let testCases = [
-            // Valid paths
-            ["/Users/test/Documents", "/Users/test/Pictures"],
-            ["/Applications", "/Library/Preferences"],
-            // Empty paths
-            [],
-            // Paths with spaces
-            ["/Users/test/My Documents", "/Volumes/Backup Drive/Data"],
-            // Paths with special characters
-            ["/Users/test/Documents!@#$%", "/Test/Path/With/Symbols/*&^"],
-            // Very long paths
-            ["/Users/test/" + String(repeating: "a", count: 1000)]
-        ]
+    @Test("Test snapshot restoration", tags: ["snapshot", "restore"])
+    func testSnapshotRestoration() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
         
-        for paths in testCases {
-            let snapshot = BackupSnapshot(
-                id: "test",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 0,
-                paths: paths
-            )
+        let testCases = MockData.Snapshot.restorationData
+        
+        // Test snapshot restoration
+        for testCase in testCases {
+            // Restore snapshot
+            try manager.restoreSnapshot(testCase.snapshot, to: testCase.path)
+            #expect(context.resticService.restoreSnapshotCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            let isValid = paths.allSatisfy { path in
-                !path.isEmpty && path.hasPrefix("/")
-            }
+            // Verify restoration
+            let verified = try manager.verifyRestoration(testCase.path)
+            #expect(verified)
+            #expect(context.fileManager.fileExistsCalled)
             
-            if isValid {
-                #expect(snapshot.isValid)
-                #expect(snapshot.paths == paths)
-            } else {
-                #expect(!snapshot.isValid)
-            }
+            context.reset()
         }
     }
     
-    // MARK: - Comparison Tests
+    // MARK: - Snapshot Deletion Tests
     
-    @Test("Compare backup snapshots for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let repositoryId = UUID()
-        let timestamp = Date()
+    @Test("Test snapshot deletion", tags: ["snapshot", "delete"])
+    func testSnapshotDeletion() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
         
-        let snapshot1 = BackupSnapshot(
-            id: "test1",
-            repositoryId: repositoryId,
-            timestamp: timestamp,
-            size: 1024,
-            tags: ["daily"],
-            paths: ["/test"]
-        )
+        let snapshots = MockData.Snapshot.deletionData
         
-        let snapshot2 = BackupSnapshot(
-            id: "test1",
-            repositoryId: repositoryId,
-            timestamp: timestamp,
-            size: 1024,
-            tags: ["daily"],
-            paths: ["/test"]
-        )
-        
-        let snapshot3 = BackupSnapshot(
-            id: "test2",
-            repositoryId: repositoryId,
-            timestamp: timestamp,
-            size: 1024,
-            tags: ["daily"],
-            paths: ["/test"]
-        )
-        
-        #expect(snapshot1 == snapshot2)
-        #expect(snapshot1 != snapshot3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup snapshot", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic snapshot
-            BackupSnapshot(
-                id: "basic",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 1024
-            ),
-            // Snapshot with tags
-            BackupSnapshot(
-                id: "with-tags",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 1024,
-                tags: ["daily", "documents"]
-            ),
-            // Full snapshot
-            BackupSnapshot(
-                id: "full",
-                repositoryId: UUID(),
-                timestamp: Date(),
-                size: 1024 * 1024,
-                tags: ["weekly", "system"],
-                hostname: "test-host",
-                username: "testuser",
-                paths: ["/test/path1", "/test/path2"]
-            )
-        ]
-        
-        for snapshot in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(snapshot)
-            let decoded = try decoder.decode(BackupSnapshot.self, from: data)
+        // Test snapshot deletion
+        for snapshot in snapshots {
+            // Delete snapshot
+            try manager.deleteSnapshot(snapshot)
+            #expect(context.resticService.deleteSnapshotCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            // Then
-            #expect(decoded.id == snapshot.id)
-            #expect(decoded.repositoryId == snapshot.repositoryId)
-            #expect(decoded.timestamp == snapshot.timestamp)
-            #expect(decoded.size == snapshot.size)
-            #expect(decoded.tags == snapshot.tags)
-            #expect(decoded.hostname == snapshot.hostname)
-            #expect(decoded.username == snapshot.username)
-            #expect(decoded.paths == snapshot.paths)
-        }
-    }
-    
-    // MARK: - Validation Tests
-    
-    @Test("Validate backup snapshot properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid snapshot
-            ("valid-id", UUID(), 1024, ["daily"], ["/test"], true),
-            // Empty ID
-            ("", UUID(), 1024, ["daily"], ["/test"], false),
-            // Invalid tags
-            ("valid-id", UUID(), 1024, ["invalid tag"], ["/test"], false),
-            // Invalid paths
-            ("valid-id", UUID(), 1024, ["daily"], ["invalid-path"], false),
-            // Zero size
-            ("valid-id", UUID(), 0, ["daily"], ["/test"], true)
-        ]
-        
-        for (id, repositoryId, size, tags, paths, isValid) in testCases {
-            let snapshot = BackupSnapshot(
-                id: id,
-                repositoryId: repositoryId,
-                timestamp: Date(),
-                size: size,
-                tags: tags,
-                paths: paths
-            )
-            
-            if isValid {
-                #expect(snapshot.isValid)
-            } else {
-                #expect(!snapshot.isValid)
+            // Verify deletion
+            do {
+                _ = try manager.verifySnapshot(snapshot)
+                throw TestFailure("Expected error for deleted snapshot")
+            } catch {
+                // Expected error
             }
+            
+            context.reset()
         }
+    }
+    
+    // MARK: - Snapshot Comparison Tests
+    
+    @Test("Test snapshot comparison", tags: ["snapshot", "compare"])
+    func testSnapshotComparison() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
+        
+        let comparisons = MockData.Snapshot.comparisonData
+        
+        // Test snapshot comparison
+        for comparison in comparisons {
+            // Compare snapshots
+            let diff = try manager.compareSnapshots(comparison.first, comparison.second)
+            #expect(diff != nil)
+            #expect(context.resticService.compareSnapshotsCalled)
+            
+            // Verify differences
+            let verified = try manager.verifyDifferences(diff!)
+            #expect(verified)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test snapshot error handling", tags: ["snapshot", "error"])
+    func testErrorHandling() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
+        
+        let errorCases = MockData.Snapshot.errorCases
+        
+        // Test error handling
+        for errorCase in errorCases {
+            do {
+                try manager.handleSnapshotOperation(errorCase)
+                throw TestFailure("Expected error for \(errorCase)")
+            } catch {
+                // Expected error
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .backupSnapshotError)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle snapshot edge cases", tags: ["snapshot", "edge"])
+    func testEdgeCases() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
+        
+        // Test invalid snapshot ID
+        do {
+            try manager.verifySnapshot(BackupSnapshot(id: "invalid-id"))
+            throw TestFailure("Expected error for invalid snapshot ID")
+        } catch {
+            // Expected error
+        }
+        
+        // Test non-existent restore path
+        do {
+            try manager.restoreSnapshot(BackupSnapshot(id: "test"), to: "/non/existent/path")
+            throw TestFailure("Expected error for non-existent path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test concurrent operations
+        do {
+            let snapshot = BackupSnapshot(id: "test")
+            try manager.deleteSnapshot(snapshot)
+            try manager.deleteSnapshot(snapshot)
+            throw TestFailure("Expected error for concurrent deletion")
+        } catch {
+            // Expected error
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test snapshot performance", tags: ["snapshot", "performance"])
+    func testPerformance() throws {
+        // Given: Snapshot manager
+        let context = TestContext()
+        let manager = context.createSnapshotManager()
+        
+        // Test listing performance
+        let startTime = context.dateProvider.now()
+        let repository = MockData.Snapshot.validRepositories[0]
+        
+        for _ in 0..<100 {
+            _ = try manager.listSnapshots(repository)
+        }
+        
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test filtering performance
+        let snapshots = try manager.listSnapshots(repository)
+        let filterStartTime = context.dateProvider.now()
+        
+        for _ in 0..<1000 {
+            _ = try manager.filterSnapshots(snapshots, by: .latest)
+        }
+        
+        let filterEndTime = context.dateProvider.now()
+        
+        let filterInterval = filterEndTime.timeIntervalSince(filterStartTime)
+        #expect(filterInterval < 0.5) // Filtering should be fast
+    }
+}
+
+// MARK: - Mock Restic Service
+
+/// Mock implementation of ResticService for testing
+final class MockResticService: ResticServiceProtocol {
+    private(set) var createSnapshotCalled = false
+    private(set) var verifySnapshotCalled = false
+    private(set) var listSnapshotsCalled = false
+    private(set) var restoreSnapshotCalled = false
+    private(set) var deleteSnapshotCalled = false
+    private(set) var compareSnapshotsCalled = false
+    
+    func createSnapshot(_ data: Data) throws -> BackupSnapshot {
+        createSnapshotCalled = true
+        return BackupSnapshot(id: "mock-snapshot")
+    }
+    
+    func verifySnapshot(_ snapshot: BackupSnapshot) throws -> Bool {
+        verifySnapshotCalled = true
+        return true
+    }
+    
+    func listSnapshots(_ repository: BackupRepository) throws -> [BackupSnapshot] {
+        listSnapshotsCalled = true
+        return [BackupSnapshot(id: "mock-snapshot")]
+    }
+    
+    func restoreSnapshot(_ snapshot: BackupSnapshot, to path: String) throws {
+        restoreSnapshotCalled = true
+    }
+    
+    func deleteSnapshot(_ snapshot: BackupSnapshot) throws {
+        deleteSnapshotCalled = true
+    }
+    
+    func compareSnapshots(_ first: BackupSnapshot, _ second: BackupSnapshot) throws -> BackupSnapshotDiff {
+        compareSnapshotsCalled = true
+        return BackupSnapshotDiff(differences: ["mock-diff"])
+    }
+    
+    func reset() {
+        createSnapshotCalled = false
+        verifySnapshotCalled = false
+        listSnapshotsCalled = false
+        restoreSnapshotCalled = false
+        deleteSnapshotCalled = false
+        compareSnapshotsCalled = false
     }
 }

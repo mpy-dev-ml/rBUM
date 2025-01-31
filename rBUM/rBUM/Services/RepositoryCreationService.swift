@@ -165,15 +165,8 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         )
         
         do {
-            // Create credentials for checking
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
-            )
-            
             // Verify repository with restic
-            try await resticService.checkRepository(at: path, credentials: credentials)
+            try await resticService.checkRepository(path, withPassword: password)
             
             // Store repository metadata
             try repositoryStorage.store(repository)

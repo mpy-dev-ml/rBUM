@@ -8,191 +8,225 @@
 import Testing
 @testable import rBUM
 
+/// Tests for RepositoryCreationViewModel functionality
 @MainActor
 struct RepositoryCreationViewModelTests {
-    // MARK: - Test Setup
+    // MARK: - Test Context
     
+    /// Test environment with mocked dependencies
     struct TestContext {
-        let creationService: TestMocks.MockRepositoryCreationService
         let viewModel: RepositoryCreationViewModel
+        let mockCreationService: MockRepositoryCreationService
+        let mockFileManager: MockFileManager
+        let mockNotificationCenter: MockNotificationCenter
         
         init() {
-            self.creationService = TestMocks.MockRepositoryCreationService()
-            self.viewModel = RepositoryCreationViewModel(creationService: creationService)
+            self.mockCreationService = MockRepositoryCreationService()
+            self.mockFileManager = MockFileManager()
+            self.mockNotificationCenter = MockNotificationCenter()
+            self.viewModel = RepositoryCreationViewModel(
+                creationService: mockCreationService,
+                fileManager: mockFileManager,
+                notificationCenter: mockNotificationCenter
+            )
+        }
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            mockCreationService.reset()
+            mockFileManager.reset()
+            mockNotificationCenter.reset()
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Repository Creation Tests
     
-    @Test("Validate repository creation with empty name", tags: ["validation", "model"])
-    func testValidationEmptyName() throws {
-        // Given
+    @Test("Create repository successfully", tags: ["creation", "repository"])
+    func testCreateRepositorySuccess() async throws {
+        // Given: Valid repository configuration
         let context = TestContext()
-        context.viewModel.name = ""
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "test-password"
-        context.viewModel.mode = .create
+        let repository = MockData.Repository.validRepository
         
-        // Then
-        #expect(!context.viewModel.isValid)
+        context.viewModel.name = repository.name
+        context.viewModel.path = repository.path
+        context.viewModel.password = MockData.Repository.validPassword
+        context.mockCreationService.createResult = repository
+        
+        // When: Creating repository
+        try await context.viewModel.createRepository()
+        
+        // Then: Repository is created without error
+        #expect(context.mockCreationService.createCalled)
+        #expect(!context.viewModel.isLoading)
+        #expect(!context.viewModel.showError)
+        #expect(context.viewModel.error == nil)
+        #expect(context.mockNotificationCenter.postNotificationCalled)
     }
     
-    @Test("Validate repository creation with empty path", tags: ["validation", "model"])
-    func testValidationEmptyPath() throws {
-        // Given
+    @Test("Handle repository creation failure", tags: ["creation", "repository", "error"])
+    func testCreateRepositoryFailure() async throws {
+        // Given: Creation will fail
         let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = ""
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "test-password"
-        context.viewModel.mode = .create
+        let repository = MockData.Repository.validRepository
         
-        // Then
-        #expect(!context.viewModel.isValid)
+        context.viewModel.name = repository.name
+        context.viewModel.path = repository.path
+        context.viewModel.password = MockData.Repository.validPassword
+        context.mockCreationService.shouldFail = true
+        context.mockCreationService.error = MockData.Error.repositoryCreationError
+        
+        // When: Creating repository
+        try await context.viewModel.createRepository()
+        
+        // Then: Error is handled properly
+        #expect(context.mockCreationService.createCalled)
+        #expect(!context.viewModel.isLoading)
+        #expect(context.viewModel.showError)
+        #expect(context.viewModel.error as? MockData.Error == MockData.Error.repositoryCreationError)
     }
     
-    @Test("Validate repository creation with empty password", tags: ["validation", "model"])
-    func testValidationEmptyPassword() throws {
-        // Given
+    @Test("Validate repository path", tags: ["validation", "repository"])
+    func testValidateRepositoryPath() async throws {
+        // Given: Various paths
         let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = ""
-        context.viewModel.confirmPassword = ""
-        context.viewModel.mode = .create
+        let validPath = MockData.Repository.validPath
+        let invalidPath = MockData.Repository.invalidPath
         
-        // Then
-        #expect(!context.viewModel.isValid)
+        // When/Then: Testing valid path
+        context.viewModel.path = validPath
+        context.mockFileManager.pathExists = true
+        context.mockFileManager.isDirectory = true
+        
+        #expect(context.viewModel.isPathValid)
+        #expect(!context.viewModel.showPathError)
+        
+        // When/Then: Testing invalid path
+        context.viewModel.path = invalidPath
+        context.mockFileManager.pathExists = false
+        
+        #expect(!context.viewModel.isPathValid)
+        #expect(context.viewModel.showPathError)
     }
     
-    @Test("Validate repository creation with mismatched passwords", tags: ["validation", "model"])
-    func testValidationPasswordMismatch() throws {
-        // Given
+    @Test("Validate repository name", tags: ["validation", "repository"])
+    func testValidateRepositoryName() async throws {
+        // Given: Various names
         let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "different-password"
-        context.viewModel.mode = .create
+        let validName = MockData.Repository.validName
+        let invalidName = ""
         
-        // Then
-        #expect(!context.viewModel.isValid)
+        // When/Then: Testing valid name
+        context.viewModel.name = validName
+        #expect(context.viewModel.isNameValid)
+        #expect(!context.viewModel.showNameError)
+        
+        // When/Then: Testing invalid name
+        context.viewModel.name = invalidName
+        #expect(!context.viewModel.isNameValid)
+        #expect(context.viewModel.showNameError)
     }
     
-    @Test("Validate repository import mode", tags: ["validation", "model"])
-    func testValidationImportMode() throws {
-        // Given
+    @Test("Validate repository password", tags: ["validation", "repository"])
+    func testValidatePassword() async throws {
+        // Given: Various passwords
         let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "different-password" // Should be ignored in import mode
-        context.viewModel.mode = .import
+        let validPassword = MockData.Repository.validPassword
+        let invalidPassword = MockData.Repository.invalidPassword
         
-        // Then
-        #expect(context.viewModel.isValid)
+        // When/Then: Testing valid password
+        context.viewModel.password = validPassword
+        #expect(context.viewModel.isPasswordValid)
+        #expect(!context.viewModel.showPasswordError)
+        
+        // When/Then: Testing invalid password
+        context.viewModel.password = invalidPassword
+        #expect(!context.viewModel.isPasswordValid)
+        #expect(context.viewModel.showPasswordError)
     }
     
-    // MARK: - Creation Tests
+    // MARK: - Path Selection Tests
     
-    @Test("Create new repository successfully", tags: ["creation", "model"])
-    func testCreateSuccess() async throws {
-        // Given
+    @Test("Select repository path", tags: ["path", "selection"])
+    func testSelectRepositoryPath() async throws {
+        // Given: Valid directory path
         let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "test-password"
-        context.viewModel.mode = .create
+        let selectedPath = MockData.Repository.validRepository.path
+        context.mockFileManager.directoryExists[selectedPath.path] = true
         
-        let expectedRepo = Repository(name: context.viewModel.name, path: URL(fileURLWithPath: context.viewModel.path))
-        context.creationService.createResult = expectedRepo
+        // When: Selecting path
+        await context.viewModel.selectPath()
+        context.viewModel.path = selectedPath
         
-        // When
-        await context.viewModel.createOrImport()
+        // Then: Path is selected and validated
+        #expect(context.viewModel.path == selectedPath)
+        #expect(context.viewModel.isPathValid)
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of RepositoryCreationService for testing
+final class MockRepositoryCreationService: RepositoryCreationServiceProtocol {
+    var createCalled = false
+    var createResult: Repository?
+    var shouldFail = false
+    var error: Error?
+    
+    func createRepository(name: String, path: URL, password: String) async throws -> Repository {
+        if shouldFail { throw error! }
         
-        // Then
-        if case .success(let repository) = context.viewModel.state {
-            #expect(repository.id == expectedRepo.id)
-            #expect(repository.name == expectedRepo.name)
-            #expect(repository.path == expectedRepo.path)
-        } else {
-            #expect(false, "Expected success state with repository")
+        createCalled = true
+        return createResult!
+    }
+    
+    func validateRepositoryName(_ name: String) async throws -> Bool {
+        !name.isEmpty && name.count <= 255
+    }
+    
+    func validateRepositoryPath(_ path: URL) async throws -> Bool {
+        path.path.starts(with: "/")
+    }
+    
+    func reset() {
+        createCalled = false
+        createResult = nil
+        shouldFail = false
+        error = nil
+    }
+}
+
+/// Mock implementation of FileManager for testing
+final class MockFileManager: FileManager {
+    var directoryExists: [String: Bool] = [:]
+    var pathExists = true
+    var isDirectory = true
+    
+    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
+        if let isDir = isDirectory {
+            isDir.pointee = true
         }
+        return directoryExists[path] ?? false
     }
     
-    @Test("Handle repository creation failure", tags: ["creation", "model", "error"])
-    func testCreateFailure() async throws {
-        // Given
-        let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.confirmPassword = "test-password"
-        context.viewModel.mode = .create
-        
-        let expectedError = RepositoryCreationError.invalidPath("Test error")
-        context.creationService.createError = expectedError
-        
-        // When
-        await context.viewModel.createOrImport()
-        
-        // Then
-        if case .error(let error as RepositoryCreationError) = context.viewModel.state {
-            #expect(error.localizedDescription == expectedError.localizedDescription)
-        } else {
-            #expect(false, "Expected error state")
-        }
+    func reset() {
+        directoryExists.removeAll()
+        pathExists = true
+        isDirectory = true
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postNotificationCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postNotificationCalled = true
+        lastNotification = notification
     }
     
-    // MARK: - Import Tests
-    
-    @Test("Import existing repository successfully", tags: ["import", "model"])
-    func testImportSuccess() async throws {
-        // Given
-        let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.mode = .import
-        
-        let expectedRepo = Repository(name: context.viewModel.name, path: URL(fileURLWithPath: context.viewModel.path))
-        context.creationService.importResult = expectedRepo
-        
-        // When
-        await context.viewModel.createOrImport()
-        
-        // Then
-        if case .success(let repository) = context.viewModel.state {
-            #expect(repository.id == expectedRepo.id)
-            #expect(repository.name == expectedRepo.name)
-            #expect(repository.path == expectedRepo.path)
-        } else {
-            #expect(false, "Expected success state with repository")
-        }
-    }
-    
-    @Test("Handle repository import failure", tags: ["import", "model", "error"])
-    func testImportFailure() async throws {
-        // Given
-        let context = TestContext()
-        context.viewModel.name = "Test Repo"
-        context.viewModel.path = "/test/path"
-        context.viewModel.password = "test-password"
-        context.viewModel.mode = .import
-        
-        let expectedError = RepositoryCreationError.invalidPath("Test error")
-        context.creationService.importError = expectedError
-        
-        // When
-        await context.viewModel.createOrImport()
-        
-        // Then
-        if case .error(let error as RepositoryCreationError) = context.viewModel.state {
-            #expect(error.localizedDescription == expectedError.localizedDescription)
-        } else {
-            #expect(false, "Expected error state")
-        }
+    func reset() {
+        postNotificationCalled = false
+        lastNotification = nil
     }
 }

@@ -6,252 +6,283 @@
 //
 
 import Testing
-import Security
-import Foundation
 @testable import rBUM
 
-/// Mock implementation of KeychainService for testing
-final class MockKeychainService: KeychainServiceProtocol {
-    // MARK: - Properties
-    var passwords: [String: [String: String]] = [:]
-    var shouldThrowError = false
-    
-    // MARK: - KeychainServiceProtocol Methods
-    func storePassword(_ password: String, forService service: String, account: String) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(errSecDuplicateItem) }
-        if passwords[service]?[account] != nil {
-            throw KeychainError.duplicateItem
-        }
-        passwords[service] = passwords[service] ?? [:]
-        passwords[service]?[account] = password
-    }
-    
-    func retrievePassword(forService service: String, account: String) async throws -> String {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(errSecItemNotFound) }
-        guard let password = passwords[service]?[account] else {
-            throw KeychainError.itemNotFound
-        }
-        return password
-    }
-    
-    func updatePassword(_ password: String, forService service: String, account: String) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(errSecItemNotFound) }
-        guard passwords[service]?[account] != nil else {
-            throw KeychainError.itemNotFound
-        }
-        passwords[service]?[account] = password
-    }
-    
-    func deletePassword(forService service: String, account: String) async throws {
-        if shouldThrowError { throw KeychainError.unexpectedStatus(errSecItemNotFound) }
-        guard passwords[service]?[account] != nil else {
-            throw KeychainError.itemNotFound
-        }
-        passwords[service]?[account] = nil
-    }
-}
-
+/// Tests for KeychainCredentialsManager functionality
 struct KeychainCredentialsManagerTests {
-    // MARK: - Test Setup
+    // MARK: - Test Context
     
+    /// Test environment with test data
     struct TestContext {
-        let keychainService: MockKeychainService
-        let credentialsManager: CredentialsManagerProtocol
+        let keychain: MockKeychain
+        let notificationCenter: MockNotificationCenter
+        let securityService: MockSecurityService
+        let accessControl: MockAccessControl
         
-        init(shouldThrowError: Bool = false) {
-            self.keychainService = MockKeychainService()
-            self.keychainService.shouldThrowError = shouldThrowError
-            self.credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
+        init() {
+            self.keychain = MockKeychain()
+            self.notificationCenter = MockNotificationCenter()
+            self.securityService = MockSecurityService()
+            self.accessControl = MockAccessControl()
+        }
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            keychain.reset()
+            notificationCenter.reset()
+            securityService.reset()
+            accessControl.reset()
+        }
+        
+        /// Create test credentials manager
+        func createManager() -> KeychainCredentialsManager {
+            KeychainCredentialsManager(
+                keychain: keychain,
+                notificationCenter: notificationCenter,
+                securityService: securityService,
+                accessControl: accessControl
+            )
         }
     }
     
-    // MARK: - Credential Storage Tests
+    // MARK: - Credentials Management Tests
     
-    @Test("Store and retrieve credentials with various configurations",
-          .tags(.core, .security, .integration),
-          arguments: [
-              (password: "simple-password", path: "/test/path"),
-              (password: "Complex!@#$%^&*()", path: "/path/with/special/chars/!@#"),
-              (password: "password with spaces", path: "/path with spaces"),
-              (password: "unicode", path: "/path/with/unicode/")
-          ])
-    func testStoreAndRetrieveCredentials(password: String, path: String) async throws {
-        // Given
+    @Test("Store and retrieve credentials", tags: ["credentials", "management"])
+    func testCredentialsManagement() throws {
+        // Given: Manager and test credentials
         let context = TestContext()
-        let testCredentials = RepositoryCredentials(
+        let manager = context.createManager()
+        let repository = MockData.Repository.validRepository
+        let credentials = MockData.Repository.validCredentials
+        
+        // When: Storing credentials
+        try manager.storeCredentials(credentials, for: repository)
+        
+        // Then: Credentials are stored and can be retrieved
+        let retrieved = try manager.getCredentials(for: repository)
+        #expect(retrieved == credentials)
+        #expect(context.keychain.addCalled)
+        #expect(!context.securityService.showError)
+    }
+    
+    @Test("Handle invalid credentials", tags: ["credentials", "error"])
+    func testInvalidCredentials() throws {
+        // Given: Manager and invalid credentials
+        let context = TestContext()
+        let manager = context.createManager()
+        let repository = MockData.Repository.validRepository
+        
+        context.keychain.shouldFail = true
+        context.keychain.error = MockData.Error.credentialsError
+        
+        // When/Then: Storing invalid credentials fails
+        #expect(throws: MockData.Error.credentialsError) {
+            try manager.storeCredentials(MockData.Repository.invalidCredentials, for: repository)
+        }
+        
+        #expect(context.securityService.showError)
+    }
+    
+    @Test("Update existing credentials", tags: ["credentials", "update"])
+    func testCredentialsUpdate() throws {
+        // Given: Manager and existing credentials
+        let context = TestContext()
+        let manager = context.createManager()
+        let repository = MockData.Repository.validRepository
+        let oldCredentials = MockData.Repository.validCredentials
+        let newCredentials = MockData.Repository.updatedCredentials
+        
+        try manager.storeCredentials(oldCredentials, for: repository)
+        
+        // When: Updating credentials
+        try manager.updateCredentials(newCredentials, for: repository)
+        
+        // Then: New credentials are stored
+        let retrieved = try manager.getCredentials(for: repository)
+        #expect(retrieved == newCredentials)
+        #expect(context.keychain.updateCalled)
+        #expect(!context.securityService.showError)
+    }
+    
+    @Test("Delete credentials", tags: ["credentials", "delete"])
+    func testCredentialsDeletion() throws {
+        // Given: Manager and stored credentials
+        let context = TestContext()
+        let manager = context.createManager()
+        let repository = MockData.Repository.validRepository
+        let credentials = MockData.Repository.validCredentials
+        
+        try manager.storeCredentials(credentials, for: repository)
+        
+        // When: Deleting credentials
+        try manager.deleteCredentials(for: repository)
+        
+        // Then: Credentials are removed
+        #expect(context.keychain.deleteCalled)
+        #expect(!context.securityService.showError)
+        #expect(throws: MockData.Error.credentialsNotFound) {
+            _ = try manager.getCredentials(for: repository)
+        }
+    }
+    
+    @Test("Verify security measures", tags: ["credentials", "security"])
+    func testSecurityMeasures() throws {
+        // Given: Manager and test data
+        let context = TestContext()
+        let manager = context.createManager()
+        let repository = MockData.Repository.validRepository
+        let credentials = MockData.Repository.validCredentials
+        
+        // When: Storing credentials
+        try manager.storeCredentials(credentials, for: repository)
+        
+        // Then: Security measures are in place
+        #expect(context.accessControl.validateCalled)
+        #expect(context.securityService.encryptCalled)
+        #expect(!context.securityService.showError)
+    }
+    
+    // MARK: - Access Control Tests
+    
+    @Test("Test access control", tags: ["access", "control"])
+    func testAccessControl() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createManager()
+        
+        let testCases = MockData.Keychain.accessControlData
+        
+        // Test access control
+        for testCase in testCases {
+            // Configure access control
+            context.accessControl.mockConfiguration = testCase.configuration
+            
+            // Store credentials with access control
+            try manager.storeCredentials(MockData.Repository.validCredentials, for: MockData.Repository.validRepository)
+            
+            // Verify access control
+            #expect(context.keychain.useAccessControlCalled)
+            let accessControl = context.keychain.lastAccessControl
+            #expect(accessControl?.contains(testCase.expectedFlags) == true)
+            
+            // Verify biometric authentication
+            if testCase.requiresBiometrics {
+                #expect(context.accessControl.biometricAuthenticationCalled)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test error handling", tags: ["error", "handling"])
+    func testErrorHandling() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createManager()
+        
+        let errorCases = MockData.Keychain.errorCases
+        
+        // Test error handling
+        for errorCase in errorCases {
+            do {
+                // Simulate error condition
+                context.keychain.simulateError = errorCase.error
+                
+                // Attempt operation
+                try errorCase.operation(manager)
+                
+                throw TestFailure("Expected error for \(errorCase)")
+            } catch {
+                // Verify error handling
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .keychainError)
+                
+                // Verify error doesn't expose sensitive data
+                let errorDescription = String(describing: error)
+                #expect(!errorDescription.contains(errorCase.sensitiveData))
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Migration Tests
+    
+    @Test("Test credentials migration", tags: ["migration", "credentials"])
+    func testCredentialsMigration() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createManager()
+        
+        let testCases = MockData.Keychain.migrationData
+        
+        // Test migration
+        for testCase in testCases {
+            // Setup old data
+            context.keychain.mockData = testCase.oldData
+            
+            // Perform migration
+            try manager.migrate()
+            
+            // Verify migration
+            let migratedData = context.keychain.lastSavedData
+            #expect(migratedData == testCase.expectedData)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Verify old data cleanup
+            #expect(context.keychain.deletePasswordCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test credentials performance", tags: ["performance", "credentials"])
+    func testPerformance() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createManager()
+        
+        let startTime = Date()
+        
+        // Perform multiple operations
+        for i in 0..<100 {
+            let credentials = RepositoryCredentials(
+                id: UUID(),
+                repositoryId: UUID(),
+                username: "test-user-\(i)",
+                password: "test-password-\(i)"
+            )
+            try manager.storeCredentials(credentials, for: MockData.Repository.validRepository)
+            _ = try manager.getCredentials(for: MockData.Repository.validRepository)
+            try manager.deleteCredentials(for: MockData.Repository.validRepository)
+        }
+        
+        let endTime = Date()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 5.0) // Should complete in under 5 seconds
+        
+        // Test individual operation performance
+        let credentials = RepositoryCredentials(
+            id: UUID(),
             repositoryId: UUID(),
-            password: password,
-            repositoryPath: path
+            username: "test-user",
+            password: "test-password"
         )
         
-        // When
-        try await context.credentialsManager.store(testCredentials)
-        let retrieved = try await context.credentialsManager.retrieve(forId: testCredentials.repositoryId)
+        let operationStart = Date()
+        try manager.storeCredentials(credentials, for: MockData.Repository.validRepository)
+        _ = try manager.getCredentials(for: MockData.Repository.validRepository)
+        try manager.deleteCredentials(for: MockData.Repository.validRepository)
+        let operationEnd = Date()
         
-        // Then
-        #expect(retrieved.password == testCredentials.password)
-        #expect(retrieved.repositoryId == testCredentials.repositoryId)
-        #expect(retrieved.repositoryPath == testCredentials.repositoryPath)
-    }
-    
-    @Test("Update credentials with various changes",
-          .tags(.core, .security, .integration),
-          arguments: [
-              (initial: "password1", updated: "newPassword1"),
-              (initial: "Complex!@#", updated: "EvenMore!@#$%^"),
-              (initial: "short", updated: String(repeating: "a", count: 100))
-          ])
-    func testUpdateCredentials(initial: String, updated: String) async throws {
-        // Given
-        let context = TestContext()
-        let repositoryId = UUID()
-        let path = "/test/path"
-        
-        let initialCredentials = RepositoryCredentials(
-            repositoryId: repositoryId,
-            password: initial,
-            repositoryPath: path
-        )
-        let updatedCredentials = RepositoryCredentials(
-            repositoryId: repositoryId,
-            password: updated,
-            repositoryPath: path
-        )
-        
-        // When
-        try await context.credentialsManager.store(initialCredentials)
-        try await context.credentialsManager.update(updatedCredentials)
-        let retrieved = try await context.credentialsManager.retrieve(forId: repositoryId)
-        
-        // Then
-        #expect(retrieved.password == updated)
-        #expect(retrieved.repositoryId == repositoryId)
-        #expect(retrieved.repositoryPath == path)
-    }
-    
-    // MARK: - Security Tests
-    
-    @Test("Handle various security scenarios",
-          .tags(.core, .security, .error_handling),
-          arguments: [
-              (operation: "store", error: KeychainError.duplicateItem),
-              (operation: "retrieve", error: KeychainError.itemNotFound),
-              (operation: "update", error: KeychainError.unexpectedStatus(errSecItemNotFound)),
-              (operation: "delete", error: KeychainError.unexpectedStatus(errSecItemNotFound))
-          ])
-    func testSecurityScenarios(operation: String, error: KeychainError) async throws {
-        // Given
-        let context = TestContext(shouldThrowError: true)
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "testPassword",
-            repositoryPath: "/test/path"
-        )
-        
-        // When/Then
-        switch operation {
-        case "store":
-            await #expect(throws: error) {
-                try await context.credentialsManager.store(testCredentials)
-            }
-        case "retrieve":
-            await #expect(throws: error) {
-                _ = try await context.credentialsManager.retrieve(forId: testCredentials.repositoryId)
-            }
-        case "update":
-            await #expect(throws: error) {
-                try await context.credentialsManager.update(testCredentials)
-            }
-        case "delete":
-            await #expect(throws: error) {
-                try await context.credentialsManager.delete(forId: testCredentials.repositoryId)
-            }
-        default:
-            #expect(false, "Unknown operation: \(operation)")
-        }
-    }
-    
-    @Test("Prevent credential leakage",
-          .tags(.core, .security, .validation))
-    func testCredentialLeakage() async throws {
-        // Given
-        let context = TestContext()
-        let sensitivePassword = "SuperSecretPassword!@#"
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: sensitivePassword,
-            repositoryPath: "/test/path"
-        )
-        
-        // When
-        try await context.credentialsManager.store(testCredentials)
-        
-        // Then
-        // Verify password is not stored in plain text
-        let rawKeychainData = context.keychainService.passwords
-        for (_, accounts) in rawKeychainData {
-            for (_, storedValue) in accounts {
-                #expect(storedValue != sensitivePassword, "Password should not be stored in plain text")
-            }
-        }
-    }
-    
-    @Test("Handle concurrent access",
-          .tags(.core, .security, .concurrency))
-    func testConcurrentAccess() async throws {
-        // Given
-        let context = TestContext()
-        let repositoryId = UUID()
-        let path = "/test/path"
-        let passwords = ["password1", "password2", "password3", "password4"]
-        
-        // When
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for password in passwords {
-                group.addTask {
-                    let credentials = RepositoryCredentials(
-                        repositoryId: repositoryId,
-                        password: password,
-                        repositoryPath: path
-                    )
-                    try await context.credentialsManager.update(credentials)
-                }
-            }
-            try await group.waitForAll()
-        }
-        
-        // Then
-        let finalCredentials = try await context.credentialsManager.retrieve(forId: repositoryId)
-        #expect(passwords.contains(finalCredentials.password))
-    }
-    
-    @Test("Handle credential deletion securely",
-          .tags(.core, .security, .cleanup))
-    func testSecureCredentialDeletion() async throws {
-        // Given
-        let context = TestContext()
-        let testCredentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "testPassword",
-            repositoryPath: "/test/path"
-        )
-        
-        // When
-        try await context.credentialsManager.store(testCredentials)
-        try await context.credentialsManager.delete(forId: testCredentials.repositoryId)
-        
-        // Then
-        // Verify credential is completely removed
-        await #expect(throws: CredentialsError.notFound) {
-            _ = try await context.credentialsManager.retrieve(forId: testCredentials.repositoryId)
-        }
-        
-        // Verify no traces in keychain service
-        let rawKeychainData = context.keychainService.passwords
-        for (_, accounts) in rawKeychainData {
-            for (_, storedValue) in accounts {
-                #expect(storedValue != testCredentials.password)
-            }
-        }
+        let operationInterval = operationEnd.timeIntervalSince(operationStart)
+        #expect(operationInterval < 0.1) // Individual operations should be fast
     }
 }

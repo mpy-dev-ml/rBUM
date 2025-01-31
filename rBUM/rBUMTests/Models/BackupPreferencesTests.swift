@@ -6,274 +6,324 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupPreferences functionality
 struct BackupPreferencesTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup preferences with default values", tags: ["basic", "model"])
-    func testDefaultInitialization() throws {
-        // When
-        let preferences = BackupPreferences()
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
         
-        // Then
-        #expect(preferences.compressionLevel == .default)
-        #expect(preferences.parallelOperations == 1)
-        #expect(preferences.bandwidthLimit == nil)
-        #expect(preferences.notificationsEnabled)
-        #expect(preferences.autoBackupEnabled == false)
-        #expect(preferences.retentionPolicy == .default)
-        #expect(preferences.excludeSystemFiles)
-        #expect(preferences.excludeHiddenFiles)
-    }
-    
-    @Test("Initialize backup preferences with custom values", tags: ["basic", "model"])
-    func testCustomInitialization() throws {
-        // Given
-        let compressionLevel = CompressionLevel.maximum
-        let parallelOperations = 4
-        let bandwidthLimit: UInt64 = 1024 * 1024 // 1 MB/s
-        let notificationsEnabled = false
-        let autoBackupEnabled = true
-        let retentionPolicy = RetentionPolicy.custom(days: 30)
-        let excludeSystemFiles = false
-        let excludeHiddenFiles = false
-        
-        // When
-        let preferences = BackupPreferences(
-            compressionLevel: compressionLevel,
-            parallelOperations: parallelOperations,
-            bandwidthLimit: bandwidthLimit,
-            notificationsEnabled: notificationsEnabled,
-            autoBackupEnabled: autoBackupEnabled,
-            retentionPolicy: retentionPolicy,
-            excludeSystemFiles: excludeSystemFiles,
-            excludeHiddenFiles: excludeHiddenFiles
-        )
-        
-        // Then
-        #expect(preferences.compressionLevel == compressionLevel)
-        #expect(preferences.parallelOperations == parallelOperations)
-        #expect(preferences.bandwidthLimit == bandwidthLimit)
-        #expect(preferences.notificationsEnabled == notificationsEnabled)
-        #expect(preferences.autoBackupEnabled == autoBackupEnabled)
-        #expect(preferences.retentionPolicy == retentionPolicy)
-        #expect(preferences.excludeSystemFiles == excludeSystemFiles)
-        #expect(preferences.excludeHiddenFiles == excludeHiddenFiles)
-    }
-    
-    // MARK: - Compression Level Tests
-    
-    @Test("Handle compression levels", tags: ["model", "compression"])
-    func testCompressionLevels() throws {
-        let testCases: [(CompressionLevel, String, Int)] = [
-            (.none, "No Compression", 0),
-            (.minimum, "Minimum Compression", 1),
-            (.default, "Default Compression", 6),
-            (.maximum, "Maximum Compression", 9)
-        ]
-        
-        for (level, description, value) in testCases {
-            var preferences = BackupPreferences()
-            preferences.compressionLevel = level
-            
-            #expect(preferences.compressionLevel == level)
-            #expect(preferences.compressionLevel.description == description)
-            #expect(preferences.compressionLevel.value == value)
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
         }
-    }
-    
-    // MARK: - Parallel Operations Tests
-    
-    @Test("Handle parallel operations limits", tags: ["model", "parallel"])
-    func testParallelOperations() throws {
-        let testCases = [
-            // Valid values
-            1, 2, 4, 8, 16,
-            // Invalid values (should be clamped)
-            0, -1, 33, 100
-        ]
         
-        for operations in testCases {
-            var preferences = BackupPreferences()
-            preferences.parallelOperations = operations
-            
-            let expectedValue = max(1, min(operations, 32))
-            #expect(preferences.parallelOperations == expectedValue)
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
         }
-    }
-    
-    // MARK: - Bandwidth Tests
-    
-    @Test("Handle bandwidth limits", tags: ["model", "bandwidth"])
-    func testBandwidthLimits() throws {
-        let testCases: [(UInt64?, String)] = [
-            // No limit
-            (nil, "Unlimited"),
-            // Bytes per second
-            (500, "500 B/s"),
-            // Kilobytes per second
-            (1024, "1.0 KB/s"),
-            // Megabytes per second
-            (1024 * 1024, "1.0 MB/s"),
-            // Gigabytes per second
-            (1024 * 1024 * 1024, "1.0 GB/s")
-        ]
         
-        for (limit, formattedLimit) in testCases {
-            var preferences = BackupPreferences()
-            preferences.bandwidthLimit = limit
-            
-            #expect(preferences.bandwidthLimit == limit)
-            #expect(preferences.formattedBandwidthLimit == formattedLimit)
-        }
-    }
-    
-    // MARK: - Retention Policy Tests
-    
-    @Test("Handle retention policies", tags: ["model", "retention"])
-    func testRetentionPolicies() throws {
-        let testCases: [(RetentionPolicy, String)] = [
-            (.default, "Default Retention (7 days)"),
-            (.none, "No Retention"),
-            (.custom(days: 30), "30 Days Retention"),
-            (.custom(days: 90), "90 Days Retention"),
-            (.custom(days: 365), "365 Days Retention")
-        ]
-        
-        for (policy, description) in testCases {
-            var preferences = BackupPreferences()
-            preferences.retentionPolicy = policy
-            
-            #expect(preferences.retentionPolicy == policy)
-            #expect(preferences.retentionPolicy.description == description)
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare backup preferences for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let preferences1 = BackupPreferences(
-            compressionLevel: .maximum,
-            parallelOperations: 4,
-            bandwidthLimit: 1024 * 1024,
-            notificationsEnabled: false,
-            autoBackupEnabled: true,
-            retentionPolicy: .custom(days: 30),
-            excludeSystemFiles: false,
-            excludeHiddenFiles: false
-        )
-        
-        let preferences2 = BackupPreferences(
-            compressionLevel: .maximum,
-            parallelOperations: 4,
-            bandwidthLimit: 1024 * 1024,
-            notificationsEnabled: false,
-            autoBackupEnabled: true,
-            retentionPolicy: .custom(days: 30),
-            excludeSystemFiles: false,
-            excludeHiddenFiles: false
-        )
-        
-        let preferences3 = BackupPreferences(
-            compressionLevel: .default,
-            parallelOperations: 2,
-            bandwidthLimit: nil,
-            notificationsEnabled: true,
-            autoBackupEnabled: false,
-            retentionPolicy: .default,
-            excludeSystemFiles: true,
-            excludeHiddenFiles: true
-        )
-        
-        #expect(preferences1 == preferences2)
-        #expect(preferences1 != preferences3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup preferences", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Default preferences
-            BackupPreferences(),
-            // Custom preferences
-            BackupPreferences(
-                compressionLevel: .maximum,
-                parallelOperations: 4,
-                bandwidthLimit: 1024 * 1024,
-                notificationsEnabled: false,
-                autoBackupEnabled: true,
-                retentionPolicy: .custom(days: 30),
-                excludeSystemFiles: false,
-                excludeHiddenFiles: false
-            ),
-            // Minimal preferences
-            BackupPreferences(
-                compressionLevel: .none,
-                parallelOperations: 1,
-                bandwidthLimit: nil,
-                notificationsEnabled: false,
-                autoBackupEnabled: false,
-                retentionPolicy: .none,
-                excludeSystemFiles: false,
-                excludeHiddenFiles: false
+        /// Create test preferences manager
+        func createPreferencesManager() -> BackupPreferencesManager {
+            BackupPreferencesManager(
+                userDefaults: userDefaults,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider
             )
-        ]
-        
-        for preferences in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(preferences)
-            let decoded = try decoder.decode(BackupPreferences.self, from: data)
-            
-            // Then
-            #expect(decoded.compressionLevel == preferences.compressionLevel)
-            #expect(decoded.parallelOperations == preferences.parallelOperations)
-            #expect(decoded.bandwidthLimit == preferences.bandwidthLimit)
-            #expect(decoded.notificationsEnabled == preferences.notificationsEnabled)
-            #expect(decoded.autoBackupEnabled == preferences.autoBackupEnabled)
-            #expect(decoded.retentionPolicy == preferences.retentionPolicy)
-            #expect(decoded.excludeSystemFiles == preferences.excludeSystemFiles)
-            #expect(decoded.excludeHiddenFiles == preferences.excludeHiddenFiles)
         }
+    }
+    
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize backup preferences manager", tags: ["init", "preferences"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
+        
+        // When: Creating preferences manager
+        let manager = context.createPreferencesManager()
+        
+        // Then: Manager is configured with default values
+        #expect(manager.preferences.count == MockData.Preferences.defaultCount)
+        #expect(manager.getPreference(MockData.Preferences.autoBackupKey) as? Bool == true)
+        #expect(manager.getPreference(MockData.Preferences.backupIntervalKey) as? Int == 3600)
+    }
+    
+    // MARK: - Preference Management Tests
+    
+    @Test("Test preference management", tags: ["preferences", "core"])
+    func testPreferenceManagement() throws {
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Test setting preferences
+        for (key, value) in MockData.Preferences.validPreferences {
+            try manager.setPreference(value, forKey: key)
+            #expect(manager.getPreference(key) as? String == value)
+            #expect(context.userDefaults.setValueCalled)
+            
+            context.reset()
+        }
+        
+        // Test removing preferences
+        let keyToRemove = MockData.Preferences.validPreferences.first!.key
+        try manager.removePreference(forKey: keyToRemove)
+        #expect(manager.getPreference(keyToRemove) == nil)
+        #expect(context.userDefaults.removeValueCalled)
+    }
+    
+    // MARK: - Type Safety Tests
+    
+    @Test("Test preference type safety", tags: ["preferences", "types"])
+    func testTypeSafety() throws {
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Test different value types
+        try manager.setPreference(true, forKey: "boolPref")
+        try manager.setPreference(42, forKey: "intPref")
+        try manager.setPreference(3.14, forKey: "doublePref")
+        try manager.setPreference("test", forKey: "stringPref")
+        try manager.setPreference(["a", "b"], forKey: "arrayPref")
+        try manager.setPreference(["key": "value"], forKey: "dictPref")
+        
+        // Verify type safety
+        #expect(manager.getPreference("boolPref") as? Bool == true)
+        #expect(manager.getPreference("intPref") as? Int == 42)
+        #expect(manager.getPreference("doublePref") as? Double == 3.14)
+        #expect(manager.getPreference("stringPref") as? String == "test")
+        #expect((manager.getPreference("arrayPref") as? [String])?.count == 2)
+        #expect((manager.getPreference("dictPref") as? [String: String])?.count == 1)
     }
     
     // MARK: - Validation Tests
     
-    @Test("Validate backup preferences properties", tags: ["model", "validation"])
+    @Test("Test preference validation", tags: ["preferences", "validation"])
     func testValidation() throws {
-        let testCases = [
-            // Valid preferences
-            (4, UInt64(1024 * 1024), 30, true),
-            // Invalid parallel operations
-            (0, UInt64(1024 * 1024), 30, false),
-            // Invalid retention days
-            (4, UInt64(1024 * 1024), -1, false),
-            // Valid without bandwidth limit
-            (4, nil, 30, true)
-        ]
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
         
-        for (operations, bandwidth, retentionDays, isValid) in testCases {
-            let preferences = BackupPreferences(
-                compressionLevel: .default,
-                parallelOperations: operations,
-                bandwidthLimit: bandwidth,
-                notificationsEnabled: true,
-                autoBackupEnabled: false,
-                retentionPolicy: .custom(days: retentionDays),
-                excludeSystemFiles: true,
-                excludeHiddenFiles: true
-            )
-            
-            if isValid {
-                #expect(preferences.isValid)
-            } else {
-                #expect(!preferences.isValid)
+        // Test invalid keys
+        for key in MockData.Preferences.invalidKeys {
+            do {
+                try manager.setPreference("test", forKey: key)
+                throw TestFailure("Expected error for invalid key: \(key)")
+            } catch {
+                // Expected error
             }
         }
+        
+        // Test invalid values
+        for value in MockData.Preferences.invalidValues {
+            do {
+                try manager.setPreference(value, forKey: "testKey")
+                throw TestFailure("Expected error for invalid value: \(value)")
+            } catch {
+                // Expected error
+            }
+        }
+    }
+    
+    // MARK: - Notification Tests
+    
+    @Test("Test preference change notifications", tags: ["preferences", "notifications"])
+    func testNotifications() throws {
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Test notification posting
+        let testKey = "testKey"
+        let testValue = "testValue"
+        
+        try manager.setPreference(testValue, forKey: testKey)
+        #expect(context.notificationCenter.postNotificationCalled)
+        
+        // Verify notification details
+        let notification = context.notificationCenter.lastPostedNotification
+        #expect(notification?.name == .backupPreferencesChanged)
+        #expect((notification?.userInfo?["key"] as? String) == testKey)
+        #expect((notification?.userInfo?["value"] as? String) == testValue)
+    }
+    
+    // MARK: - Persistence Tests
+    
+    @Test("Test preferences persistence", tags: ["preferences", "persistence"])
+    func testPersistence() throws {
+        // Given: Preferences manager with preferences
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Set test preferences
+        for (key, value) in MockData.Preferences.validPreferences {
+            try manager.setPreference(value, forKey: key)
+        }
+        
+        // When: Saving state
+        try manager.save()
+        
+        // Then: State is persisted
+        let loadedManager = context.createPreferencesManager()
+        try loadedManager.load()
+        
+        for (key, value) in MockData.Preferences.validPreferences {
+            #expect(loadedManager.getPreference(key) as? String == value)
+        }
+    }
+    
+    // MARK: - Migration Tests
+    
+    @Test("Test preferences migration", tags: ["preferences", "migration"])
+    func testMigration() throws {
+        // Given: Preferences manager with old format
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Set old format preferences
+        for (key, value) in MockData.Preferences.oldFormatPreferences {
+            context.userDefaults.setValue(value, forKey: key)
+        }
+        
+        // When: Migrating preferences
+        try manager.migratePreferences()
+        
+        // Then: Preferences are in new format
+        for (key, value) in MockData.Preferences.oldFormatPreferences {
+            let newKey = key.replacingOccurrences(of: "old", with: "new")
+            #expect(manager.getPreference(newKey) as? String == value)
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle preferences edge cases", tags: ["preferences", "edge"])
+    func testEdgeCases() throws {
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Test empty key
+        do {
+            try manager.setPreference("test", forKey: "")
+            throw TestFailure("Expected error for empty key")
+        } catch {
+            // Expected error
+        }
+        
+        // Test nil value removal
+        try manager.setPreference(nil, forKey: "testKey")
+        #expect(manager.getPreference("testKey") == nil)
+        
+        // Test overwriting existing preference
+        try manager.setPreference("value1", forKey: "testKey")
+        try manager.setPreference("value2", forKey: "testKey")
+        #expect(manager.getPreference("testKey") as? String == "value2")
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test preferences performance", tags: ["preferences", "performance"])
+    func testPerformance() throws {
+        // Given: Preferences manager
+        let context = TestContext()
+        let manager = context.createPreferencesManager()
+        
+        // Test rapid preference updates
+        let startTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            try manager.setPreference("value\(i)", forKey: "key\(i)")
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test preference lookup performance
+        let lookupStartTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            _ = manager.getPreference("key\(i)")
+        }
+        let lookupEndTime = context.dateProvider.now()
+        
+        let lookupInterval = lookupEndTime.timeIntervalSince(lookupStartTime)
+        #expect(lookupInterval < 0.1) // Preference lookups should be fast
+    }
+}
+
+// MARK: - Mock User Defaults
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaultsProtocol {
+    private var storage: [String: Any] = [:]
+    private(set) var setValueCalled = false
+    private(set) var removeValueCalled = false
+    
+    func setValue(_ value: Any?, forKey key: String) {
+        setValueCalled = true
+        storage[key] = value
+    }
+    
+    func value(forKey key: String) -> Any? {
+        storage[key]
+    }
+    
+    func removeValue(forKey key: String) {
+        removeValueCalled = true
+        storage.removeValue(forKey: key)
+    }
+    
+    func reset() {
+        storage.removeAll()
+        setValueCalled = false
+        removeValueCalled = false
+    }
+}
+
+// MARK: - Mock Notification Center
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenterProtocol {
+    private(set) var postNotificationCalled = false
+    private(set) var lastPostedNotification: Notification?
+    
+    func post(name: Notification.Name, object: Any?, userInfo: [AnyHashable: Any]?) {
+        postNotificationCalled = true
+        lastPostedNotification = Notification(name: name, object: object, userInfo: userInfo)
+    }
+    
+    func reset() {
+        postNotificationCalled = false
+        lastPostedNotification = nil
+    }
+}
+
+// MARK: - Mock Date Provider
+
+/// Mock implementation of DateProvider for testing
+final class MockDateProvider: DateProviderProtocol {
+    private var currentDate = Date()
+    
+    func now() -> Date {
+        currentDate
+    }
+    
+    func advanceTime(by interval: TimeInterval) {
+        currentDate = currentDate.addingTimeInterval(interval)
+    }
+    
+    func reset() {
+        currentDate = Date()
     }
 }

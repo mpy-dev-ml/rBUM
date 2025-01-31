@@ -27,7 +27,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
             // Store password in keychain
             try await keychainService.storePassword(
                 credentials.password,
-                forService: credentials.keychainService,
+                service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
             
@@ -50,7 +50,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
             
             // Retrieve password from keychain
             let password = try await keychainService.retrievePassword(
-                forService: credentials.keychainService,
+                service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
             
@@ -77,7 +77,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
             // Update password in keychain
             try await keychainService.updatePassword(
                 credentials.password,
-                forService: existingCredentials.keychainService,
+                service: existingCredentials.keychainService,
                 account: existingCredentials.keychainAccount
             )
             
@@ -100,7 +100,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
             
             // Delete password from keychain
             try await keychainService.deletePassword(
-                forService: credentials.keychainService,
+                service: credentials.keychainService,
                 account: credentials.keychainAccount
             )
             
@@ -122,7 +122,7 @@ final class KeychainCredentialsManager: CredentialsManagerProtocol {
         
         // Get password from Keychain
         return try await keychainService.retrievePassword(
-            forService: credentials.keychainService,
+            service: credentials.keychainService,
             account: credentials.repositoryPath
         )
     }

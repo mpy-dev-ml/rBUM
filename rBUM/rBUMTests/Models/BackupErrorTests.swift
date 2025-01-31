@@ -6,221 +6,244 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupError functionality
 struct BackupErrorTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Test all backup error types", tags: ["basic", "model", "error"])
-    func testBackupErrorTypes() throws {
-        let testCases: [(BackupError, String)] = [
-            (.repositoryNotFound, "Repository not found"),
-            (.sourcePathNotFound, "Source path not found"),
-            (.insufficientPermissions, "Insufficient permissions"),
-            (.networkError, "Network error occurred"),
-            (.outOfSpace, "Insufficient disk space"),
-            (.repositoryLocked, "Repository is locked"),
-            (.invalidConfiguration, "Invalid backup configuration"),
-            (.resticError("test error"), "Restic error: test error")
-        ]
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let notificationCenter: MockNotificationCenter
         
-        for (error, expectedDescription) in testCases {
-            #expect(error.description == expectedDescription)
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.notificationCenter = MockNotificationCenter()
+        }
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            notificationCenter.reset()
         }
     }
     
-    // MARK: - Localization Tests
+    // MARK: - Error Creation Tests
     
-    @Test("Test error localization", tags: ["model", "error", "localization"])
-    func testErrorLocalization() throws {
+    @Test("Create backup errors with different types", tags: ["error", "init"])
+    func testErrorCreation() throws {
+        // Given: Different error scenarios
         let testCases: [(BackupError, String)] = [
-            (.repositoryNotFound, "The backup repository could not be found. Please verify the repository path and credentials."),
-            (.sourcePathNotFound, "The source path for backup could not be found. Please verify the path exists and is accessible."),
-            (.insufficientPermissions, "Insufficient permissions to access the backup location. Please check file system permissions."),
-            (.networkError, "A network error occurred during the backup operation. Please check your network connection."),
-            (.outOfSpace, "There is not enough disk space to complete the backup operation."),
-            (.repositoryLocked, "The repository is currently locked by another operation. Please try again later."),
-            (.invalidConfiguration, "The backup configuration is invalid. Please check your settings."),
-            (.resticError("test error"), "Restic encountered an error: test error")
-        ]
-        
-        for (error, expectedLocalizedDescription) in testCases {
-            #expect(error.localizedDescription == expectedLocalizedDescription)
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare backup errors for equality", tags: ["model", "error", "comparison"])
-    func testEquatable() throws {
-        // Test basic error types
-        #expect(BackupError.repositoryNotFound == BackupError.repositoryNotFound)
-        #expect(BackupError.sourcePathNotFound != BackupError.repositoryNotFound)
-        
-        // Test restic errors
-        #expect(BackupError.resticError("test") == BackupError.resticError("test"))
-        #expect(BackupError.resticError("test1") != BackupError.resticError("test2"))
-        #expect(BackupError.resticError("test") != BackupError.repositoryNotFound)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup errors", tags: ["model", "error", "serialization"])
-    func testCodable() throws {
-        let testCases: [BackupError] = [
-            .repositoryNotFound,
-            .sourcePathNotFound,
-            .insufficientPermissions,
-            .networkError,
-            .outOfSpace,
-            .repositoryLocked,
-            .invalidConfiguration,
-            .resticError("test error")
-        ]
-        
-        for error in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(error)
-            let decoded = try decoder.decode(BackupError.self, from: data)
+            // Network errors
+            (MockData.Error.networkError, "Network connection failed"),
+            (MockData.Error.timeoutError, "Operation timed out"),
+            (MockData.Error.connectionError, "Failed to connect to repository"),
             
-            // Then
-            #expect(decoded == error)
-            #expect(decoded.description == error.description)
-            #expect(decoded.localizedDescription == error.localizedDescription)
+            // Permission errors
+            (MockData.Error.permissionError, "Insufficient permissions"),
+            (MockData.Error.accessDeniedError, "Access denied to backup location"),
+            
+            // Repository errors
+            (MockData.Error.repositoryError, "Repository operation failed"),
+            (MockData.Error.repositoryNotFoundError, "Repository not found"),
+            (MockData.Error.repositoryCorruptError, "Repository is corrupted"),
+            
+            // Configuration errors
+            (MockData.Error.configurationError, "Invalid configuration"),
+            (MockData.Error.invalidPathError, "Invalid backup path"),
+            
+            // Credential errors
+            (MockData.Error.credentialError, "Invalid credentials"),
+            (MockData.Error.authenticationError, "Authentication failed"),
+            
+            // System errors
+            (MockData.Error.systemError, "System error occurred"),
+            (MockData.Error.diskSpaceError, "Insufficient disk space"),
+            
+            // Restic errors
+            (MockData.Error.resticError, "Restic command failed"),
+            (MockData.Error.snapshotError, "Failed to create snapshot")
+        ]
+        
+        // When/Then: Test each error case
+        for (error, expectedMessage) in testCases {
+            #expect(error.localizedDescription.contains(expectedMessage))
+            #expect(error.isRecoverable == MockData.Error.recoverableErrors.contains(error))
         }
     }
     
     // MARK: - Error Handling Tests
     
-    @Test("Handle error conversion to NSError", tags: ["model", "error", "conversion"])
-    func testNSErrorConversion() throws {
-        let testCases: [(BackupError, Int)] = [
-            (.repositoryNotFound, 1001),
-            (.sourcePathNotFound, 1002),
-            (.insufficientPermissions, 1003),
-            (.networkError, 1004),
-            (.outOfSpace, 1005),
-            (.repositoryLocked, 1006),
-            (.invalidConfiguration, 1007),
-            (.resticError("test"), 1008)
-        ]
-        
-        for (error, expectedCode) in testCases {
-            let nsError = error as NSError
-            #expect(nsError.domain == "dev.mpy.rBUM.BackupError")
-            #expect(nsError.code == expectedCode)
-            #expect(nsError.localizedDescription == error.localizedDescription)
-        }
-    }
-    
-    // MARK: - Error Recovery Tests
-    
-    @Test("Test error recovery options", tags: ["model", "error", "recovery"])
-    func testErrorRecoveryOptions() throws {
+    @Test("Handle error recovery options", tags: ["error", "recovery"])
+    func testErrorRecovery() throws {
+        // Given: Different error recovery scenarios
         let testCases: [(BackupError, [String])] = [
-            (.repositoryNotFound, [
-                "Check repository path",
-                "Verify repository credentials",
-                "Initialize new repository"
-            ]),
-            (.sourcePathNotFound, [
-                "Check source path",
-                "Verify file permissions",
-                "Update backup configuration"
-            ]),
-            (.insufficientPermissions, [
-                "Check file permissions",
-                "Run with elevated privileges",
-                "Update access rights"
-            ]),
-            (.networkError, [
-                "Check network connection",
-                "Verify VPN status",
-                "Retry operation"
-            ]),
-            (.outOfSpace, [
-                "Free up disk space",
-                "Choose different location",
-                "Reduce backup scope"
-            ]),
-            (.repositoryLocked, [
-                "Wait and retry",
-                "Force unlock repository",
-                "Check running operations"
-            ]),
-            (.invalidConfiguration, [
-                "Review configuration",
-                "Reset to defaults",
-                "Check documentation"
-            ]),
-            (.resticError("test"), [
-                "Check restic logs",
-                "Verify restic version",
-                "Contact support"
-            ])
+            // Network errors with recovery options
+            (MockData.Error.networkError, ["Retry connection", "Check network settings"]),
+            (MockData.Error.timeoutError, ["Retry operation", "Increase timeout"]),
+            
+            // Permission errors with recovery options
+            (MockData.Error.permissionError, ["Request permissions", "Use different location"]),
+            
+            // Repository errors with recovery options
+            (MockData.Error.repositoryError, ["Check repository", "Repair repository"]),
+            
+            // Non-recoverable errors
+            (MockData.Error.systemError, []),
+            (MockData.Error.diskSpaceError, ["Free up space"])
         ]
         
+        // When/Then: Test recovery options
         for (error, expectedOptions) in testCases {
-            #expect(error.recoveryOptions == expectedOptions)
-        }
-    }
-    
-    // MARK: - Error Context Tests
-    
-    @Test("Test error context information", tags: ["model", "error", "context"])
-    func testErrorContext() throws {
-        let testCases: [(BackupError, [String: String])] = [
-            (.repositoryNotFound, [
-                "errorType": "repository",
-                "severity": "critical",
-                "recoverable": "true"
-            ]),
-            (.sourcePathNotFound, [
-                "errorType": "filesystem",
-                "severity": "critical",
-                "recoverable": "true"
-            ]),
-            (.insufficientPermissions, [
-                "errorType": "permissions",
-                "severity": "high",
-                "recoverable": "true"
-            ]),
-            (.networkError, [
-                "errorType": "network",
-                "severity": "medium",
-                "recoverable": "true"
-            ]),
-            (.outOfSpace, [
-                "errorType": "storage",
-                "severity": "critical",
-                "recoverable": "true"
-            ]),
-            (.repositoryLocked, [
-                "errorType": "concurrency",
-                "severity": "medium",
-                "recoverable": "true"
-            ]),
-            (.invalidConfiguration, [
-                "errorType": "configuration",
-                "severity": "high",
-                "recoverable": "true"
-            ]),
-            (.resticError("test"), [
-                "errorType": "restic",
-                "severity": "unknown",
-                "recoverable": "unknown",
-                "resticMessage": "test"
-            ])
-        ]
-        
-        for (error, expectedContext) in testCases {
-            let context = error.errorContext
-            for (key, value) in expectedContext {
-                #expect(context[key] == value, "Context key '\(key)' has incorrect value")
+            let recoveryOptions = error.recoveryOptions
+            #expect(recoveryOptions.count == expectedOptions.count)
+            for (option, expectedOption) in zip(recoveryOptions, expectedOptions) {
+                #expect(option == expectedOption)
             }
         }
+    }
+    
+    // MARK: - Error Classification Tests
+    
+    @Test("Classify errors by type", tags: ["error", "classification"])
+    func testErrorClassification() throws {
+        // Given: Different error types
+        let testCases: [(BackupError, BackupErrorType)] = [
+            (MockData.Error.networkError, .network),
+            (MockData.Error.permissionError, .permission),
+            (MockData.Error.repositoryError, .repository),
+            (MockData.Error.configurationError, .configuration),
+            (MockData.Error.credentialError, .credential),
+            (MockData.Error.systemError, .system),
+            (MockData.Error.resticError, .restic)
+        ]
+        
+        // When/Then: Test error classification
+        for (error, expectedType) in testCases {
+            #expect(error.type == expectedType)
+        }
+    }
+    
+    // MARK: - Error Persistence Tests
+    
+    @Test("Test error persistence", tags: ["error", "persistence"])
+    func testErrorPersistence() throws {
+        // Given: Context and test errors
+        let context = TestContext()
+        let testErrors = [
+            MockData.Error.networkError,
+            MockData.Error.permissionError,
+            MockData.Error.repositoryError
+        ]
+        
+        for error in testErrors {
+            // When: Storing error
+            context.userDefaults.set(error.persistenceData, forKey: "LastBackupError")
+            
+            // Then: Error can be retrieved
+            if let data = context.userDefaults.object(forKey: "LastBackupError") as? Data,
+               let retrievedError = try? BackupError.fromPersistenceData(data) {
+                #expect(retrievedError == error)
+                #expect(retrievedError.localizedDescription == error.localizedDescription)
+            } else {
+                throw TestFailure("Failed to persist and retrieve error")
+            }
+        }
+    }
+    
+    // MARK: - Notification Tests
+    
+    @Test("Test error notifications", tags: ["error", "notification"])
+    func testErrorNotifications() throws {
+        // Given: Context and test error
+        let context = TestContext()
+        let error = MockData.Error.networkError
+        
+        // When: Posting error notification
+        NotificationCenter.default.post(
+            name: .backupErrorOccurred,
+            object: nil,
+            userInfo: ["error": error]
+        )
+        
+        // Then: Notification is received with correct error
+        #expect(context.notificationCenter.postCalled)
+        if let notification = context.notificationCenter.lastNotification,
+           let notificationError = notification.userInfo?["error"] as? BackupError {
+            #expect(notificationError == error)
+        } else {
+            throw TestFailure("Failed to receive error notification")
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle error edge cases", tags: ["error", "edge"])
+    func testEdgeCases() throws {
+        // Test empty error message
+        let emptyError = BackupError(code: .unknown, message: "")
+        #expect(emptyError.localizedDescription == "Unknown error occurred")
+        
+        // Test maximum length message
+        let longMessage = String(repeating: "a", count: 1000)
+        let longError = BackupError(code: .unknown, message: longMessage)
+        #expect(longError.localizedDescription.count <= 500)
+        
+        // Test nil recovery options
+        let noRecoveryError = BackupError(code: .unknown, message: "No recovery", recoveryOptions: nil)
+        #expect(noRecoveryError.recoveryOptions.isEmpty)
+        
+        // Test invalid persistence data
+        let invalidData = Data([0x00, 0x01, 0x02])
+        do {
+            _ = try BackupError.fromPersistenceData(invalidData)
+            throw TestFailure("Expected error for invalid data")
+        } catch {
+            // Expected error
+        }
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaults {
+    var storage: [String: Any] = [:]
+    
+    override func set(_ value: Any?, forKey defaultName: String) {
+        if let value = value {
+            storage[defaultName] = value
+        } else {
+            storage.removeValue(forKey: defaultName)
+        }
+    }
+    
+    override func object(forKey defaultName: String) -> Any? {
+        storage[defaultName]
+    }
+    
+    override func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
+    }
+    
+    func reset() {
+        storage.removeAll()
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
+    }
+    
+    func reset() {
+        postCalled = false
+        lastNotification = nil
     }
 }

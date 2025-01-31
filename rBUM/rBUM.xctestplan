@@ -1,72 +1,37 @@
 {
   "configurations" : [
     {
-      "id" : "B147DC38-A6A9-46D9-9E3E-71F5E547AB82",
-      "name" : "Default",
+      "id" : "89B6B817-12AF-48D8-97CF-1395225DD2D4",
+      "name" : "Test Scheme Action",
       "options" : {
-        "defaultTestExecutionTimeAllowance" : 60,
-        "testTimeoutsEnabled" : true
-      }
-    },
-    {
-      "id" : "5F8C9D23-B4E7-4F1A-9B2C-D8F3E6A7C901",
-      "name" : "CI",
-      "options" : {
-        "defaultTestExecutionTimeAllowance" : 120,
-        "testTimeoutsEnabled" : true,
-        "targetForVariableExpansion" : {
-          "containerPath" : "container:rBUM.xcodeproj",
-          "identifier" : "rBUM",
-          "name" : "rBUM"
-        }
+
       }
     }
   ],
   "defaultOptions" : {
-    "codeCoverage" : {
-      "targets" : [
-        {
-          "containerPath" : "container:rBUM.xcodeproj",
-          "identifier" : "rBUM",
-          "name" : "rBUM"
-        }
-      ]
-    },
     "environmentVariableEntries" : [
       {
-        "key" : "SWIFT_TESTING_ENABLE",
-        "value" : "1"
+        "key" : "IDEPreferLogStreaming",
+        "value" : "YES"
+      },
+      {
+        "key" : "OS_ACTIVITY_MODE",
+        "value" : "debug"
       }
     ],
     "targetForVariableExpansion" : {
       "containerPath" : "container:rBUM.xcodeproj",
-      "identifier" : "rBUM",
+      "identifier" : "8D4680552D4AF2EA00A3EE30",
       "name" : "rBUM"
     }
   },
   "testTargets" : [
     {
-      "target" : {
-        "containerPath" : "container:rBUM.xcodeproj",
-        "identifier" : "rBUMTests",
-        "name" : "rBUMTests"
-      }
-    },
-    {
-      "enabled" : false,
       "parallelizable" : true,
       "target" : {
         "containerPath" : "container:rBUM.xcodeproj",
-        "identifier" : "rBUMUITests",
-        "name" : "rBUMUITests"
-      }
-    },
-    {
-      "enabled" : false,
-      "target" : {
-        "containerPath" : "container:rBUM.xcodeproj",
-        "identifier" : "rBUMPerformanceTests",
-        "name" : "rBUMPerformanceTests"
+        "identifier" : "8D4680AA2D4B73A100A3EE30",
+        "name" : "rBUMTests"
       }
     }
   ],

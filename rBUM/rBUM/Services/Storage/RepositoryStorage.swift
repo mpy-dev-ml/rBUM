@@ -10,45 +10,36 @@ import Foundation
 /// Protocol for managing repository storage
 protocol RepositoryStorageProtocol {
     /// Store repository metadata
-    /// - Parameter repository: The repository to store
     func store(_ repository: Repository) throws
     
     /// Retrieve repository metadata by ID
-    /// - Parameter id: The repository ID
-    /// - Returns: The stored repository metadata
     func retrieve(forId id: UUID) throws -> Repository?
     
     /// List all stored repositories
-    /// - Returns: Array of stored repositories
     func list() throws -> [Repository]
     
     /// Delete repository metadata
-    /// - Parameter id: The repository ID
     func delete(forId id: UUID) throws
     
-    /// Check if a repository exists at the given path
-    /// - Parameters:
-    ///   - path: The path to check
-    ///   - excludingId: Optional ID of repository to exclude from check
-    /// - Returns: True if a repository exists at the path
+    /// Check if repository exists at path
     func exists(atPath path: URL, excludingId: UUID?) throws -> Bool
 }
 
-/// Error types for repository storage operations
+/// Errors that can occur during repository storage operations
 enum RepositoryStorageError: LocalizedError, Equatable {
     case fileOperationFailed(String)
-    case invalidData
-    case repositoryNotFound
+    case invalidData(String)
+    case repositoryNotFound(UUID)
     case repositoryAlreadyExists
     
     var errorDescription: String? {
         switch self {
-        case .fileOperationFailed(let operation):
-            return "Failed to \(operation) repository file"
-        case .invalidData:
-            return "Invalid repository data format"
-        case .repositoryNotFound:
-            return "Repository not found"
+        case .fileOperationFailed(let message):
+            return "File operation failed: \(message)"
+        case .invalidData(let message):
+            return "Invalid data: \(message)"
+        case .repositoryNotFound(let id):
+            return "Repository not found with ID: \(id)"
         case .repositoryAlreadyExists:
             return "Repository already exists at this location"
         }
@@ -58,10 +49,10 @@ enum RepositoryStorageError: LocalizedError, Equatable {
         switch (lhs, rhs) {
         case (.fileOperationFailed(let lhsOp), .fileOperationFailed(let rhsOp)):
             return lhsOp == rhsOp
-        case (.invalidData, .invalidData):
-            return true
-        case (.repositoryNotFound, .repositoryNotFound):
-            return true
+        case (.invalidData(let lhsOp), .invalidData(let rhsOp)):
+            return lhsOp == rhsOp
+        case (.repositoryNotFound(let lhsId), .repositoryNotFound(let rhsId)):
+            return lhsId == rhsId
         case (.repositoryAlreadyExists, .repositoryAlreadyExists):
             return true
         default:
@@ -70,33 +61,48 @@ enum RepositoryStorageError: LocalizedError, Equatable {
     }
 }
 
-/// Manages the storage of repository metadata using FileManager
+/// Manages repository metadata persistence
 final class RepositoryStorage: RepositoryStorageProtocol {
     private let fileManager: FileManager
     private let logger = Logging.logger(for: .repository)
-    private let customStorageURL: URL?
+    private let customStorageURL: URL?  // Optional custom storage location
     
-    /// URL where repository metadata is stored
+    /// Get the storage URL for repositories
     private var storageURL: URL {
         if let customURL = customStorageURL {
             return customURL
         }
         
-        let appSupport = try! fileManager.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        return appSupport
-            .appendingPathComponent("dev.mpy.rBUM", isDirectory: true)
-            .appendingPathComponent("repositories.json")
+        do {
+            let appDirectory = try getApplicationSupportDirectory()
+            return appDirectory.appendingPathComponent("Repositories", isDirectory: true)
+        } catch {
+            // Fallback to temporary directory if we can't access application support
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("dev.mpy.rBUM")
+                .appendingPathComponent("Repositories", isDirectory: true)
+        }
     }
     
     init(fileManager: FileManager = .default, storageURL: URL? = nil) {
         self.fileManager = fileManager
         self.customStorageURL = storageURL
         try? createStorageDirectoryIfNeeded()
+    }
+    
+    private func getApplicationSupportDirectory() throws -> URL {
+        guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw RepositoryStorageError.fileOperationFailed("directory not found")
+        }
+        
+        let bundleID = Bundle.main.bundleIdentifier ?? "dev.mpy.rBUM"
+        let appDirectory = appSupportURL.appendingPathComponent(bundleID)
+        
+        if !FileManager.default.fileExists(atPath: appDirectory.path) {
+            try FileManager.default.createDirectory(at: appDirectory, withIntermediateDirectories: true)
+        }
+        
+        return appDirectory
     }
     
     private func createStorageDirectoryIfNeeded() throws {

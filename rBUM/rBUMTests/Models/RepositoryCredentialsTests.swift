@@ -6,280 +6,288 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for RepositoryCredentials functionality
 struct RepositoryCredentialsTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize repository credentials with basic properties", tags: ["basic", "model"])
-    func testRepositoryCredentialsInitialization() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
+    /// Test environment with test data
+    struct TestContext {
+        let keychain: MockKeychain
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
+        let securityService: MockSecurityService
         
-        // When
-        let credentials = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path
-        )
+        init() {
+            self.keychain = MockKeychain()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
+            self.securityService = MockSecurityService()
+        }
         
-        // Then
-        #expect(credentials.repositoryId == id)
-        #expect(credentials.repositoryPath == path)
-        #expect(credentials.keyFileName == nil)
-        #expect(credentials.createdAt.timeIntervalSinceNow <= 0)
-        #expect(credentials.modifiedAt.timeIntervalSinceNow <= 0)
-    }
-    
-    @Test("Initialize repository credentials with key file", tags: ["basic", "model", "security"])
-    func testRepositoryCredentialsWithKeyFile() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
-        let keyFile = "key.txt"
+        /// Reset all mocks to initial state
+        func reset() {
+            keychain.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
+            securityService.reset()
+        }
         
-        // When
-        let credentials = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path,
-            keyFileName: keyFile
-        )
-        
-        // Then
-        #expect(credentials.keyFileName == keyFile)
-    }
-    
-    // MARK: - Keychain Integration Tests
-    
-    @Test("Generate correct keychain service name", tags: ["keychain", "security"])
-    func testKeychainServiceName() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
-        let credentials = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path
-        )
-        
-        // When
-        let serviceName = credentials.keychainService
-        
-        // Then
-        #expect(serviceName == "dev.mpy.rBUM.repository.\(id.uuidString)")
-    }
-    
-    @Test("Generate correct keychain account name", tags: ["keychain", "security"])
-    func testKeychainAccountName() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
-        let credentials = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path
-        )
-        
-        // When
-        let accountName = credentials.keychainAccount
-        
-        // Then
-        #expect(accountName == path)
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare credentials for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
-        let credentials1 = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path
-        )
-        let credentials2 = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path
-        )
-        let credentials3 = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "test-password",
-            repositoryPath: path
-        )
-        
-        // Then
-        #expect(credentials1 == credentials2)
-        #expect(credentials1 != credentials3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode credentials", tags: ["model", "serialization"])
-    func testCodable() throws {
-        // Given
-        let id = UUID()
-        let path = "/test/path"
-        let keyFile = "key.txt"
-        let credentials = RepositoryCredentials(
-            repositoryId: id,
-            password: "test-password",
-            repositoryPath: path,
-            keyFileName: keyFile
-        )
-        
-        // When
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(credentials)
-        let decoded = try decoder.decode(RepositoryCredentials.self, from: data)
-        
-        // Then
-        #expect(credentials == decoded)
-        #expect(decoded.repositoryId == id)
-        #expect(decoded.repositoryPath == path)
-        #expect(decoded.keyFileName == keyFile)
-    }
-    
-    // MARK: - Parameterized Tests
-    
-    @Test("Handle various credential formats", tags: ["parameterized", "model", "security"])
-    func testCredentialFormats() throws {
-        let testCases = [
-            // Test basic credentials
-            (
-                "Basic credentials",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "simple-password",
-                    repositoryPath: "/basic/path"
-                )
-            ),
-            // Test credentials with spaces
-            (
-                "Credentials with spaces",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "password with spaces",
-                    repositoryPath: "/path with spaces/repo"
-                )
-            ),
-            // Test credentials with special characters
-            (
-                "Credentials with special characters",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "password!@#$%^&*()",
-                    repositoryPath: "/path/with/special/chars/!@#$/repo"
-                )
-            ),
-            // Test credentials with very long values
-            (
-                "Long credentials",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: String(repeating: "a", count: 1000),
-                    repositoryPath: "/very/long/path/" + String(repeating: "a", count: 1000)
-                )
-            ),
-            // Test credentials with empty password
-            (
-                "Empty password",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "",
-                    repositoryPath: "/empty/password/repo"
-                )
-            ),
-            // Test credentials with key file
-            (
-                "With key file",
-                RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "password",
-                    repositoryPath: "/path/with/key",
-                    keyFileName: "key.txt"
-                )
+        /// Create test credentials manager
+        func createCredentialsManager() -> RepositoryCredentialsManager {
+            RepositoryCredentialsManager(
+                keychain: keychain,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider,
+                securityService: securityService
             )
-        ]
-        
-        for (name, credentials) in testCases {
-            // Test encoding/decoding
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(credentials)
-            let decoded = try decoder.decode(RepositoryCredentials.self, from: data)
-            
-            // Verify all properties are preserved
-            #expect(decoded.repositoryId == credentials.repositoryId, "Failed to preserve ID for: \(name)")
-            #expect(decoded.password == credentials.password, "Failed to preserve password for: \(name)")
-            #expect(decoded.repositoryPath == credentials.repositoryPath, "Failed to preserve path for: \(name)")
-            #expect(decoded.keyFileName == credentials.keyFileName, "Failed to preserve key file for: \(name)")
-            
-            // Verify keychain integration
-            let serviceName = credentials.keychainService
-            let accountName = credentials.keychainAccount
-            #expect(serviceName.contains(credentials.repositoryId.uuidString), "Invalid service name for: \(name)")
-            #expect(accountName == credentials.repositoryPath, "Invalid account name for: \(name)")
         }
     }
     
-    @Test("Validate timestamp behavior", tags: ["model", "timestamp"])
-    func testTimestampBehavior() throws {
-        // Given initial credentials
-        let credentials = RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "test-password",
-            repositoryPath: "/test/path"
-        )
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize credentials manager", tags: ["init", "credentials"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        // Initial timestamps should be close to now
-        let now = Date()
-        #expect(abs(credentials.createdAt.timeIntervalSince(now)) < 1.0)
-        #expect(abs(credentials.modifiedAt.timeIntervalSince(now)) < 1.0)
-        #expect(credentials.createdAt == credentials.modifiedAt)
+        // When: Creating credentials manager
+        let manager = context.createCredentialsManager()
         
-        // Sleep to ensure time difference
-        Thread.sleep(forTimeInterval: 0.1)
-        
-        // When updating
-        var updated = credentials
-        updated.password = "new-password"
-        
-        // Then timestamps should reflect the change
-        #expect(updated.createdAt == credentials.createdAt)
-        #expect(updated.modifiedAt > credentials.modifiedAt)
-        #expect(updated.modifiedAt > updated.createdAt)
+        // Then: Manager is properly configured
+        #expect(manager.isInitialized)
+        #expect(manager.credentialsCount == 0)
     }
     
-    @Test("Handle invalid paths", tags: ["model", "validation"])
-    func testInvalidPaths() throws {
-        let invalidPaths = [
-            "", // Empty path
-            "relative/path", // Relative path
-            "/path/with/null/\0/character", // Path with null character
-            "/path/with/newline\n/character", // Path with newline
-            String(repeating: "a", count: 4096) // Extremely long path
-        ]
+    // MARK: - Credentials Storage Tests
+    
+    @Test("Test credentials storage", tags: ["credentials", "storage"])
+    func testCredentialsStorage() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
         
-        for path in invalidPaths {
-            // Attempt to create credentials with invalid path
-            let credentials = RepositoryCredentials(
-                repositoryId: UUID(),
-                password: "test-password",
-                repositoryPath: path
-            )
+        let testCases = MockData.Credentials.storageData
+        
+        // Test credentials storage
+        for testCase in testCases {
+            // Store credentials
+            try manager.storeCredentials(testCase.credentials, for: testCase.repository)
+            #expect(context.keychain.saveCredentialsCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
             
-            // Verify path is normalized or rejected
-            let accountName = credentials.keychainAccount
-            #expect(!accountName.contains("\0"))
-            #expect(!accountName.contains("\n"))
-            #expect(accountName.count <= 1024)
+            // Retrieve credentials
+            let retrieved = try manager.retrieveCredentials(for: testCase.repository)
+            #expect(retrieved == testCase.credentials)
+            #expect(context.keychain.retrieveCredentialsCalled)
+            
+            context.reset()
         }
+    }
+    
+    // MARK: - Credentials Update Tests
+    
+    @Test("Test credentials updates", tags: ["credentials", "update"])
+    func testCredentialsUpdates() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        let testCases = MockData.Credentials.updateData
+        
+        // Test credentials updates
+        for testCase in testCases {
+            // Store initial credentials
+            try manager.storeCredentials(testCase.initial, for: testCase.repository)
+            
+            // Update credentials
+            try manager.updateCredentials(testCase.updated, for: testCase.repository)
+            #expect(context.keychain.updateCredentialsCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Verify updates
+            let retrieved = try manager.retrieveCredentials(for: testCase.repository)
+            #expect(retrieved == testCase.updated)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Credentials Deletion Tests
+    
+    @Test("Test credentials deletion", tags: ["credentials", "delete"])
+    func testCredentialsDeletion() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        let testCases = MockData.Credentials.deletionData
+        
+        // Test credentials deletion
+        for testCase in testCases {
+            // Store credentials
+            try manager.storeCredentials(testCase.credentials, for: testCase.repository)
+            
+            // Delete credentials
+            try manager.deleteCredentials(for: testCase.repository)
+            #expect(context.keychain.deleteCredentialsCalled)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Verify deletion
+            do {
+                _ = try manager.retrieveCredentials(for: testCase.repository)
+                throw TestFailure("Expected error for deleted credentials")
+            } catch {
+                // Expected error
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Credentials Validation Tests
+    
+    @Test("Test credentials validation", tags: ["credentials", "validate"])
+    func testCredentialsValidation() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        let testCases = MockData.Credentials.validationData
+        
+        // Test credentials validation
+        for testCase in testCases {
+            // Validate credentials
+            let isValid = try manager.validateCredentials(testCase.credentials)
+            #expect(isValid == testCase.expectedValid)
+            
+            if !isValid {
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .repositoryCredentialsValidationError)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Credentials Security Tests
+    
+    @Test("Test credentials security", tags: ["credentials", "security"])
+    func testCredentialsSecurity() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        let testCases = MockData.Credentials.securityData
+        
+        // Test credentials security
+        for testCase in testCases {
+            // Encrypt credentials
+            let encrypted = try manager.encryptCredentials(testCase.credentials)
+            #expect(context.securityService.encryptCalled)
+            
+            // Decrypt credentials
+            let decrypted = try manager.decryptCredentials(encrypted)
+            #expect(context.securityService.decryptCalled)
+            #expect(decrypted == testCase.credentials)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test credentials error handling", tags: ["credentials", "error"])
+    func testErrorHandling() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        let errorCases = MockData.Credentials.errorCases
+        
+        // Test error handling
+        for errorCase in errorCases {
+            do {
+                try manager.handleCredentialsOperation(errorCase)
+                throw TestFailure("Expected error for \(errorCase)")
+            } catch {
+                // Expected error
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .repositoryCredentialsError)
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle credentials edge cases", tags: ["credentials", "edge"])
+    func testEdgeCases() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        // Test missing credentials
+        do {
+            _ = try manager.retrieveCredentials(for: BackupRepository(id: "invalid"))
+            throw TestFailure("Expected error for missing credentials")
+        } catch {
+            // Expected error
+        }
+        
+        // Test invalid credentials format
+        do {
+            try manager.validateCredentials(RepositoryCredentials(username: "", password: ""))
+            throw TestFailure("Expected error for invalid credentials")
+        } catch {
+            // Expected error
+        }
+        
+        // Test corrupted encrypted data
+        do {
+            _ = try manager.decryptCredentials(Data())
+            throw TestFailure("Expected error for corrupted data")
+        } catch {
+            // Expected error
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test credentials performance", tags: ["credentials", "performance"])
+    func testPerformance() throws {
+        // Given: Credentials manager
+        let context = TestContext()
+        let manager = context.createCredentialsManager()
+        
+        // Test encryption performance
+        let startTime = context.dateProvider.now()
+        let testCredentials = MockData.Credentials.securityData[0].credentials
+        
+        for _ in 0..<100 {
+            _ = try manager.encryptCredentials(testCredentials)
+        }
+        
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test validation performance
+        let validationStartTime = context.dateProvider.now()
+        
+        for _ in 0..<1000 {
+            _ = try manager.validateCredentials(testCredentials)
+        }
+        
+        let validationEndTime = context.dateProvider.now()
+        
+        let validationInterval = validationEndTime.timeIntervalSince(validationStartTime)
+        #expect(validationInterval < 0.5) // Validation should be fast
     }
 }

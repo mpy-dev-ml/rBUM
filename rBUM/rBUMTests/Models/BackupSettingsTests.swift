@@ -6,277 +6,344 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupSettings functionality
 struct BackupSettingsTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup settings with default values", tags: ["basic", "model"])
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let notificationCenter: MockNotificationCenter
+        let fileManager: MockFileManager
+        
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.notificationCenter = MockNotificationCenter()
+            self.fileManager = MockFileManager()
+        }
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            notificationCenter.reset()
+            fileManager.reset()
+        }
+        
+        /// Create test settings
+        func createSettings(
+            maxConcurrentBackups: Int = 2,
+            maxBackupAttempts: Int = 3,
+            retryDelay: TimeInterval = 300,
+            notifyOnSuccess: Bool = true,
+            notifyOnFailure: Bool = true,
+            notifyOnWarning: Bool = true,
+            compressBackups: Bool = true,
+            excludeHiddenFiles: Bool = true,
+            excludeSystemFiles: Bool = true,
+            excludeCaches: Bool = true,
+            repository: Repository = MockData.Repository.validRepository
+        ) -> BackupSettings {
+            BackupSettings(
+                maxConcurrentBackups: maxConcurrentBackups,
+                maxBackupAttempts: maxBackupAttempts,
+                retryDelay: retryDelay,
+                notifyOnSuccess: notifyOnSuccess,
+                notifyOnFailure: notifyOnFailure,
+                notifyOnWarning: notifyOnWarning,
+                compressBackups: compressBackups,
+                excludeHiddenFiles: excludeHiddenFiles,
+                excludeSystemFiles: excludeSystemFiles,
+                excludeCaches: excludeCaches,
+                repository: repository
+            )
+        }
+    }
+    
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize with default values", tags: ["init", "settings"])
     func testDefaultInitialization() throws {
-        // When
-        let settings = BackupSettings()
+        // Given: Default settings parameters
+        let context = TestContext()
         
-        // Then
-        #expect(settings.resticPath == "/usr/local/bin/restic")
-        #expect(settings.cachePath.lastPathComponent == "Cache")
-        #expect(settings.tempPath.lastPathComponent == "Temp")
-        #expect(settings.logPath.lastPathComponent == "Logs")
-        #expect(settings.maxLogSize == 10 * 1024 * 1024) // 10 MB
-        #expect(settings.maxLogFiles == 10)
-        #expect(settings.logLevel == .info)
-        #expect(settings.useSystemKeychain)
+        // When: Creating settings
+        let settings = context.createSettings()
+        
+        // Then: Settings are configured correctly
+        #expect(settings.maxConcurrentBackups == 2)
+        #expect(settings.maxBackupAttempts == 3)
+        #expect(settings.retryDelay == 300)
+        #expect(settings.notifyOnSuccess)
+        #expect(settings.notifyOnFailure)
+        #expect(settings.notifyOnWarning)
+        #expect(settings.compressBackups)
+        #expect(settings.excludeHiddenFiles)
+        #expect(settings.excludeSystemFiles)
+        #expect(settings.excludeCaches)
     }
     
-    @Test("Initialize backup settings with custom values", tags: ["basic", "model"])
+    @Test("Initialize with custom values", tags: ["init", "settings"])
     func testCustomInitialization() throws {
-        // Given
-        let resticPath = "/opt/bin/restic"
-        let cachePath = URL(fileURLWithPath: "/custom/cache")
-        let tempPath = URL(fileURLWithPath: "/custom/temp")
-        let logPath = URL(fileURLWithPath: "/custom/logs")
-        let maxLogSize: UInt64 = 20 * 1024 * 1024 // 20 MB
-        let maxLogFiles = 20
-        let logLevel = LogLevel.debug
-        let useSystemKeychain = false
+        // Given: Custom settings parameters
+        let context = TestContext()
         
-        // When
-        let settings = BackupSettings(
-            resticPath: resticPath,
-            cachePath: cachePath,
-            tempPath: tempPath,
-            logPath: logPath,
-            maxLogSize: maxLogSize,
-            maxLogFiles: maxLogFiles,
-            logLevel: logLevel,
-            useSystemKeychain: useSystemKeychain
+        // When: Creating settings
+        let settings = context.createSettings(
+            maxConcurrentBackups: 4,
+            maxBackupAttempts: 5,
+            retryDelay: 600,
+            notifyOnSuccess: false,
+            notifyOnFailure: true,
+            notifyOnWarning: false,
+            compressBackups: false,
+            excludeHiddenFiles: false,
+            excludeSystemFiles: false,
+            excludeCaches: false
         )
         
-        // Then
-        #expect(settings.resticPath == resticPath)
-        #expect(settings.cachePath == cachePath)
-        #expect(settings.tempPath == tempPath)
-        #expect(settings.logPath == logPath)
-        #expect(settings.maxLogSize == maxLogSize)
-        #expect(settings.maxLogFiles == maxLogFiles)
-        #expect(settings.logLevel == logLevel)
-        #expect(settings.useSystemKeychain == useSystemKeychain)
+        // Then: Settings are configured correctly
+        #expect(settings.maxConcurrentBackups == 4)
+        #expect(settings.maxBackupAttempts == 5)
+        #expect(settings.retryDelay == 600)
+        #expect(!settings.notifyOnSuccess)
+        #expect(settings.notifyOnFailure)
+        #expect(!settings.notifyOnWarning)
+        #expect(!settings.compressBackups)
+        #expect(!settings.excludeHiddenFiles)
+        #expect(!settings.excludeSystemFiles)
+        #expect(!settings.excludeCaches)
     }
     
-    // MARK: - Path Tests
+    // MARK: - Persistence Tests
     
-    @Test("Handle path validations", tags: ["model", "path"])
-    func testPathValidations() throws {
-        let testCases = [
-            // Valid paths
-            ("/usr/local/bin/restic", "/cache", "/temp", "/logs", true),
-            ("/opt/restic", "~/cache", "~/temp", "~/logs", true),
-            // Invalid restic path
-            ("", "/cache", "/temp", "/logs", false),
-            // Invalid cache path
-            ("/usr/local/bin/restic", "", "/temp", "/logs", false),
-            // Invalid temp path
-            ("/usr/local/bin/restic", "/cache", "", "/logs", false),
-            // Invalid log path
-            ("/usr/local/bin/restic", "/cache", "/temp", "", false),
-            // Paths with spaces
-            ("/usr/local/bin/restic", "/cache path", "/temp path", "/log path", true),
-            // Paths with special characters
-            ("/usr/local/bin/restic", "/cache!@#", "/temp$%^", "/logs&*()", true)
-        ]
-        
-        for (resticPath, cachePath, tempPath, logPath, isValid) in testCases {
-            let settings = BackupSettings(
-                resticPath: resticPath,
-                cachePath: URL(fileURLWithPath: cachePath),
-                tempPath: URL(fileURLWithPath: tempPath),
-                logPath: URL(fileURLWithPath: logPath)
-            )
-            
-            if isValid {
-                #expect(settings.isValid)
-            } else {
-                #expect(!settings.isValid)
-            }
-        }
-    }
-    
-    // MARK: - Log Level Tests
-    
-    @Test("Handle log levels", tags: ["model", "logging"])
-    func testLogLevels() throws {
-        let testCases: [(LogLevel, String)] = [
-            (.error, "Error"),
-            (.warning, "Warning"),
-            (.info, "Information"),
-            (.debug, "Debug"),
-            (.trace, "Trace")
-        ]
-        
-        for (level, description) in testCases {
-            var settings = BackupSettings()
-            settings.logLevel = level
-            
-            #expect(settings.logLevel == level)
-            #expect(settings.logLevel.description == description)
-        }
-    }
-    
-    // MARK: - Log Size Tests
-    
-    @Test("Handle log size limits", tags: ["model", "logging"])
-    func testLogSizeLimits() throws {
-        let testCases: [(UInt64, String)] = [
-            (1024, "1.0 KB"),
-            (1024 * 1024, "1.0 MB"),
-            (10 * 1024 * 1024, "10.0 MB"),
-            (1024 * 1024 * 1024, "1.0 GB")
-        ]
-        
-        for (size, formattedSize) in testCases {
-            var settings = BackupSettings()
-            settings.maxLogSize = size
-            
-            #expect(settings.maxLogSize == size)
-            #expect(settings.formattedMaxLogSize == formattedSize)
-        }
-    }
-    
-    // MARK: - Log File Count Tests
-    
-    @Test("Handle log file count limits", tags: ["model", "logging"])
-    func testLogFileCountLimits() throws {
-        let testCases = [
-            // Valid counts
-            1, 5, 10, 20, 50,
-            // Invalid counts (should be clamped)
-            0, -1, 101, 1000
-        ]
-        
-        for count in testCases {
-            var settings = BackupSettings()
-            settings.maxLogFiles = count
-            
-            let expectedValue = max(1, min(count, 100))
-            #expect(settings.maxLogFiles == expectedValue)
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare backup settings for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let settings1 = BackupSettings(
-            resticPath: "/test/restic",
-            cachePath: URL(fileURLWithPath: "/test/cache"),
-            tempPath: URL(fileURLWithPath: "/test/temp"),
-            logPath: URL(fileURLWithPath: "/test/logs"),
-            maxLogSize: 1024 * 1024,
-            maxLogFiles: 10,
-            logLevel: .debug,
-            useSystemKeychain: false
+    @Test("Save and load settings", tags: ["persistence", "settings"])
+    func testPersistence() throws {
+        // Given: Settings with custom values
+        let context = TestContext()
+        let settings = context.createSettings(
+            maxConcurrentBackups: 4,
+            maxBackupAttempts: 5,
+            retryDelay: 600,
+            notifyOnSuccess: false,
+            notifyOnFailure: true,
+            notifyOnWarning: false,
+            compressBackups: false,
+            excludeHiddenFiles: false,
+            excludeSystemFiles: false,
+            excludeCaches: false
         )
         
-        let settings2 = BackupSettings(
-            resticPath: "/test/restic",
-            cachePath: URL(fileURLWithPath: "/test/cache"),
-            tempPath: URL(fileURLWithPath: "/test/temp"),
-            logPath: URL(fileURLWithPath: "/test/logs"),
-            maxLogSize: 1024 * 1024,
-            maxLogFiles: 10,
-            logLevel: .debug,
-            useSystemKeychain: false
-        )
+        // When: Saving and loading settings
+        settings.save(to: context.userDefaults)
+        let loaded = BackupSettings.load(from: context.userDefaults)
         
-        let settings3 = BackupSettings(
-            resticPath: "/other/restic",
-            cachePath: URL(fileURLWithPath: "/other/cache"),
-            tempPath: URL(fileURLWithPath: "/other/temp"),
-            logPath: URL(fileURLWithPath: "/other/logs")
-        )
-        
-        #expect(settings1 == settings2)
-        #expect(settings1 != settings3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup settings", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Default settings
-            BackupSettings(),
-            // Custom settings
-            BackupSettings(
-                resticPath: "/test/restic",
-                cachePath: URL(fileURLWithPath: "/test/cache"),
-                tempPath: URL(fileURLWithPath: "/test/temp"),
-                logPath: URL(fileURLWithPath: "/test/logs"),
-                maxLogSize: 1024 * 1024,
-                maxLogFiles: 10,
-                logLevel: .debug,
-                useSystemKeychain: false
-            ),
-            // Minimal settings
-            BackupSettings(
-                resticPath: "/usr/bin/restic",
-                cachePath: URL(fileURLWithPath: "/cache"),
-                tempPath: URL(fileURLWithPath: "/temp"),
-                logPath: URL(fileURLWithPath: "/logs")
-            )
-        ]
-        
-        for settings in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(settings)
-            let decoded = try decoder.decode(BackupSettings.self, from: data)
-            
-            // Then
-            #expect(decoded.resticPath == settings.resticPath)
-            #expect(decoded.cachePath == settings.cachePath)
-            #expect(decoded.tempPath == settings.tempPath)
-            #expect(decoded.logPath == settings.logPath)
-            #expect(decoded.maxLogSize == settings.maxLogSize)
-            #expect(decoded.maxLogFiles == settings.maxLogFiles)
-            #expect(decoded.logLevel == settings.logLevel)
-            #expect(decoded.useSystemKeychain == settings.useSystemKeychain)
-        }
+        // Then: Loaded settings match original
+        #expect(loaded?.maxConcurrentBackups == settings.maxConcurrentBackups)
+        #expect(loaded?.maxBackupAttempts == settings.maxBackupAttempts)
+        #expect(loaded?.retryDelay == settings.retryDelay)
+        #expect(loaded?.notifyOnSuccess == settings.notifyOnSuccess)
+        #expect(loaded?.notifyOnFailure == settings.notifyOnFailure)
+        #expect(loaded?.notifyOnWarning == settings.notifyOnWarning)
+        #expect(loaded?.compressBackups == settings.compressBackups)
+        #expect(loaded?.excludeHiddenFiles == settings.excludeHiddenFiles)
+        #expect(loaded?.excludeSystemFiles == settings.excludeSystemFiles)
+        #expect(loaded?.excludeCaches == settings.excludeCaches)
     }
     
     // MARK: - Validation Tests
     
-    @Test("Validate backup settings properties", tags: ["model", "validation"])
+    @Test("Validate settings", tags: ["validation", "settings"])
     func testValidation() throws {
-        let testCases = [
+        // Given: Settings with various configurations
+        let context = TestContext()
+        let testCases: [(BackupSettings, Bool)] = [
             // Valid settings
-            ("/test/restic", 1024 * 1024, 10, true),
-            // Invalid restic path
-            ("", 1024 * 1024, 10, false),
-            // Invalid log size
-            ("/test/restic", 0, 10, false),
-            // Invalid log file count
-            ("/test/restic", 1024 * 1024, 0, false),
-            // All valid maximums
-            ("/test/restic", UInt64.max, 100, true)
+            (context.createSettings(
+                maxConcurrentBackups: 2,
+                maxBackupAttempts: 3,
+                retryDelay: 300
+            ), true),
+            
+            // Invalid max concurrent backups
+            (context.createSettings(
+                maxConcurrentBackups: 0,
+                maxBackupAttempts: 3,
+                retryDelay: 300
+            ), false),
+            
+            // Invalid max backup attempts
+            (context.createSettings(
+                maxConcurrentBackups: 2,
+                maxBackupAttempts: 0,
+                retryDelay: 300
+            ), false),
+            
+            // Invalid retry delay
+            (context.createSettings(
+                maxConcurrentBackups: 2,
+                maxBackupAttempts: 3,
+                retryDelay: -1
+            ), false)
         ]
         
-        for (resticPath, logSize, logFiles, isValid) in testCases {
-            let settings = BackupSettings(
-                resticPath: resticPath,
-                cachePath: URL(fileURLWithPath: "/test/cache"),
-                tempPath: URL(fileURLWithPath: "/test/temp"),
-                logPath: URL(fileURLWithPath: "/test/logs"),
-                maxLogSize: logSize,
-                maxLogFiles: logFiles
-            )
-            
-            if isValid {
-                #expect(settings.isValid)
-            } else {
-                #expect(!settings.isValid)
-            }
+        // When/Then: Test validation
+        for (settings, isValid) in testCases {
+            #expect(settings.isValid() == isValid)
         }
+    }
+    
+    // MARK: - Notification Tests
+    
+    @Test("Handle notifications", tags: ["notification", "settings"])
+    func testNotifications() throws {
+        // Given: Settings with different notification configurations
+        let context = TestContext()
+        let testCases: [(BackupSettings, NotificationType, Bool)] = [
+            // Success notifications
+            (context.createSettings(notifyOnSuccess: true), .success, true),
+            (context.createSettings(notifyOnSuccess: false), .success, false),
+            
+            // Failure notifications
+            (context.createSettings(notifyOnFailure: true), .failure, true),
+            (context.createSettings(notifyOnFailure: false), .failure, false),
+            
+            // Warning notifications
+            (context.createSettings(notifyOnWarning: true), .warning, true),
+            (context.createSettings(notifyOnWarning: false), .warning, false)
+        ]
+        
+        // When/Then: Test notification handling
+        for (settings, type, shouldNotify) in testCases {
+            #expect(settings.shouldNotify(for: type) == shouldNotify)
+        }
+    }
+    
+    // MARK: - Exclusion Tests
+    
+    @Test("Handle file exclusions", tags: ["exclusion", "settings"])
+    func testExclusions() throws {
+        // Given: Settings with different exclusion configurations
+        let context = TestContext()
+        let testCases: [(BackupSettings, String, Bool)] = [
+            // Hidden files
+            (context.createSettings(excludeHiddenFiles: true), ".hidden", true),
+            (context.createSettings(excludeHiddenFiles: false), ".hidden", false),
+            
+            // System files
+            (context.createSettings(excludeSystemFiles: true), "/var/log/system.log", true),
+            (context.createSettings(excludeSystemFiles: false), "/var/log/system.log", false),
+            
+            // Cache files
+            (context.createSettings(excludeCaches: true), "Library/Caches/test.cache", true),
+            (context.createSettings(excludeCaches: false), "Library/Caches/test.cache", false),
+            
+            // Regular files
+            (context.createSettings(), "document.txt", false)
+        ]
+        
+        // When/Then: Test exclusion handling
+        for (settings, path, shouldExclude) in testCases {
+            #expect(settings.shouldExclude(path) == shouldExclude)
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle edge cases", tags: ["edge", "settings"])
+    func testEdgeCases() throws {
+        // Given: Edge case scenarios
+        let context = TestContext()
+        
+        // Test maximum values
+        let maxSettings = context.createSettings(
+            maxConcurrentBackups: Int.max,
+            maxBackupAttempts: Int.max,
+            retryDelay: TimeInterval.greatestFiniteMagnitude
+        )
+        #expect(!maxSettings.isValid())
+        
+        // Test minimum values
+        let minSettings = context.createSettings(
+            maxConcurrentBackups: Int.min,
+            maxBackupAttempts: Int.min,
+            retryDelay: TimeInterval.leastNormalMagnitude
+        )
+        #expect(!minSettings.isValid())
+        
+        // Test empty paths
+        let settings = context.createSettings()
+        #expect(!settings.shouldExclude(""))
+        
+        // Test nil UserDefaults
+        let nilDefaults = MockUserDefaults()
+        nilDefaults.removeObject(forKey: BackupSettings.defaultsKey)
+        let loadedSettings = BackupSettings.load(from: nilDefaults)
+        #expect(loadedSettings == nil)
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaults {
+    var storage: [String: Any] = [:]
+    
+    override func set(_ value: Any?, forKey defaultName: String) {
+        if let value = value {
+            storage[defaultName] = value
+        } else {
+            storage.removeValue(forKey: defaultName)
+        }
+    }
+    
+    override func object(forKey defaultName: String) -> Any? {
+        storage[defaultName]
+    }
+    
+    override func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
+    }
+    
+    func reset() {
+        storage.removeAll()
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
+    }
+    
+    func reset() {
+        postCalled = false
+        lastNotification = nil
+    }
+}
+
+/// Mock implementation of FileManager for testing
+final class MockFileManager: FileManager {
+    var files: [String: (isHidden: Bool, isSystem: Bool)] = [:]
+    
+    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
+        files[path] != nil
+    }
+    
+    func isHidden(_ path: String) -> Bool {
+        files[path]?.isHidden ?? false
+    }
+    
+    func isSystem(_ path: String) -> Bool {
+        files[path]?.isSystem ?? false
+    }
+    
+    func reset() {
+        files.removeAll()
     }
 }

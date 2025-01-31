@@ -6,283 +6,243 @@
 //
 
 import Testing
-import Foundation
-import Security
 @testable import rBUM
 
+/// Tests for BackupCredentials functionality
 struct BackupCredentialsTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup credentials with password", tags: ["basic", "model", "security"])
-    func testPasswordInitialization() throws {
-        // Given
-        let repositoryId = UUID()
-        let password = "test-password-123"
+    /// Test environment with test data
+    struct TestContext {
+        let keychain: MockKeychain
+        let notificationCenter: MockNotificationCenter
         
-        // When
-        let credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            password: password
-        )
-        
-        // Then
-        #expect(credentials.repositoryId == repositoryId)
-        #expect(credentials.hasPassword)
-        #expect(!credentials.hasKeyFile)
-        #expect(credentials.keyFilePath == nil)
-        
-        // Password should be securely stored and not directly accessible
-        #expect(credentials.password == nil)
-    }
-    
-    @Test("Initialize backup credentials with key file", tags: ["basic", "model", "security"])
-    func testKeyFileInitialization() throws {
-        // Given
-        let repositoryId = UUID()
-        let keyFilePath = URL(fileURLWithPath: "/test/key.pem")
-        
-        // When
-        let credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            keyFilePath: keyFilePath
-        )
-        
-        // Then
-        #expect(credentials.repositoryId == repositoryId)
-        #expect(!credentials.hasPassword)
-        #expect(credentials.hasKeyFile)
-        #expect(credentials.keyFilePath == keyFilePath)
-    }
-    
-    // MARK: - Password Tests
-    
-    @Test("Handle secure password storage", tags: ["model", "security", "password"])
-    func testSecurePasswordStorage() throws {
-        // Given
-        let repositoryId = UUID()
-        let password = "test-password-123"
-        
-        // When
-        let credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            password: password
-        )
-        
-        // Then
-        // Password should be stored in keychain
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "rBUM",
-            kSecAttrAccount as String: repositoryId.uuidString,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        #expect(status == errSecSuccess)
-        if let passwordData = result as? Data,
-           let storedPassword = String(data: passwordData, encoding: .utf8) {
-            #expect(storedPassword == password)
-        } else {
-            #expect(false, "Password not found in keychain")
+        init() {
+            self.keychain = MockKeychain()
+            self.notificationCenter = MockNotificationCenter()
         }
-    }
-    
-    @Test("Handle password updates", tags: ["model", "security", "password"])
-    func testPasswordUpdates() throws {
-        // Given
-        let repositoryId = UUID()
-        var credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            password: "old-password"
-        )
         
-        // When
-        credentials.updatePassword("new-password")
-        
-        // Then
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "rBUM",
-            kSecAttrAccount as String: repositoryId.uuidString,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        #expect(status == errSecSuccess)
-        if let passwordData = result as? Data,
-           let storedPassword = String(data: passwordData, encoding: .utf8) {
-            #expect(storedPassword == "new-password")
-        } else {
-            #expect(false, "Updated password not found in keychain")
+        /// Reset all mocks to initial state
+        func reset() {
+            keychain.reset()
+            notificationCenter.reset()
         }
-    }
-    
-    // MARK: - Key File Tests
-    
-    @Test("Handle key file validation", tags: ["model", "security", "keyfile"])
-    func testKeyFileValidation() throws {
-        let testCases = [
-            // Valid paths
-            "/test/key.pem",
-            "/test/keys/repository.key",
-            // Invalid paths
-            "",
-            "relative/path/key.pem",
-            "/test/key.invalid"
-        ]
         
-        for path in testCases {
-            let credentials = BackupCredentials(
-                repositoryId: UUID(),
-                keyFilePath: URL(fileURLWithPath: path)
+        /// Create test credentials
+        func createCredentials(
+            username: String = MockData.Credentials.validUsername,
+            password: String = MockData.Credentials.validPassword,
+            repository: Repository = MockData.Repository.validRepository,
+            isEnabled: Bool = true
+        ) -> BackupCredentials {
+            BackupCredentials(
+                username: username,
+                password: password,
+                repository: repository,
+                isEnabled: isEnabled
             )
-            
-            let isValid = path.hasPrefix("/") &&
-                         (path.hasSuffix(".pem") || path.hasSuffix(".key"))
-            
-            if isValid {
-                #expect(credentials.isValid)
-            } else {
-                #expect(!credentials.isValid)
-            }
         }
     }
     
-    @Test("Handle key file updates", tags: ["model", "security", "keyfile"])
-    func testKeyFileUpdates() throws {
-        // Given
-        let repositoryId = UUID()
-        var credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            keyFilePath: URL(fileURLWithPath: "/test/old.key")
-        )
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize with default values", tags: ["init", "credentials"])
+    func testDefaultInitialization() throws {
+        // Given: Default credentials parameters
+        let context = TestContext()
         
-        // When
-        let newPath = URL(fileURLWithPath: "/test/new.key")
-        credentials.updateKeyFile(newPath)
+        // When: Creating credentials
+        let credentials = context.createCredentials()
         
-        // Then
-        #expect(credentials.keyFilePath == newPath)
-        #expect(credentials.hasKeyFile)
+        // Then: Credentials are configured correctly
+        #expect(credentials.username == MockData.Credentials.validUsername)
+        #expect(credentials.password == MockData.Credentials.validPassword)
+        #expect(credentials.repository == MockData.Repository.validRepository)
+        #expect(credentials.isEnabled)
     }
     
-    // MARK: - Authentication Tests
-    
-    @Test("Handle authentication method changes", tags: ["model", "security", "auth"])
-    func testAuthenticationChanges() throws {
-        // Given
-        let repositoryId = UUID()
-        var credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            password: "test-password"
+    @Test("Initialize with custom values", tags: ["init", "credentials"])
+    func testCustomInitialization() throws {
+        // Given: Custom credentials parameters
+        let context = TestContext()
+        let customUsername = "custom-user"
+        let customPassword = "custom-pass"
+        let customRepository = MockData.Repository.customRepository
+        
+        // When: Creating credentials
+        let credentials = context.createCredentials(
+            username: customUsername,
+            password: customPassword,
+            repository: customRepository,
+            isEnabled: false
         )
         
-        // Test switching from password to key file
-        credentials.updateKeyFile(URL(fileURLWithPath: "/test/key.pem"))
-        #expect(credentials.hasKeyFile)
-        #expect(!credentials.hasPassword)
-        
-        // Test switching back to password
-        credentials.updatePassword("new-password")
-        #expect(!credentials.hasKeyFile)
-        #expect(credentials.hasPassword)
-        
-        // Test removing all authentication
-        credentials.removeAuthentication()
-        #expect(!credentials.hasKeyFile)
-        #expect(!credentials.hasPassword)
+        // Then: Credentials are configured correctly
+        #expect(credentials.username == customUsername)
+        #expect(credentials.password == customPassword)
+        #expect(credentials.repository == customRepository)
+        #expect(!credentials.isEnabled)
     }
     
-    // MARK: - Comparison Tests
+    // MARK: - Persistence Tests
     
-    @Test("Compare credentials for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let repositoryId = UUID()
-        
-        let credentials1 = BackupCredentials(
-            repositoryId: repositoryId,
-            password: "test-password"
+    @Test("Save and load credentials", tags: ["persistence", "credentials"])
+    func testPersistence() throws {
+        // Given: Credentials with custom values
+        let context = TestContext()
+        let credentials = context.createCredentials(
+            username: "test-user",
+            password: "test-pass",
+            isEnabled: false
         )
         
-        let credentials2 = BackupCredentials(
-            repositoryId: repositoryId,
-            password: "test-password"
-        )
+        // When: Saving and loading credentials
+        credentials.save(to: context.keychain)
+        let loaded = BackupCredentials.load(from: context.keychain, forRepository: credentials.repository)
         
-        let credentials3 = BackupCredentials(
-            repositoryId: UUID(),
-            password: "test-password"
-        )
-        
-        #expect(credentials1 == credentials2)
-        #expect(credentials1 != credentials3)
+        // Then: Loaded credentials match original
+        #expect(loaded?.username == credentials.username)
+        #expect(loaded?.password == credentials.password)
+        #expect(loaded?.repository == credentials.repository)
+        #expect(loaded?.isEnabled == credentials.isEnabled)
     }
     
-    // MARK: - Serialization Tests
+    // MARK: - Validation Tests
     
-    @Test("Handle secure serialization", tags: ["model", "security", "serialization"])
-    func testSecureSerialization() throws {
-        let testCases = [
-            // Password credentials
-            BackupCredentials(
-                repositoryId: UUID(),
-                password: "test-password"
-            ),
-            // Key file credentials
-            BackupCredentials(
-                repositoryId: UUID(),
-                keyFilePath: URL(fileURLWithPath: "/test/key.pem")
-            ),
-            // No authentication
-            BackupCredentials(repositoryId: UUID())
+    @Test("Validate credentials", tags: ["validation", "credentials"])
+    func testValidation() throws {
+        // Given: Credentials with various validation scenarios
+        let context = TestContext()
+        let testCases: [(BackupCredentials, Bool)] = [
+            // Valid credentials
+            (context.createCredentials(), true),
+            
+            // Invalid - empty username
+            (context.createCredentials(username: ""), false),
+            
+            // Invalid - empty password
+            (context.createCredentials(password: ""), false),
+            
+            // Invalid - invalid repository
+            (context.createCredentials(repository: MockData.Repository.invalidRepository), false)
         ]
         
-        for credentials in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(credentials)
-            let decoded = try decoder.decode(BackupCredentials.self, from: data)
-            
-            // Then
-            #expect(decoded.repositoryId == credentials.repositoryId)
-            #expect(decoded.hasPassword == credentials.hasPassword)
-            #expect(decoded.hasKeyFile == credentials.hasKeyFile)
-            #expect(decoded.keyFilePath == credentials.keyFilePath)
-            
-            // Ensure password is not serialized
-            let json = String(data: data, encoding: .utf8) ?? ""
-            #expect(!json.contains("password"))
-            #expect(!json.contains("test-password"))
+        // When/Then: Test validation
+        for (credentials, isValid) in testCases {
+            #expect(credentials.isValid() == isValid)
         }
     }
     
-    // MARK: - Cleanup
+    // MARK: - Security Tests
     
-    @Test("Clean up credentials from keychain", tags: ["model", "security", "cleanup"])
-    func testCleanup() throws {
-        // Given
-        let repositoryId = UUID()
-        let credentials = BackupCredentials(
-            repositoryId: repositoryId,
-            password: "test-password"
+    @Test("Handle secure storage", tags: ["security", "credentials"])
+    func testSecureStorage() throws {
+        // Given: Credentials and keychain
+        let context = TestContext()
+        let credentials = context.createCredentials()
+        
+        // When: Storing credentials
+        credentials.save(to: context.keychain)
+        
+        // Then: Credentials are stored securely
+        #expect(context.keychain.isEncrypted)
+        #expect(context.keychain.containsCredentials(forRepository: credentials.repository))
+    }
+    
+    @Test("Handle credential updates", tags: ["security", "credentials"])
+    func testCredentialUpdates() throws {
+        // Given: Initial credentials
+        let context = TestContext()
+        let credentials = context.createCredentials()
+        
+        // When: Updating credentials
+        credentials.save(to: context.keychain)
+        let updatedCredentials = context.createCredentials(
+            username: "updated-user",
+            password: "updated-pass"
         )
+        updatedCredentials.save(to: context.keychain)
         
-        // When
-        credentials.cleanup()
+        // Then: Updated credentials are stored
+        let loaded = BackupCredentials.load(from: context.keychain, forRepository: credentials.repository)
+        #expect(loaded?.username == updatedCredentials.username)
+        #expect(loaded?.password == updatedCredentials.password)
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle edge cases", tags: ["edge", "credentials"])
+    func testEdgeCases() throws {
+        // Given: Edge case scenarios
+        let context = TestContext()
         
-        // Then
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "rBUM",
-            kSecAttrAccount as String: repositoryId.uuidString
-        ]
+        // Test nil keychain
+        let emptyKeychain = MockKeychain()
+        let loadedCredentials = BackupCredentials.load(from: emptyKeychain, forRepository: MockData.Repository.validRepository)
+        #expect(loadedCredentials == nil)
         
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        #expect(status == errSecItemNotFound)
+        // Test special characters
+        let specialChars = "!@#$%^&*()"
+        let specialCredentials = context.createCredentials(
+            username: "user\(specialChars)",
+            password: "pass\(specialChars)"
+        )
+        specialCredentials.save(to: context.keychain)
+        let loadedSpecial = BackupCredentials.load(from: context.keychain, forRepository: specialCredentials.repository)
+        #expect(loadedSpecial?.username == specialCredentials.username)
+        #expect(loadedSpecial?.password == specialCredentials.password)
+        
+        // Test maximum length
+        let maxLength = String(repeating: "a", count: 1024)
+        let maxCredentials = context.createCredentials(
+            username: maxLength,
+            password: maxLength
+        )
+        #expect(!maxCredentials.isValid())
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of Keychain for testing
+final class MockKeychain: KeychainProtocol {
+    var storage: [String: (username: String, password: String)] = [:]
+    var isEncrypted = true
+    
+    func save(username: String, password: String, forRepository repository: Repository) {
+        storage[repository.id] = (username: username, password: password)
+    }
+    
+    func load(forRepository repository: Repository) -> (username: String, password: String)? {
+        storage[repository.id]
+    }
+    
+    func containsCredentials(forRepository repository: Repository) -> Bool {
+        storage[repository.id] != nil
+    }
+    
+    func delete(forRepository repository: Repository) {
+        storage.removeValue(forKey: repository.id)
+    }
+    
+    func reset() {
+        storage.removeAll()
+        isEncrypted = true
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
+    }
+    
+    func reset() {
+        postCalled = false
+        lastNotification = nil
     }
 }

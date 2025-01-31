@@ -6,322 +6,343 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupMonitor functionality
 struct BackupMonitorTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup monitor with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let fileManager: MockFileManager
+        let dateProvider: MockDateProvider
+        let notificationCenter: MockNotificationCenter
+        let fsEventStream: MockFSEventStream
         
-        // When
-        let monitor = BackupMonitor(
-            id: id,
-            repositoryId: repositoryId
-        )
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.fileManager = MockFileManager()
+            self.dateProvider = MockDateProvider()
+            self.notificationCenter = MockNotificationCenter()
+            self.fsEventStream = MockFSEventStream()
+        }
         
-        // Then
-        #expect(monitor.id == id)
-        #expect(monitor.repositoryId == repositoryId)
-        #expect(monitor.isActive == false)
-        #expect(monitor.lastCheckTime == nil)
-        #expect(monitor.checkInterval == 300) // Default 5 minutes
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            fileManager.reset()
+            dateProvider.reset()
+            notificationCenter.reset()
+            fsEventStream.reset()
+        }
+        
+        /// Create test monitor
+        func createMonitor() -> BackupMonitor {
+            BackupMonitor(
+                userDefaults: userDefaults,
+                fileManager: fileManager,
+                dateProvider: dateProvider,
+                notificationCenter: notificationCenter,
+                fsEventStream: fsEventStream
+            )
+        }
     }
     
-    @Test("Initialize backup monitor with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
-        let isActive = true
-        let lastCheckTime = Date()
-        let checkInterval: TimeInterval = 600 // 10 minutes
-        let filters = [BackupFilter(pattern: "*.tmp", type: .exclude)]
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize backup monitor", tags: ["init", "monitor"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        // When
-        let monitor = BackupMonitor(
-            id: id,
-            repositoryId: repositoryId,
-            isActive: isActive,
-            lastCheckTime: lastCheckTime,
-            checkInterval: checkInterval,
-            filters: filters
-        )
+        // When: Creating monitor
+        let monitor = context.createMonitor()
         
-        // Then
-        #expect(monitor.id == id)
-        #expect(monitor.repositoryId == repositoryId)
-        #expect(monitor.isActive == isActive)
-        #expect(monitor.lastCheckTime == lastCheckTime)
-        #expect(monitor.checkInterval == checkInterval)
-        #expect(monitor.filters == filters)
+        // Then: Monitor is configured correctly
+        #expect(!monitor.isActive)
+        #expect(monitor.watchedPaths.isEmpty)
+        #expect(monitor.excludedPaths.isEmpty)
     }
     
-    // MARK: - Activity Tests
+    // MARK: - Path Management Tests
     
-    @Test("Handle monitor activity state", tags: ["model", "activity"])
-    func testActivityState() throws {
-        // Given
-        var monitor = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+    @Test("Test path management", tags: ["path", "monitor"])
+    func testPathManagement() throws {
+        // Given: Monitor and test data
+        let context = TestContext()
+        let monitor = context.createMonitor()
         
-        // Test activation
-        monitor.activate()
-        #expect(monitor.isActive)
-        #expect(monitor.lastCheckTime != nil)
+        let paths = MockData.Path.validPaths
+        let excludedPaths = MockData.Path.excludedPaths
         
-        // Test deactivation
-        monitor.deactivate()
+        // When: Adding paths
+        for path in paths {
+            try monitor.addPath(path)
+        }
+        
+        // Then: Paths are watched
+        #expect(monitor.watchedPaths.count == paths.count)
+        for path in paths {
+            #expect(monitor.isWatching(path))
+        }
+        
+        // When: Adding excluded paths
+        for path in excludedPaths {
+            try monitor.addExcludedPath(path)
+        }
+        
+        // Then: Paths are excluded
+        #expect(monitor.excludedPaths.count == excludedPaths.count)
+        for path in excludedPaths {
+            #expect(monitor.isExcluded(path))
+        }
+        
+        // When: Removing paths
+        try monitor.removePath(paths[0])
+        try monitor.removeExcludedPath(excludedPaths[0])
+        
+        // Then: Paths are removed
+        #expect(!monitor.isWatching(paths[0]))
+        #expect(!monitor.isExcluded(excludedPaths[0]))
+    }
+    
+    // MARK: - Monitoring Tests
+    
+    @Test("Monitor file system events", tags: ["monitor", "events"])
+    func testFileSystemMonitoring() async throws {
+        // Given: Monitor with test paths
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        let paths = MockData.Backup.validSourcePaths
+        
+        // When: Starting monitoring
+        try await monitor.startMonitoring(paths: paths)
+        
+        // Then: Monitoring is active
+        #expect(context.fsEventStream.isStarted)
+        #expect(monitor.isMonitoring)
+        #expect(!monitor.showError)
+        #expect(monitor.monitoredPaths == Set(paths))
+    }
+    
+    @Test("Handle monitoring errors", tags: ["monitor", "error"])
+    func testMonitoringErrors() async throws {
+        // Given: Monitor with failing stream
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        context.fsEventStream.shouldFail = true
+        context.fsEventStream.error = MockData.Error.monitoringError
+        
+        // When: Starting monitoring
+        try await monitor.startMonitoring(paths: MockData.Backup.validSourcePaths)
+        
+        // Then: Error is handled properly
+        #expect(!context.fsEventStream.isStarted)
+        #expect(!monitor.isMonitoring)
+        #expect(monitor.showError)
+        #expect(monitor.error as? MockData.Error == MockData.Error.monitoringError)
+    }
+    
+    @Test("Filter file system events", tags: ["monitor", "filter"])
+    func testEventFiltering() async throws {
+        // Given: Monitor with test paths
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        let paths = MockData.Backup.validSourcePaths
+        let events = MockData.FSEvent.validEvents
+        
+        try await monitor.startMonitoring(paths: paths)
+        
+        // When: Processing events
+        monitor.processEvents(events)
+        
+        // Then: Events are filtered correctly
+        #expect(context.notificationCenter.postNotificationCalled)
+        #expect(monitor.lastEventTime == context.dateProvider.now)
+        #expect(!monitor.showError)
+    }
+    
+    @Test("Handle path changes", tags: ["monitor", "paths"])
+    func testPathChanges() async throws {
+        // Given: Monitor with initial paths
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        let initialPaths = MockData.Backup.validSourcePaths
+        let newPaths = MockData.Backup.updatedSourcePaths
+        
+        try await monitor.startMonitoring(paths: initialPaths)
+        
+        // When: Updating monitored paths
+        try await monitor.updatePaths(newPaths)
+        
+        // Then: Paths are updated correctly
+        #expect(monitor.monitoredPaths == Set(newPaths))
+        #expect(context.fsEventStream.isRestarted)
+        #expect(!monitor.showError)
+    }
+    
+    @Test("Stop monitoring", tags: ["monitor", "stop"])
+    func testStopMonitoring() async throws {
+        // Given: Active monitor
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        try await monitor.startMonitoring(paths: MockData.Backup.validSourcePaths)
+        
+        // When: Stopping monitoring
+        await monitor.stopMonitoring()
+        
+        // Then: Monitoring is stopped
+        #expect(!context.fsEventStream.isStarted)
+        #expect(!monitor.isMonitoring)
+        #expect(monitor.monitoredPaths.isEmpty)
+        #expect(!monitor.showError)
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test monitor performance", tags: ["performance", "monitor"])
+    func testPerformance() throws {
+        // Given: Monitor
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        
+        // Test bulk path addition
+        let startTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            try monitor.addPath("/test/path/\(i)")
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test event processing performance
+        try monitor.start()
+        
+        let eventStartTime = context.dateProvider.now()
+        for _ in 0..<100 {
+            context.fsEventStream.simulateEvents(for: "/test/path/0")
+        }
+        let eventEndTime = context.dateProvider.now()
+        
+        let eventInterval = eventEndTime.timeIntervalSince(eventStartTime)
+        #expect(eventInterval < 0.1) // Event processing should be fast
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle monitor edge cases", tags: ["edge", "monitor"])
+    func testEdgeCases() throws {
+        // Given: Monitor
+        let context = TestContext()
+        let monitor = context.createMonitor()
+        
+        // Test invalid paths
+        do {
+            try monitor.addPath("")
+            throw TestFailure("Expected error for empty path")
+        } catch {
+            // Expected error
+        }
+        
+        do {
+            try monitor.addPath("relative/path")
+            throw TestFailure("Expected error for relative path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test duplicate paths
+        let path = MockData.Path.validPaths[0]
+        try monitor.addPath(path)
+        do {
+            try monitor.addPath(path)
+            throw TestFailure("Expected error for duplicate path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test starting without paths
+        do {
+            try monitor.start()
+            throw TestFailure("Expected error when starting without paths")
+        } catch {
+            // Expected error
+        }
+        
+        // Test stopping when not started
+        monitor.stop()
         #expect(!monitor.isActive)
     }
     
-    // MARK: - Check Interval Tests
+    // MARK: - Persistence Tests
     
-    @Test("Handle check interval updates", tags: ["model", "interval"])
-    func testCheckInterval() throws {
-        let testCases: [(TimeInterval, Bool)] = [
-            (60, true),      // 1 minute
-            (300, true),     // 5 minutes
-            (3600, true),    // 1 hour
-            (86400, true),   // 1 day
-            (0, false),      // Invalid: 0 seconds
-            (-1, false),     // Invalid: negative
-            (30, false)      // Invalid: too short
-        ]
+    @Test("Test monitor persistence", tags: ["persistence", "monitor"])
+    func testPersistence() throws {
+        // Given: Monitor with configuration
+        let context = TestContext()
+        let monitor = context.createMonitor()
         
-        for (interval, isValid) in testCases {
-            var monitor = BackupMonitor(
-                id: UUID(),
-                repositoryId: UUID()
-            )
-            
-            if isValid {
-                monitor.checkInterval = interval
-                #expect(monitor.checkInterval == interval)
-            } else {
-                let originalInterval = monitor.checkInterval
-                monitor.checkInterval = interval
-                #expect(monitor.checkInterval == originalInterval)
-            }
+        let paths = MockData.Path.validPaths
+        let excludedPaths = MockData.Path.excludedPaths
+        
+        for path in paths {
+            try monitor.addPath(path)
         }
-    }
-    
-    // MARK: - Filter Tests
-    
-    @Test("Handle backup filters", tags: ["model", "filters"])
-    func testFilters() throws {
-        // Given
-        var monitor = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID()
-        )
-        
-        let filters = [
-            BackupFilter(pattern: "*.tmp", type: .exclude),
-            BackupFilter(pattern: "*.log", type: .exclude),
-            BackupFilter(pattern: "*.dat", type: .include)
-        ]
-        
-        // Test adding filters
-        for filter in filters {
-            monitor.addFilter(filter)
-        }
-        #expect(monitor.filters.count == filters.count)
-        
-        // Test removing filters
-        monitor.removeFilter(filters[0])
-        #expect(monitor.filters.count == filters.count - 1)
-        #expect(!monitor.filters.contains(filters[0]))
-        
-        // Test clearing filters
-        monitor.clearFilters()
-        #expect(monitor.filters.isEmpty)
-    }
-    
-    // MARK: - Check Tests
-    
-    @Test("Handle backup checks", tags: ["model", "check"])
-    func testBackupChecks() throws {
-        // Given
-        var monitor = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID(),
-            isActive: true,
-            checkInterval: 60
-        )
-        
-        // Test initial check
-        let initialCheck = monitor.shouldCheck()
-        #expect(initialCheck)
-        
-        // Test after recent check
-        monitor.lastCheckTime = Date()
-        let immediateCheck = monitor.shouldCheck()
-        #expect(!immediateCheck)
-        
-        // Test after interval
-        monitor.lastCheckTime = Date(timeIntervalSinceNow: -120)
-        let intervalCheck = monitor.shouldCheck()
-        #expect(intervalCheck)
-    }
-    
-    // MARK: - Event Tests
-    
-    @Test("Handle monitor events", tags: ["model", "events"])
-    func testEvents() throws {
-        // Given
-        var monitor = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID(),
-            isActive: true
-        )
-        
-        // Test file change event
-        let fileEvent = BackupMonitorEvent(
-            type: .fileChanged,
-            path: "/test/file.txt",
-            timestamp: Date()
-        )
-        monitor.handleEvent(fileEvent)
-        #expect(monitor.lastEventTime == fileEvent.timestamp)
-        
-        // Test directory change event
-        let dirEvent = BackupMonitorEvent(
-            type: .directoryChanged,
-            path: "/test/dir",
-            timestamp: Date()
-        )
-        monitor.handleEvent(dirEvent)
-        #expect(monitor.lastEventTime == dirEvent.timestamp)
-    }
-    
-    // MARK: - Statistics Tests
-    
-    @Test("Track monitoring statistics", tags: ["model", "statistics"])
-    func testStatistics() throws {
-        // Given
-        var monitor = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID(),
-            isActive: true
-        )
-        
-        // Test event counting
-        for _ in 0..<5 {
-            monitor.handleEvent(BackupMonitorEvent(
-                type: .fileChanged,
-                path: "/test/file.txt",
-                timestamp: Date()
-            ))
+        for path in excludedPaths {
+            try monitor.addExcludedPath(path)
         }
         
-        #expect(monitor.statistics.totalEvents == 5)
-        #expect(monitor.statistics.lastEventTime != nil)
-        #expect(monitor.statistics.averageEventsPerHour > 0)
+        // When: Saving configuration
+        try monitor.save()
+        
+        // Then: Configuration is persisted
+        let loadedMonitor = context.createMonitor()
+        try loadedMonitor.load()
+        
+        #expect(loadedMonitor.watchedPaths == monitor.watchedPaths)
+        #expect(loadedMonitor.excludedPaths == monitor.excludedPaths)
     }
+}
+
+// MARK: - Mock FSEventStream
+
+/// Mock implementation of FSEventStream for testing
+final class MockFSEventStream: FSEventStreamProtocol {
+    private(set) var isStarted: Bool = false
+    private var eventHandler: ((String) -> Void)?
+    private(set) var isRestarted: Bool = false
+    var shouldFail: Bool = false
+    var error: Error?
     
-    // MARK: - Comparison Tests
-    
-    @Test("Compare monitors for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let monitor1 = BackupMonitor(
-            id: UUID(),
-            repositoryId: UUID(),
-            isActive: true,
-            checkInterval: 300
-        )
-        
-        let monitor2 = BackupMonitor(
-            id: monitor1.id,
-            repositoryId: monitor1.repositoryId,
-            isActive: true,
-            checkInterval: 300
-        )
-        
-        let monitor3 = BackupMonitor(
-            id: UUID(),
-            repositoryId: monitor1.repositoryId,
-            isActive: true,
-            checkInterval: 300
-        )
-        
-        #expect(monitor1 == monitor2)
-        #expect(monitor1 != monitor3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup monitor", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic monitor
-            BackupMonitor(
-                id: UUID(),
-                repositoryId: UUID()
-            ),
-            // Active monitor with filters
-            BackupMonitor(
-                id: UUID(),
-                repositoryId: UUID(),
-                isActive: true,
-                lastCheckTime: Date(),
-                checkInterval: 300,
-                filters: [
-                    BackupFilter(pattern: "*.tmp", type: .exclude)
-                ]
-            )
-        ]
-        
-        for monitor in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(monitor)
-            let decoded = try decoder.decode(BackupMonitor.self, from: data)
-            
-            // Then
-            #expect(decoded.id == monitor.id)
-            #expect(decoded.repositoryId == monitor.repositoryId)
-            #expect(decoded.isActive == monitor.isActive)
-            #expect(decoded.lastCheckTime == monitor.lastCheckTime)
-            #expect(decoded.checkInterval == monitor.checkInterval)
-            #expect(decoded.filters == monitor.filters)
+    func start(paths: [String], handler: @escaping (String) -> Void) throws {
+        if shouldFail {
+            throw error!
         }
+        isStarted = true
+        eventHandler = handler
     }
     
-    // MARK: - Validation Tests
+    func stop() {
+        isStarted = false
+        eventHandler = nil
+    }
     
-    @Test("Validate backup monitor properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid monitor
-            (UUID(), UUID(), 300, true),
-            // Invalid check interval
-            (UUID(), UUID(), 0, false),
-            // Invalid check interval
-            (UUID(), UUID(), -1, false),
-            // Invalid check interval (too short)
-            (UUID(), UUID(), 30, false)
-        ]
-        
-        for (id, repoId, interval, isValid) in testCases {
-            let monitor = BackupMonitor(
-                id: id,
-                repositoryId: repoId,
-                checkInterval: interval
-            )
-            
-            if isValid {
-                #expect(monitor.isValid)
-            } else {
-                #expect(!monitor.isValid)
-            }
-        }
+    func restart() {
+        isRestarted = true
+    }
+    
+    func simulateEvents(for path: String) {
+        eventHandler?(path)
+    }
+    
+    func reset() {
+        isStarted = false
+        eventHandler = nil
+        isRestarted = false
+        shouldFail = false
+        error = nil
     }
 }

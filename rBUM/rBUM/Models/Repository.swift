@@ -7,22 +7,23 @@
 
 import Foundation
 
+/// Represents a Restic backup repository
 struct Repository: Identifiable, Codable, Hashable {
     let id: UUID
-    var name: String
-    var path: URL
-    var lastBackup: Date?
-    var backupCount: Int
-    var totalSize: Int64
-    var createdAt: Date
-    var modifiedAt: Date
+    var name: String        // Repository display name
+    var path: URL          // Local path to repository
+    var lastBackup: Date?  // Most recent backup date
+    var backupCount: Int   // Number of backups
+    var totalSize: Int64   // Total size in bytes
+    var createdAt: Date    // Creation timestamp
+    var modifiedAt: Date   // Last modified timestamp
     
-    /// The keychain service name for this repository
+    /// Keychain service name for repository credentials
     var keychainService: String {
         "dev.mpy.rBUM.repository.\(id.uuidString)"
     }
     
-    /// The keychain account name for this repository
+    /// Keychain account name for repository credentials
     var keychainAccount: String {
         path.path
     }

@@ -69,68 +69,25 @@ enum ResticError: LocalizedError, Equatable {
     }
 }
 
-/// Protocol for interacting with the Restic command-line tool
+/// Handles Restic command execution and error handling
 protocol ResticCommandServiceProtocol {
-    /// Initialize a new repository at the given path
-    /// - Parameters:
-    ///   - path: Path where the repository should be created
-    ///   - password: Password to encrypt the repository
+    /// Initialize a new repository
     func initializeRepository(at path: URL, password: String) async throws
     
-    /// Check if a repository is valid and accessible
-    /// - Parameters:
-    ///   - path: Path to the repository
-    ///   - credentials: Credentials for accessing the repository
-    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws
+    /// List all snapshots in a repository
+    func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot]
     
-    /// Create a backup of specified paths
-    /// - Parameters:
-    ///   - paths: Paths to backup
-    ///   - repository: Repository to store the backup
-    ///   - credentials: Credentials for accessing the repository
-    ///   - tags: Optional tags to apply to the backup
-    ///   - onProgress: Optional callback for progress updates
-    ///   - onStatusChange: Optional callback for status changes
-    func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        credentials: RepositoryCredentials,
-        tags: [String]?,
-        onProgress: ((BackupProgress) -> Void)?,
-        onStatusChange: ((BackupStatus) -> Void)?
-    ) async throws
-    
-    /// List snapshots in a repository
-    /// - Parameters:
-    ///   - repository: Repository to list snapshots from
-    ///   - credentials: Credentials for accessing the repository
-    /// - Returns: Array of snapshots
-    func listSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials
-    ) async throws -> [Snapshot]
+    /// Create a new backup
+    func createBackup(paths: [URL], to repository: Repository, credentials: RepositoryCredentials, tags: [String]?, onProgress: ((BackupProgress) -> Void)?, onStatusChange: ((BackupStatus) -> Void)?) async throws
     
     /// Prune old snapshots from a repository
-    /// - Parameters:
-    ///   - repository: Repository to prune
-    ///   - credentials: Credentials for accessing the repository
-    ///   - keepLast: Number of most recent snapshots to keep
-    ///   - keepDaily: Number of daily snapshots to keep
-    ///   - keepWeekly: Number of weekly snapshots to keep
-    ///   - keepMonthly: Number of monthly snapshots to keep
-    ///   - keepYearly: Number of yearly snapshots to keep
-    func pruneSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
-    ) async throws
+    func pruneSnapshots(in repository: Repository, credentials: RepositoryCredentials, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws
+    
+    /// Check repository integrity and return its status
+    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus
 }
 
-/// Service for interacting with the Restic command-line tool
+/// Restic command execution service
 final class ResticCommandService: ResticCommandServiceProtocol {
     private let fileManager = FileManager.default
     private let resticPath: String
@@ -213,9 +170,15 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         try await executeCommand(arguments, credentials: credentials)
     }
     
-    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {
-        let arguments = ["check"]
-        try await executeCommand(arguments, credentials: credentials)
+    func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot] {
+        let arguments = ["snapshots", "--json"]
+        
+        let output = try await executeCommand(arguments, credentials: credentials)
+        
+        return try JSONDecoder().decode([Snapshot].self, from: Data(output.utf8))
     }
     
     func createBackup(
@@ -276,17 +239,6 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         }
     }
     
-    func listSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials
-    ) async throws -> [Snapshot] {
-        let arguments = ["snapshots", "--json"]
-        
-        let output = try await executeCommand(arguments, credentials: credentials)
-        
-        return try JSONDecoder().decode([Snapshot].self, from: Data(output.utf8))
-    }
-    
     func pruneSnapshots(
         in repository: Repository,
         credentials: RepositoryCredentials,
@@ -324,5 +276,38 @@ final class ResticCommandService: ResticCommandServiceProtocol {
         }
         
         try await executeCommand(arguments, credentials: credentials)
+    }
+    
+    /// Check repository integrity and return its status
+    /// - Parameters:
+    ///   - repository: URL of the repository to check
+    ///   - password: Repository password
+    /// - Returns: Repository status including integrity check results
+    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
+        let arguments = [
+            "check",
+            "--json",
+            "--repository", repository.path,
+            "--password", password
+        ]
+        
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),  // Generate new UUID since this is a one-time check
+            password: password,
+            repositoryPath: repository.path
+        )
+        
+        let output = try await executeCommand(arguments, credentials: credentials)
+        guard let outputData = output.data(using: String.Encoding.utf8) else {
+            throw ResticError.commandError("Invalid output format")
+        }
+        
+        let decoder = JSONDecoder()
+        do {
+            let status = try decoder.decode(RepositoryStatus.self, from: outputData)
+            return status
+        } catch {
+            throw ResticError.commandError("Failed to parse repository status: \(error.localizedDescription)")
+        }
     }
 }

@@ -6,473 +6,298 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupConfiguration functionality
 struct BackupConfigurationTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup configuration with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Backup"
-        let sourcePath = URL(fileURLWithPath: "/test/source")
-        let repositoryId = UUID()
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let fileManager: MockFileManager
+        let notificationCenter: MockNotificationCenter
         
-        // When
-        let config = BackupConfiguration(
-            id: id,
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId
-        )
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.fileManager = MockFileManager()
+            self.notificationCenter = MockNotificationCenter()
+        }
         
-        // Then
-        #expect(config.id == id)
-        #expect(config.name == name)
-        #expect(config.sourcePath == sourcePath)
-        #expect(config.repositoryId == repositoryId)
-        #expect(config.excludePatterns.isEmpty)
-        #expect(config.schedule == nil)
-        #expect(config.createdAt.timeIntervalSinceNow <= 0)
-        #expect(config.modifiedAt.timeIntervalSinceNow <= 0)
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            fileManager.reset()
+            notificationCenter.reset()
+        }
+        
+        /// Create test configuration
+        func createConfiguration(
+            id: String = MockData.Configuration.validId,
+            name: String = MockData.Configuration.validName,
+            sourcePaths: [String] = MockData.Configuration.validSourcePaths,
+            excludePatterns: [String] = MockData.Configuration.validExcludePatterns,
+            includePatterns: [String] = MockData.Configuration.validIncludePatterns,
+            schedule: BackupSchedule = MockData.Schedule.validSchedule,
+            repository: Repository = MockData.Repository.validRepository,
+            isEnabled: Bool = true
+        ) -> BackupConfiguration {
+            BackupConfiguration(
+                id: id,
+                name: name,
+                sourcePaths: sourcePaths,
+                excludePatterns: excludePatterns,
+                includePatterns: includePatterns,
+                schedule: schedule,
+                repository: repository,
+                isEnabled: isEnabled
+            )
+        }
     }
     
-    @Test("Initialize backup configuration with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Backup"
-        let sourcePath = URL(fileURLWithPath: "/test/source")
-        let repositoryId = UUID()
-        let excludePatterns = ["*.log", "tmp/*"]
-        let schedule = BackupSchedule(interval: .daily, time: Date())
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize with default values", tags: ["init", "configuration"])
+    func testDefaultInitialization() throws {
+        // Given: Default configuration parameters
+        let context = TestContext()
         
-        // When
-        let config = BackupConfiguration(
-            id: id,
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId,
-            excludePatterns: excludePatterns,
-            schedule: schedule
-        )
+        // When: Creating configuration
+        let config = context.createConfiguration()
         
-        // Then
-        #expect(config.id == id)
-        #expect(config.name == name)
-        #expect(config.sourcePath == sourcePath)
-        #expect(config.repositoryId == repositoryId)
-        #expect(config.excludePatterns == excludePatterns)
-        #expect(config.schedule == schedule)
+        // Then: Configuration is configured correctly
+        #expect(config.id == MockData.Configuration.validId)
+        #expect(config.name == MockData.Configuration.validName)
+        #expect(config.sourcePaths == MockData.Configuration.validSourcePaths)
+        #expect(config.excludePatterns == MockData.Configuration.validExcludePatterns)
+        #expect(config.includePatterns == MockData.Configuration.validIncludePatterns)
+        #expect(config.schedule == MockData.Schedule.validSchedule)
+        #expect(config.repository == MockData.Repository.validRepository)
+        #expect(config.isEnabled)
     }
     
-    // MARK: - Comparison Tests
-    
-    @Test("Compare configurations for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Backup"
-        let sourcePath = URL(fileURLWithPath: "/test/source")
-        let repositoryId = UUID()
-        let excludePatterns = ["*.log"]
-        let schedule = BackupSchedule(interval: .daily, time: Date())
+    @Test("Initialize with custom values", tags: ["init", "configuration"])
+    func testCustomInitialization() throws {
+        // Given: Custom configuration parameters
+        let context = TestContext()
+        let customId = "custom-id"
+        let customName = "Custom Backup"
+        let customSourcePaths = ["/custom/path1", "/custom/path2"]
+        let customExcludePatterns = ["*.tmp", "*.log"]
+        let customIncludePatterns = ["*.doc", "*.pdf"]
+        let customSchedule = MockData.Schedule.customSchedule
+        let customRepository = MockData.Repository.customRepository
         
-        let config1 = BackupConfiguration(
-            id: id,
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId,
-            excludePatterns: excludePatterns,
-            schedule: schedule
+        // When: Creating configuration
+        let config = context.createConfiguration(
+            id: customId,
+            name: customName,
+            sourcePaths: customSourcePaths,
+            excludePatterns: customExcludePatterns,
+            includePatterns: customIncludePatterns,
+            schedule: customSchedule,
+            repository: customRepository,
+            isEnabled: false
         )
         
-        let config2 = BackupConfiguration(
-            id: id,
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId,
-            excludePatterns: excludePatterns,
-            schedule: schedule
-        )
-        
-        let config3 = BackupConfiguration(
-            id: UUID(),
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId,
-            excludePatterns: excludePatterns,
-            schedule: schedule
-        )
-        
-        // Then
-        #expect(config1 == config2)
-        #expect(config1 != config3)
+        // Then: Configuration is configured correctly
+        #expect(config.id == customId)
+        #expect(config.name == customName)
+        #expect(config.sourcePaths == customSourcePaths)
+        #expect(config.excludePatterns == customExcludePatterns)
+        #expect(config.includePatterns == customIncludePatterns)
+        #expect(config.schedule == customSchedule)
+        #expect(config.repository == customRepository)
+        #expect(!config.isEnabled)
     }
     
-    // MARK: - Serialization Tests
+    // MARK: - Persistence Tests
     
-    @Test("Encode and decode configuration", tags: ["model", "serialization"])
-    func testCodable() throws {
-        // Given
-        let id = UUID()
-        let name = "Test Backup"
-        let sourcePath = URL(fileURLWithPath: "/test/source")
-        let repositoryId = UUID()
-        let excludePatterns = ["*.log", "tmp/*"]
-        let schedule = BackupSchedule(interval: .daily, time: Date())
-        
-        let config = BackupConfiguration(
-            id: id,
-            name: name,
-            sourcePath: sourcePath,
-            repositoryId: repositoryId,
-            excludePatterns: excludePatterns,
-            schedule: schedule
+    @Test("Save and load configuration", tags: ["persistence", "configuration"])
+    func testPersistence() throws {
+        // Given: Configuration with custom values
+        let context = TestContext()
+        let config = context.createConfiguration(
+            id: "test-id",
+            name: "Test Backup",
+            sourcePaths: ["/test/path1", "/test/path2"],
+            excludePatterns: ["*.tmp"],
+            includePatterns: ["*.doc"],
+            isEnabled: false
         )
         
-        // When
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(config)
-        let decoded = try decoder.decode(BackupConfiguration.self, from: data)
+        // When: Saving and loading configuration
+        config.save(to: context.userDefaults)
+        let loaded = BackupConfiguration.load(from: context.userDefaults, withId: config.id)
         
-        // Then
-        #expect(decoded.id == config.id)
-        #expect(decoded.name == config.name)
-        #expect(decoded.sourcePath == config.sourcePath)
-        #expect(decoded.repositoryId == config.repositoryId)
-        #expect(decoded.excludePatterns == config.excludePatterns)
-        #expect(decoded.schedule == config.schedule)
+        // Then: Loaded configuration matches original
+        #expect(loaded?.id == config.id)
+        #expect(loaded?.name == config.name)
+        #expect(loaded?.sourcePaths == config.sourcePaths)
+        #expect(loaded?.excludePatterns == config.excludePatterns)
+        #expect(loaded?.includePatterns == config.includePatterns)
+        #expect(loaded?.schedule == config.schedule)
+        #expect(loaded?.repository == config.repository)
+        #expect(loaded?.isEnabled == config.isEnabled)
     }
     
     // MARK: - Validation Tests
     
-    @Test("Validate source paths", tags: ["model", "validation"])
-    func testSourcePathValidation() throws {
-        let invalidPaths = [
-            "", // Empty path
-            "relative/path", // Relative path
-            "/path/with/null/\0/character", // Path with null character
-            "/path/with/newline\n/character", // Path with newline
-            String(repeating: "a", count: 4096) // Extremely long path
+    @Test("Validate configuration", tags: ["validation", "configuration"])
+    func testValidation() throws {
+        // Given: Configurations with various validation scenarios
+        let context = TestContext()
+        let testCases: [(BackupConfiguration, Bool)] = [
+            // Valid configuration
+            (context.createConfiguration(), true),
+            
+            // Invalid - empty name
+            (context.createConfiguration(name: ""), false),
+            
+            // Invalid - empty source paths
+            (context.createConfiguration(sourcePaths: []), false),
+            
+            // Invalid - empty repository
+            (context.createConfiguration(repository: MockData.Repository.invalidRepository), false),
+            
+            // Invalid - invalid schedule
+            (context.createConfiguration(schedule: MockData.Schedule.invalidSchedule), false)
         ]
         
-        for path in invalidPaths {
-            // Attempt to create configuration with invalid path
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: "Test",
-                sourcePath: URL(fileURLWithPath: path),
-                repositoryId: UUID()
-            )
-            
-            // Verify path is normalized
-            let normalizedPath = config.sourcePath.path
-            #expect(!normalizedPath.contains("\0"))
-            #expect(!normalizedPath.contains("\n"))
-            #expect(normalizedPath.count <= 1024)
-            #expect(normalizedPath.hasPrefix("/"))
+        // When/Then: Test validation
+        for (config, isValid) in testCases {
+            #expect(config.isValid() == isValid)
         }
     }
     
-    @Test("Validate exclude patterns", tags: ["model", "validation"])
-    func testExcludePatternValidation() throws {
-        let testCases = [
-            // Basic patterns
-            ["*.log", "tmp/*", ".DS_Store"],
-            ["node_modules/", "*.tmp", "*.bak"],
-            // Empty patterns
-            [""],
-            // Patterns with spaces
-            ["file with spaces.txt", "folder with spaces/*"],
-            // Special characters
-            ["test!@#$%^&*()_+.txt", "[abc].txt", "{test}.log"],
-            // Very long patterns
-            [String(repeating: "a", count: 1000)],
-            // Multiple patterns with mixed formats
-            ["*.log", "test[0-9].txt", "backup{1,2,3}.dat", "**/*.tmp"]
+    // MARK: - Source Path Tests
+    
+    @Test("Handle source paths", tags: ["paths", "configuration"])
+    func testSourcePaths() throws {
+        // Given: Configuration with source paths
+        let context = TestContext()
+        let testCases: [(BackupConfiguration, String, Bool)] = [
+            // Valid paths
+            (context.createConfiguration(sourcePaths: ["/test/path1"]), "/test/path1", true),
+            (context.createConfiguration(sourcePaths: ["/test/path1", "/test/path2"]), "/test/path2", true),
+            
+            // Invalid paths
+            (context.createConfiguration(sourcePaths: ["/test/path1"]), "/test/path2", false),
+            (context.createConfiguration(sourcePaths: []), "/test/path1", false)
         ]
         
-        for patterns in testCases {
-            // Create configuration with test patterns
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: "Test",
-                sourcePath: URL(fileURLWithPath: "/test"),
-                repositoryId: UUID(),
-                excludePatterns: patterns
-            )
-            
-            // Verify patterns are preserved
-            #expect(config.excludePatterns == patterns)
+        // When/Then: Test source path handling
+        for (config, path, contains) in testCases {
+            #expect(config.containsSourcePath(path) == contains)
         }
-    }
-    
-    // MARK: - Schedule Tests
-    
-    @Test("Handle backup schedules", tags: ["model", "schedule"])
-    func testScheduleHandling() throws {
-        let testCases = [
-            // Daily schedule
-            BackupSchedule(interval: .daily, time: Date()),
-            // Weekly schedule
-            BackupSchedule(interval: .weekly, time: Date()),
-            // Monthly schedule
-            BackupSchedule(interval: .monthly, time: Date()),
-            // Custom interval schedule
-            BackupSchedule(interval: .custom(hours: 12), time: Date())
-        ]
-        
-        for schedule in testCases {
-            // Create configuration with schedule
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: "Test",
-                sourcePath: URL(fileURLWithPath: "/test"),
-                repositoryId: UUID(),
-                schedule: schedule
-            )
-            
-            // Verify schedule is preserved
-            #expect(config.schedule == schedule)
-            
-            // Test serialization of schedule
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(config)
-            let decoded = try decoder.decode(BackupConfiguration.self, from: data)
-            
-            #expect(decoded.schedule == schedule)
-        }
-    }
-    
-    @Test("Handle timestamp behavior", tags: ["model", "timestamp"])
-    func testTimestampBehavior() throws {
-        // Given initial configuration
-        let config = BackupConfiguration(
-            id: UUID(),
-            name: "Test",
-            sourcePath: URL(fileURLWithPath: "/test"),
-            repositoryId: UUID()
-        )
-        
-        // Initial timestamps should be close to now
-        let now = Date()
-        #expect(abs(config.createdAt.timeIntervalSince(now)) < 1.0)
-        #expect(abs(config.modifiedAt.timeIntervalSince(now)) < 1.0)
-        #expect(config.createdAt == config.modifiedAt)
-        
-        // Sleep to ensure time difference
-        Thread.sleep(forTimeInterval: 0.1)
-        
-        // When updating
-        var updated = config
-        updated.name = "Updated Test"
-        
-        // Then timestamps should reflect the change
-        #expect(updated.createdAt == config.createdAt)
-        #expect(updated.modifiedAt > config.modifiedAt)
-        #expect(updated.modifiedAt > updated.createdAt)
     }
     
     // MARK: - Pattern Tests
     
-    @Test("Handle exclude pattern validation", tags: ["model", "patterns"])
-    func testExcludePatterns() throws {
-        let testCases = [
-            // Valid patterns
-            ["*.log", "tmp/*", ".DS_Store"],
-            ["node_modules/", "*.tmp", "*.bak"],
-            // Empty patterns
-            [],
-            // Invalid patterns
-            [""], // Empty pattern
-            [" "], // Whitespace only
-            [String(repeating: "*", count: 1000)] // Too long
-        ]
-        
-        for patterns in testCases {
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: "Test",
-                sourcePath: URL(fileURLWithPath: "/test"),
-                repositoryId: UUID(),
-                excludePatterns: patterns
-            )
-            
-            let isValid = patterns.allSatisfy { pattern in
-                !pattern.isEmpty &&
-                pattern.trimmingCharacters(in: .whitespaces) == pattern &&
-                pattern.count <= 100
-            }
-            
-            if isValid {
-                #expect(config.isValid)
-                #expect(config.excludePatterns == patterns)
-            } else {
-                #expect(!config.isValid)
-            }
-        }
-    }
-    
-    // MARK: - Name Tests
-    
-    @Test("Handle configuration name validation", tags: ["model", "name"])
-    func testNameValidation() throws {
-        let testCases = [
-            // Valid names
-            "Daily Backup",
-            "System Files",
-            "Photos - 2024",
-            // Invalid names
-            "",
-            " ",
-            String(repeating: "a", count: 1000)
-        ]
-        
-        for name in testCases {
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: name,
-                sourcePath: URL(fileURLWithPath: "/test"),
-                repositoryId: UUID()
-            )
-            
-            let isValid = !name.isEmpty &&
-                         name.trimmingCharacters(in: .whitespaces) == name &&
-                         name.count <= 100
-            
-            if isValid {
-                #expect(config.isValid)
-                #expect(config.name == name)
-            } else {
-                #expect(!config.isValid)
-            }
-        }
-    }
-    
-    // MARK: - Schedule Tests
-    
-    @Test("Handle schedule updates", tags: ["model", "schedule"])
-    func testScheduleUpdates() throws {
-        // Given
-        var config = BackupConfiguration(
-            id: UUID(),
-            name: "Test",
-            sourcePath: URL(fileURLWithPath: "/test"),
-            repositoryId: UUID()
+    @Test("Handle patterns", tags: ["patterns", "configuration"])
+    func testPatterns() throws {
+        // Given: Configuration with patterns
+        let context = TestContext()
+        let config = context.createConfiguration(
+            excludePatterns: ["*.tmp", "*.log"],
+            includePatterns: ["*.doc", "*.pdf"]
         )
         
-        let testCases = [
-            // Daily schedule
-            BackupSchedule(interval: .daily, time: Date()),
-            // Weekly schedule
-            BackupSchedule(
-                interval: .weekly,
-                time: Date(),
-                weeklyDays: [.monday, .wednesday, .friday]
-            ),
-            // Monthly schedule
-            BackupSchedule(
-                interval: .monthly,
-                time: Date(),
-                monthlyDays: [1, 15]
-            ),
-            // Custom schedule
-            BackupSchedule(interval: .custom(hours: 12), time: Date()),
-            // No schedule
-            nil
-        ]
+        // Test exclude patterns
+        #expect(config.shouldExclude("test.tmp"))
+        #expect(config.shouldExclude("test.log"))
+        #expect(!config.shouldExclude("test.doc"))
         
-        for schedule in testCases {
-            // When
-            config.schedule = schedule
-            
-            // Then
-            #expect(config.schedule == schedule)
-            if schedule != nil {
-                #expect(config.modifiedAt > config.createdAt)
-            }
-        }
+        // Test include patterns
+        #expect(config.shouldInclude("test.doc"))
+        #expect(config.shouldInclude("test.pdf"))
+        #expect(!config.shouldInclude("test.tmp"))
     }
     
-    // MARK: - Timestamp Tests
+    // MARK: - Edge Cases
     
-    @Test("Handle timestamp updates", tags: ["model", "timestamp"])
-    func testTimestampUpdates() throws {
-        // Given
-        var config = BackupConfiguration(
-            id: UUID(),
-            name: "Test",
-            sourcePath: URL(fileURLWithPath: "/test"),
-            repositoryId: UUID()
+    @Test("Handle edge cases", tags: ["edge", "configuration"])
+    func testEdgeCases() throws {
+        // Given: Edge case scenarios
+        let context = TestContext()
+        
+        // Test nil UserDefaults
+        let nilDefaults = MockUserDefaults()
+        nilDefaults.removeObject(forKey: BackupConfiguration.defaultsKey)
+        let loadedConfig = BackupConfiguration.load(from: nilDefaults, withId: "test-id")
+        #expect(loadedConfig == nil)
+        
+        // Test empty patterns
+        let emptyPatternConfig = context.createConfiguration(
+            excludePatterns: [],
+            includePatterns: []
         )
+        #expect(!emptyPatternConfig.shouldExclude("test.file"))
+        #expect(emptyPatternConfig.shouldInclude("test.file"))
         
-        let originalCreatedAt = config.createdAt
-        let originalModifiedAt = config.modifiedAt
-        
-        // Test property updates
-        let testUpdates = [
-            { config.name = "Updated Name" },
-            { config.sourcePath = URL(fileURLWithPath: "/updated") },
-            { config.excludePatterns = ["*.new"] },
-            { config.schedule = BackupSchedule(interval: .daily, time: Date()) }
-        ]
-        
-        for update in testUpdates {
-            // When
-            update()
-            
-            // Then
-            #expect(config.createdAt == originalCreatedAt)
-            #expect(config.modifiedAt > originalModifiedAt)
+        // Test duplicate source paths
+        let duplicatePaths = ["/test/path", "/test/path"]
+        let duplicateConfig = context.createConfiguration(sourcePaths: duplicatePaths)
+        #expect(duplicateConfig.sourcePaths.count == 1)
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaults {
+    var storage: [String: Any] = [:]
+    
+    override func set(_ value: Any?, forKey defaultName: String) {
+        if let value = value {
+            storage[defaultName] = value
+        } else {
+            storage.removeValue(forKey: defaultName)
         }
     }
     
-    // MARK: - Description Tests
+    override func object(forKey defaultName: String) -> Any? {
+        storage[defaultName]
+    }
     
-    @Test("Generate human-readable configuration descriptions", tags: ["model", "description"])
-    func testDescriptions() throws {
-        let testCases = [
-            // Basic configuration
-            (
-                BackupConfiguration(
-                    id: UUID(),
-                    name: "Daily Backup",
-                    sourcePath: URL(fileURLWithPath: "/test"),
-                    repositoryId: UUID()
-                ),
-                "Daily Backup (/test)"
-            ),
-            // Configuration with schedule
-            (
-                BackupConfiguration(
-                    id: UUID(),
-                    name: "Weekly Backup",
-                    sourcePath: URL(fileURLWithPath: "/data"),
-                    repositoryId: UUID(),
-                    schedule: BackupSchedule(interval: .weekly, time: Date())
-                ),
-                "Weekly Backup (/data) - Weekly"
-            ),
-            // Configuration with patterns
-            (
-                BackupConfiguration(
-                    id: UUID(),
-                    name: "System Backup",
-                    sourcePath: URL(fileURLWithPath: "/system"),
-                    repositoryId: UUID(),
-                    excludePatterns: ["*.log", "tmp/*"]
-                ),
-                "System Backup (/system) - 2 exclusions"
-            )
-        ]
-        
-        for (config, expectedDescription) in testCases {
-            #expect(config.description == expectedDescription)
-        }
+    override func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
+    }
+    
+    func reset() {
+        storage.removeAll()
+    }
+}
+
+/// Mock implementation of FileManager for testing
+final class MockFileManager: FileManager {
+    var files: [String: Bool] = [:]
+    
+    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
+        files[path] ?? false
+    }
+    
+    func addFile(_ path: String) {
+        files[path] = true
+    }
+    
+    func reset() {
+        files.removeAll()
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
+    
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
+    }
+    
+    func reset() {
+        postCalled = false
+        lastNotification = nil
     }
 }

@@ -6,293 +6,188 @@
 //
 
 import Testing
-import Foundation
-import Network
 @testable import rBUM
 
+/// Tests for BackupNetwork functionality
 struct BackupNetworkTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup network with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
+    /// Test environment with test data
+    struct TestContext {
+        let urlSession: MockURLSession
+        let notificationCenter: MockNotificationCenter
+        let networkMonitor: MockNetworkMonitor
         
-        // When
-        let network = BackupNetwork(id: id)
-        
-        // Then
-        #expect(network.id == id)
-        #expect(network.isActive == false)
-        #expect(network.currentInterface == nil)
-        #expect(network.allowedInterfaces.isEmpty)
-        #expect(network.bandwidthLimit == nil)
-    }
-    
-    @Test("Initialize backup network with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let isActive = true
-        let currentInterface = NetworkInterface(name: "en0", type: .wifi)
-        let allowedInterfaces = [NetworkInterface(name: "en0", type: .wifi)]
-        let bandwidthLimit: UInt64 = 1024 * 1024 // 1 MB/s
-        
-        // When
-        let network = BackupNetwork(
-            id: id,
-            isActive: isActive,
-            currentInterface: currentInterface,
-            allowedInterfaces: allowedInterfaces,
-            bandwidthLimit: bandwidthLimit
-        )
-        
-        // Then
-        #expect(network.id == id)
-        #expect(network.isActive == isActive)
-        #expect(network.currentInterface == currentInterface)
-        #expect(network.allowedInterfaces == allowedInterfaces)
-        #expect(network.bandwidthLimit == bandwidthLimit)
-    }
-    
-    // MARK: - Interface Tests
-    
-    @Test("Handle network interfaces", tags: ["model", "interface"])
-    func testNetworkInterfaces() throws {
-        // Given
-        var network = BackupNetwork(id: UUID())
-        
-        let interfaces = [
-            NetworkInterface(name: "en0", type: .wifi),
-            NetworkInterface(name: "en1", type: .ethernet),
-            NetworkInterface(name: "utun0", type: .vpn)
-        ]
-        
-        // Test adding interfaces
-        for interface in interfaces {
-            network.addAllowedInterface(interface)
-        }
-        #expect(network.allowedInterfaces.count == interfaces.count)
-        
-        // Test removing interfaces
-        network.removeAllowedInterface(interfaces[0])
-        #expect(network.allowedInterfaces.count == interfaces.count - 1)
-        #expect(!network.allowedInterfaces.contains(interfaces[0]))
-        
-        // Test clearing interfaces
-        network.clearAllowedInterfaces()
-        #expect(network.allowedInterfaces.isEmpty)
-    }
-    
-    // MARK: - Connection Tests
-    
-    @Test("Handle network connections", tags: ["model", "connection"])
-    func testNetworkConnections() throws {
-        // Given
-        var network = BackupNetwork(id: UUID())
-        let interface = NetworkInterface(name: "en0", type: .wifi)
-        network.addAllowedInterface(interface)
-        
-        // Test connection establishment
-        network.connect(interface)
-        #expect(network.isActive)
-        #expect(network.currentInterface == interface)
-        
-        // Test connection state
-        #expect(network.isConnected)
-        #expect(network.isAllowedInterface(interface))
-        
-        // Test disconnection
-        network.disconnect()
-        #expect(!network.isActive)
-        #expect(network.currentInterface == nil)
-    }
-    
-    // MARK: - Bandwidth Tests
-    
-    @Test("Handle bandwidth limits", tags: ["model", "bandwidth"])
-    func testBandwidthLimits() throws {
-        let testCases: [(UInt64?, Bool)] = [
-            (nil, true),                    // No limit
-            (1024 * 1024, true),           // 1 MB/s
-            (1024 * 1024 * 10, true),      // 10 MB/s
-            (0, false),                     // Invalid: 0
-            (100, false)                    // Invalid: too low
-        ]
-        
-        for (limit, isValid) in testCases {
-            var network = BackupNetwork(id: UUID())
-            
-            if isValid {
-                network.bandwidthLimit = limit
-                #expect(network.bandwidthLimit == limit)
-            } else {
-                let originalLimit = network.bandwidthLimit
-                network.bandwidthLimit = limit
-                #expect(network.bandwidthLimit == originalLimit)
-            }
-        }
-    }
-    
-    // MARK: - Transfer Tests
-    
-    @Test("Handle data transfers", tags: ["model", "transfer"])
-    func testDataTransfers() throws {
-        // Given
-        var network = BackupNetwork(id: UUID())
-        let interface = NetworkInterface(name: "en0", type: .wifi)
-        network.addAllowedInterface(interface)
-        network.connect(interface)
-        
-        // Test transfer start
-        let transfer = network.startTransfer(size: 1024 * 1024)
-        #expect(transfer != nil)
-        #expect(transfer?.status == .pending)
-        
-        // Test transfer progress
-        network.updateTransfer(transfer!.id, bytesTransferred: 512 * 1024)
-        let updatedTransfer = network.getTransfer(transfer!.id)
-        #expect(updatedTransfer?.progress == 0.5)
-        
-        // Test transfer completion
-        network.completeTransfer(transfer!.id)
-        let completedTransfer = network.getTransfer(transfer!.id)
-        #expect(completedTransfer?.status == .completed)
-    }
-    
-    // MARK: - Error Tests
-    
-    @Test("Handle network errors", tags: ["model", "error"])
-    func testNetworkErrors() throws {
-        // Given
-        var network = BackupNetwork(id: UUID())
-        let interface = NetworkInterface(name: "en0", type: .wifi)
-        
-        // Test connection errors
-        let connectionError = network.connect(interface)
-        #expect(connectionError == .interfaceNotAllowed)
-        
-        // Test transfer errors
-        network.addAllowedInterface(interface)
-        network.connect(interface)
-        
-        let transfer = network.startTransfer(size: 1024 * 1024)
-        network.disconnect()
-        
-        let transferError = network.updateTransfer(transfer!.id, bytesTransferred: 512 * 1024)
-        #expect(transferError == .notConnected)
-    }
-    
-    // MARK: - Statistics Tests
-    
-    @Test("Track network statistics", tags: ["model", "statistics"])
-    func testNetworkStatistics() throws {
-        // Given
-        var network = BackupNetwork(id: UUID())
-        let interface = NetworkInterface(name: "en0", type: .wifi)
-        network.addAllowedInterface(interface)
-        network.connect(interface)
-        
-        // Simulate transfers
-        for size in [1024 * 1024, 2 * 1024 * 1024, 3 * 1024 * 1024] {
-            let transfer = network.startTransfer(size: size)
-            network.completeTransfer(transfer!.id)
+        init() {
+            self.urlSession = MockURLSession()
+            self.notificationCenter = MockNotificationCenter()
+            self.networkMonitor = MockNetworkMonitor()
         }
         
-        // Test statistics
-        let stats = network.statistics
-        #expect(stats.totalBytesTransferred == 6 * 1024 * 1024)
-        #expect(stats.totalTransfers == 3)
-        #expect(stats.averageSpeed > 0)
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare networks for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let network1 = BackupNetwork(
-            id: UUID(),
-            isActive: true,
-            currentInterface: NetworkInterface(name: "en0", type: .wifi)
-        )
+        /// Reset all mocks to initial state
+        func reset() {
+            urlSession.reset()
+            notificationCenter.reset()
+            networkMonitor.reset()
+        }
         
-        let network2 = BackupNetwork(
-            id: network1.id,
-            isActive: true,
-            currentInterface: NetworkInterface(name: "en0", type: .wifi)
-        )
-        
-        let network3 = BackupNetwork(
-            id: UUID(),
-            isActive: true,
-            currentInterface: NetworkInterface(name: "en0", type: .wifi)
-        )
-        
-        #expect(network1 == network2)
-        #expect(network1 != network3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup network", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic network
-            BackupNetwork(id: UUID()),
-            // Active network with interface
+        /// Create test network manager
+        func createNetwork() -> BackupNetwork {
             BackupNetwork(
-                id: UUID(),
-                isActive: true,
-                currentInterface: NetworkInterface(name: "en0", type: .wifi),
-                allowedInterfaces: [NetworkInterface(name: "en0", type: .wifi)],
-                bandwidthLimit: 1024 * 1024
+                urlSession: urlSession,
+                notificationCenter: notificationCenter,
+                networkMonitor: networkMonitor
             )
-        ]
-        
-        for network in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(network)
-            let decoded = try decoder.decode(BackupNetwork.self, from: data)
-            
-            // Then
-            #expect(decoded.id == network.id)
-            #expect(decoded.isActive == network.isActive)
-            #expect(decoded.currentInterface == network.currentInterface)
-            #expect(decoded.allowedInterfaces == network.allowedInterfaces)
-            #expect(decoded.bandwidthLimit == network.bandwidthLimit)
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Network Tests
     
-    @Test("Validate backup network properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid network
-            (UUID(), true, 1024 * 1024, true),
-            // Invalid bandwidth limit
-            (UUID(), true, 0, false),
-            // Invalid state (active without interface)
-            (UUID(), true, nil, false)
-        ]
+    @Test("Test network connectivity", tags: ["network", "connectivity"])
+    func testNetworkConnectivity() async throws {
+        // Given: Network manager with mock monitor
+        let context = TestContext()
+        let network = context.createNetwork()
         
-        for (id, active, bandwidth, isValid) in testCases {
-            var network = BackupNetwork(id: id)
-            network.isActive = active
-            network.bandwidthLimit = bandwidth
-            
-            if active {
-                network.addAllowedInterface(NetworkInterface(name: "en0", type: .wifi))
-                network.connect(NetworkInterface(name: "en0", type: .wifi))
-            }
-            
-            if isValid {
-                #expect(network.isValid)
-            } else {
-                #expect(!network.isValid)
-            }
+        // When: Network becomes available
+        context.networkMonitor.setNetworkStatus(true)
+        
+        // Then: Network status is updated
+        #expect(network.isNetworkAvailable)
+        #expect(context.notificationCenter.postNotificationCalled)
+        #expect(!network.showError)
+        
+        // When: Network becomes unavailable
+        context.networkMonitor.setNetworkStatus(false)
+        
+        // Then: Network status is updated
+        #expect(!network.isNetworkAvailable)
+        #expect(context.notificationCenter.postNotificationCalled)
+        #expect(!network.showError)
+    }
+    
+    @Test("Test network requests", tags: ["network", "request"])
+    func testNetworkRequests() async throws {
+        // Given: Network manager with mock session
+        let context = TestContext()
+        let network = context.createNetwork()
+        let request = MockData.Network.validRequest
+        
+        context.networkMonitor.setNetworkStatus(true)
+        context.urlSession.mockResponse = MockData.Network.validResponse
+        
+        // When: Making network request
+        let response = try await network.send(request)
+        
+        // Then: Request is successful
+        #expect(context.urlSession.lastRequest?.url == request.url)
+        #expect(response.statusCode == 200)
+        #expect(!network.showError)
+    }
+    
+    @Test("Handle network errors", tags: ["network", "error"])
+    func testNetworkErrors() async throws {
+        // Given: Network manager with failing session
+        let context = TestContext()
+        let network = context.createNetwork()
+        let request = MockData.Network.validRequest
+        
+        context.networkMonitor.setNetworkStatus(true)
+        context.urlSession.shouldFail = true
+        context.urlSession.error = MockData.Error.networkError
+        
+        // When/Then: Network request fails
+        #expect(throws: MockData.Error.networkError) {
+            _ = try await network.send(request)
         }
+        
+        #expect(network.showError)
+        #expect(network.error as? MockData.Error == MockData.Error.networkError)
+    }
+    
+    @Test("Handle timeout errors", tags: ["network", "timeout"])
+    func testTimeoutErrors() async throws {
+        // Given: Network manager with timeout
+        let context = TestContext()
+        let network = context.createNetwork()
+        let request = MockData.Network.validRequest
+        
+        context.networkMonitor.setNetworkStatus(true)
+        context.urlSession.shouldTimeout = true
+        
+        // When/Then: Network request times out
+        #expect(throws: URLError(.timedOut)) {
+            _ = try await network.send(request)
+        }
+        
+        #expect(network.showError)
+        #expect(network.error is URLError)
+    }
+    
+    @Test("Handle offline state", tags: ["network", "offline"])
+    func testOfflineState() async throws {
+        // Given: Network manager in offline state
+        let context = TestContext()
+        let network = context.createNetwork()
+        let request = MockData.Network.validRequest
+        
+        context.networkMonitor.setNetworkStatus(false)
+        
+        // When/Then: Network request fails when offline
+        #expect(throws: BackupNetworkError.offline) {
+            _ = try await network.send(request)
+        }
+        
+        #expect(!network.showError)
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test network performance", tags: ["network", "performance"])
+    func testNetworkPerformance() async throws {
+        // Given: Network manager with mock session
+        let context = TestContext()
+        let network = context.createNetwork()
+        let request = MockData.Network.validRequest
+        
+        context.networkMonitor.setNetworkStatus(true)
+        context.urlSession.mockResponse = MockData.Network.validResponse
+        
+        // When: Making multiple requests
+        let startTime = Date()
+        for _ in 0..<10 {
+            _ = try await network.send(request)
+        }
+        let endTime = Date()
+        
+        // Then: Requests complete within reasonable time
+        let duration = endTime.timeIntervalSince(startTime)
+        #expect(duration < 1.0) // All requests should complete within 1 second
+    }
+}
+
+// MARK: - Mock Network Monitor
+
+final class MockNetworkMonitor: NetworkMonitorProtocol {
+    private var isAvailable: Bool = false
+    private var statusHandler: ((Bool) -> Void)?
+    
+    func startMonitoring(handler: @escaping (Bool) -> Void) {
+        statusHandler = handler
+        handler(isAvailable)
+    }
+    
+    func stopMonitoring() {
+        statusHandler = nil
+    }
+    
+    func setNetworkStatus(_ available: Bool) {
+        isAvailable = available
+        statusHandler?(available)
+    }
+    
+    func reset() {
+        isAvailable = false
+        statusHandler = nil
     }
 }

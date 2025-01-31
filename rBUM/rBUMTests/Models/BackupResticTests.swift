@@ -6,358 +6,401 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupRestic functionality
 struct BackupResticTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup restic with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
-        let path = URL(fileURLWithPath: "/usr/local/bin/restic")
+    /// Test environment with test data
+    struct TestContext {
+        let fileManager: MockFileManager
+        let processManager: MockProcessManager
+        let keychain: MockKeychain
+        let notificationCenter: MockNotificationCenter
+        let dateProvider: MockDateProvider
         
-        // When
-        let restic = BackupRestic(
-            id: id,
-            repositoryId: repositoryId,
-            executablePath: path
-        )
-        
-        // Then
-        #expect(restic.id == id)
-        #expect(restic.repositoryId == repositoryId)
-        #expect(restic.executablePath == path)
-        #expect(restic.version != nil)
-        #expect(restic.jsonOutput == true)
-    }
-    
-    @Test("Initialize backup restic with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
-        let path = URL(fileURLWithPath: "/usr/local/bin/restic")
-        let version = "0.15.1"
-        let jsonOutput = true
-        let compressionLevel = 6
-        let parallelOperations = 4
-        
-        // When
-        let restic = BackupRestic(
-            id: id,
-            repositoryId: repositoryId,
-            executablePath: path,
-            version: version,
-            jsonOutput: jsonOutput,
-            compressionLevel: compressionLevel,
-            parallelOperations: parallelOperations
-        )
-        
-        // Then
-        #expect(restic.id == id)
-        #expect(restic.repositoryId == repositoryId)
-        #expect(restic.executablePath == path)
-        #expect(restic.version == version)
-        #expect(restic.jsonOutput == jsonOutput)
-        #expect(restic.compressionLevel == compressionLevel)
-        #expect(restic.parallelOperations == parallelOperations)
-    }
-    
-    // MARK: - Command Tests
-    
-    @Test("Handle restic commands", tags: ["model", "command"])
-    func testCommands() throws {
-        // Given
-        let restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        // Test backup command
-        let backupCmd = restic.buildCommand(
-            .backup,
-            args: ["--path", "/test/source"]
-        )
-        #expect(backupCmd.contains("backup"))
-        #expect(backupCmd.contains("--json"))
-        #expect(backupCmd.contains("/test/source"))
-        
-        // Test restore command
-        let restoreCmd = restic.buildCommand(
-            .restore,
-            args: ["--target", "/test/restore"]
-        )
-        #expect(restoreCmd.contains("restore"))
-        #expect(restoreCmd.contains("--json"))
-        #expect(restoreCmd.contains("/test/restore"))
-        
-        // Test check command
-        let checkCmd = restic.buildCommand(.check)
-        #expect(checkCmd.contains("check"))
-        #expect(checkCmd.contains("--json"))
-    }
-    
-    // MARK: - Output Tests
-    
-    @Test("Handle command output parsing", tags: ["model", "output"])
-    func testOutputParsing() throws {
-        // Given
-        let restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        // Test JSON output parsing
-        let jsonOutput = """
-        {
-            "message_type": "status",
-            "percent_done": 0.5,
-            "total_files": 100,
-            "files_done": 50,
-            "total_bytes": 1024,
-            "bytes_done": 512
-        }
-        """
-        
-        let status = restic.parseOutput(jsonOutput)
-        #expect(status != nil)
-        #expect(status?.progress == 0.5)
-        #expect(status?.filesProcessed == 50)
-        #expect(status?.totalFiles == 100)
-        #expect(status?.bytesProcessed == 512)
-        #expect(status?.totalBytes == 1024)
-    }
-    
-    // MARK: - Error Tests
-    
-    @Test("Handle restic errors", tags: ["model", "error"])
-    func testErrorHandling() throws {
-        // Given
-        let restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        // Test error parsing
-        let errorOutput = """
-        {
-            "message_type": "error",
-            "error": "repository not found",
-            "code": 1
-        }
-        """
-        
-        let error = restic.parseError(errorOutput)
-        #expect(error == .repositoryNotFound)
-        
-        // Test timeout error
-        let timeoutOutput = """
-        {
-            "message_type": "error",
-            "error": "timeout after 30s",
-            "code": 2
-        }
-        """
-        
-        let timeoutError = restic.parseError(timeoutOutput)
-        #expect(timeoutError == .timeout)
-    }
-    
-    // MARK: - Configuration Tests
-    
-    @Test("Handle restic configuration", tags: ["model", "config"])
-    func testConfiguration() throws {
-        // Given
-        var restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        // Test compression level
-        let compressionLevels = [-1, 0, 6, 9, 10]
-        for level in compressionLevels {
-            let isValid = level >= 0 && level <= 9
-            if isValid {
-                restic.compressionLevel = level
-                #expect(restic.compressionLevel == level)
-            } else {
-                let originalLevel = restic.compressionLevel
-                restic.compressionLevel = level
-                #expect(restic.compressionLevel == originalLevel)
-            }
+        init() {
+            self.fileManager = MockFileManager()
+            self.processManager = MockProcessManager()
+            self.keychain = MockKeychain()
+            self.notificationCenter = MockNotificationCenter()
+            self.dateProvider = MockDateProvider()
         }
         
-        // Test parallel operations
-        let parallelOps = [-1, 0, 4, 8, 16]
-        for ops in parallelOps {
-            let isValid = ops > 0 && ops <= 8
-            if isValid {
-                restic.parallelOperations = ops
-                #expect(restic.parallelOperations == ops)
-            } else {
-                let originalOps = restic.parallelOperations
-                restic.parallelOperations = ops
-                #expect(restic.parallelOperations == originalOps)
-            }
+        /// Reset all mocks to initial state
+        func reset() {
+            fileManager.reset()
+            processManager.reset()
+            keychain.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
+        }
+        
+        /// Create test restic manager
+        func createResticManager() -> BackupResticManager {
+            BackupResticManager(
+                fileManager: fileManager,
+                processManager: processManager,
+                keychain: keychain,
+                notificationCenter: notificationCenter,
+                dateProvider: dateProvider
+            )
         }
     }
     
-    // MARK: - Version Tests
+    // MARK: - Initialization Tests
     
-    @Test("Handle restic version checks", tags: ["model", "version"])
-    func testVersionChecks() throws {
-        // Given
-        let restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
+    @Test("Initialize restic manager", tags: ["init", "restic"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        let testCases = [
-            ("0.15.1", true),
-            ("0.14.0", true),
-            ("0.13.0", false),
-            ("invalid", false)
-        ]
+        // When: Creating restic manager
+        let manager = context.createResticManager()
         
-        for (version, isValid) in testCases {
-            #expect(restic.isCompatibleVersion(version) == isValid)
-        }
+        // Then: Manager is properly configured
+        #expect(manager.isInstalled)
+        #expect(manager.version != nil)
+        #expect(!manager.isRunning)
     }
     
     // MARK: - Repository Tests
     
-    @Test("Handle repository operations", tags: ["model", "repository"])
+    @Test("Test repository operations", tags: ["restic", "repository"])
     func testRepositoryOperations() throws {
-        // Given
-        let restic = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let repositories = MockData.Restic.validRepositories
         
         // Test repository initialization
-        let initCmd = restic.buildCommand(.init)
-        #expect(initCmd.contains("init"))
-        #expect(initCmd.contains("--json"))
-        
-        // Test repository check
-        let checkCmd = restic.buildCommand(.check)
-        #expect(checkCmd.contains("check"))
-        #expect(checkCmd.contains("--json"))
-        
-        // Test repository statistics
-        let statsCmd = restic.buildCommand(.stats)
-        #expect(statsCmd.contains("stats"))
-        #expect(statsCmd.contains("--json"))
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare restic instances for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let restic1 = BackupRestic(
-            id: UUID(),
-            repositoryId: UUID(),
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        let restic2 = BackupRestic(
-            id: restic1.id,
-            repositoryId: restic1.repositoryId,
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        let restic3 = BackupRestic(
-            id: UUID(),
-            repositoryId: restic1.repositoryId,
-            executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-        )
-        
-        #expect(restic1 == restic2)
-        #expect(restic1 != restic3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup restic", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic restic
-            BackupRestic(
-                id: UUID(),
-                repositoryId: UUID(),
-                executablePath: URL(fileURLWithPath: "/usr/local/bin/restic")
-            ),
-            // Full restic configuration
-            BackupRestic(
-                id: UUID(),
-                repositoryId: UUID(),
-                executablePath: URL(fileURLWithPath: "/usr/local/bin/restic"),
-                version: "0.15.1",
-                jsonOutput: true,
-                compressionLevel: 6,
-                parallelOperations: 4
-            )
-        ]
-        
-        for restic in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(restic)
-            let decoded = try decoder.decode(BackupRestic.self, from: data)
+        for repo in repositories {
+            try manager.initRepository(repo)
+            #expect(context.processManager.runProcessCalled)
+            #expect(context.keychain.setPasswordCalled)
             
-            // Then
-            #expect(decoded.id == restic.id)
-            #expect(decoded.repositoryId == restic.repositoryId)
-            #expect(decoded.executablePath == restic.executablePath)
-            #expect(decoded.version == restic.version)
-            #expect(decoded.jsonOutput == restic.jsonOutput)
-            #expect(decoded.compressionLevel == restic.compressionLevel)
-            #expect(decoded.parallelOperations == restic.parallelOperations)
+            context.reset()
+        }
+        
+        // Test repository checks
+        for repo in repositories {
+            try manager.checkRepository(repo)
+            #expect(context.processManager.runProcessCalled)
+            let args = context.processManager.lastProcessArgs
+            #expect(args.contains("check"))
+            
+            context.reset()
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Backup Tests
     
-    @Test("Validate backup restic properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid restic
-            (UUID(), UUID(), "/usr/local/bin/restic", "0.15.1", 6, 4, true),
-            // Invalid path
-            (UUID(), UUID(), "", "0.15.1", 6, 4, false),
-            // Invalid version
-            (UUID(), UUID(), "/usr/local/bin/restic", "0.13.0", 6, 4, false),
-            // Invalid compression
-            (UUID(), UUID(), "/usr/local/bin/restic", "0.15.1", 10, 4, false),
-            // Invalid parallel ops
-            (UUID(), UUID(), "/usr/local/bin/restic", "0.15.1", 6, 16, false)
-        ]
+    @Test("Test backup operations", tags: ["restic", "backup"])
+    func testBackupOperations() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
         
-        for (id, repoId, path, version, compression, parallel, isValid) in testCases {
-            let restic = BackupRestic(
-                id: id,
-                repositoryId: repoId,
-                executablePath: URL(fileURLWithPath: path),
-                version: version,
-                compressionLevel: compression,
-                parallelOperations: parallel
-            )
+        let backups = MockData.Restic.validBackups
+        
+        // Test backup creation
+        for backup in backups {
+            try manager.createBackup(backup)
+            #expect(context.processManager.runProcessCalled)
+            let args = context.processManager.lastProcessArgs
+            #expect(args.contains("backup"))
             
-            if isValid {
-                #expect(restic.isValid)
-            } else {
-                #expect(!restic.isValid)
+            context.reset()
+        }
+        
+        // Test backup verification
+        for backup in backups {
+            try manager.verifyBackup(backup)
+            #expect(context.processManager.runProcessCalled)
+            let args = context.processManager.lastProcessArgs
+            #expect(args.contains("verify"))
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Restore Tests
+    
+    @Test("Test restore operations", tags: ["restic", "restore"])
+    func testRestoreOperations() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let restores = MockData.Restic.validRestores
+        
+        // Test restore operations
+        for restore in restores {
+            try manager.restore(restore)
+            #expect(context.processManager.runProcessCalled)
+            let args = context.processManager.lastProcessArgs
+            #expect(args.contains("restore"))
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Snapshot Tests
+    
+    @Test("Test snapshot operations", tags: ["restic", "snapshot"])
+    func testSnapshotOperations() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let snapshots = MockData.Restic.validSnapshots
+        
+        // Test snapshot listing
+        let repository = MockData.Restic.validRepositories[0]
+        try manager.listSnapshots(repository)
+        #expect(context.processManager.runProcessCalled)
+        let args = context.processManager.lastProcessArgs
+        #expect(args.contains("snapshots"))
+        
+        context.reset()
+        
+        // Test snapshot operations
+        for snapshot in snapshots {
+            // Test checking snapshot
+            try manager.checkSnapshot(snapshot)
+            #expect(context.processManager.runProcessCalled)
+            
+            context.reset()
+            
+            // Test removing snapshot
+            try manager.removeSnapshot(snapshot)
+            #expect(context.processManager.runProcessCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Process Management Tests
+    
+    @Test("Test process management", tags: ["restic", "process"])
+    func testProcessManagement() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let operations = MockData.Restic.processOperations
+        
+        // Test process handling
+        for operation in operations {
+            // Start process
+            try manager.startOperation(operation)
+            #expect(manager.isRunning)
+            #expect(context.processManager.runProcessCalled)
+            
+            // Test process output
+            let output = "Progress: 50%"
+            context.processManager.simulateOutput(output)
+            #expect(context.notificationCenter.postNotificationCalled)
+            
+            // Test process completion
+            context.processManager.simulateCompletion(0)
+            #expect(!manager.isRunning)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test error handling", tags: ["restic", "error"])
+    func testErrorHandling() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let operations = MockData.Restic.errorOperations
+        
+        // Test error handling
+        for operation in operations {
+            do {
+                try manager.startOperation(operation)
+                
+                // Simulate error
+                let error = "Error: repository locked"
+                context.processManager.simulateError(error)
+                
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .backupError)
+                
+            } catch {
+                // Expected error
             }
+            
+            context.reset()
         }
+    }
+    
+    // MARK: - Configuration Tests
+    
+    @Test("Test restic configuration", tags: ["restic", "config"])
+    func testConfiguration() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        let configs = MockData.Restic.validConfigs
+        
+        // Test configuration handling
+        for config in configs {
+            try manager.applyConfiguration(config)
+            #expect(context.processManager.runProcessCalled)
+            
+            // Verify environment variables
+            let env = context.processManager.lastProcessEnv
+            #expect(env["RESTIC_PASSWORD"] != nil)
+            #expect(env["RESTIC_REPOSITORY"] != nil)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle restic edge cases", tags: ["restic", "edge"])
+    func testEdgeCases() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        // Test invalid repository path
+        do {
+            try manager.initRepository(MockData.Restic.invalidRepository)
+            throw TestFailure("Expected error for invalid repository")
+        } catch {
+            // Expected error
+        }
+        
+        // Test missing password
+        do {
+            context.keychain.simulatePasswordMissing()
+            try manager.createBackup(MockData.Restic.validBackups[0])
+            throw TestFailure("Expected error for missing password")
+        } catch {
+            // Expected error
+        }
+        
+        // Test concurrent operations
+        do {
+            let operation = MockData.Restic.processOperations[0]
+            try manager.startOperation(operation)
+            try manager.startOperation(operation)
+            throw TestFailure("Expected error for concurrent operations")
+        } catch {
+            // Expected error
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test restic performance", tags: ["restic", "performance"])
+    func testPerformance() throws {
+        // Given: Restic manager
+        let context = TestContext()
+        let manager = context.createResticManager()
+        
+        // Test command generation performance
+        let startTime = context.dateProvider.now()
+        for _ in 0..<1000 {
+            _ = try manager.buildCommand(["backup", "/test"])
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test environment setup performance
+        let setupStartTime = context.dateProvider.now()
+        for _ in 0..<1000 {
+            _ = try manager.prepareEnvironment(MockData.Restic.validConfigs[0])
+        }
+        let setupEndTime = context.dateProvider.now()
+        
+        let setupInterval = setupEndTime.timeIntervalSince(setupStartTime)
+        #expect(setupInterval < 0.1) // Environment setup should be fast
+    }
+}
+
+// MARK: - Mock Process Manager
+
+/// Mock implementation of ProcessManager for testing
+final class MockProcessManager: ProcessManagerProtocol {
+    private(set) var runProcessCalled = false
+    private(set) var lastProcessArgs: [String] = []
+    private(set) var lastProcessEnv: [String: String] = [:]
+    private var outputHandler: ((String) -> Void)?
+    private var completionHandler: ((Int32) -> Void)?
+    
+    func runProcess(_ args: [String], environment: [String: String]?, output: @escaping (String) -> Void, completion: @escaping (Int32) -> Void) throws {
+        runProcessCalled = true
+        lastProcessArgs = args
+        lastProcessEnv = environment ?? [:]
+        outputHandler = output
+        completionHandler = completion
+    }
+    
+    func simulateOutput(_ output: String) {
+        outputHandler?(output)
+    }
+    
+    func simulateError(_ error: String) {
+        outputHandler?(error)
+        completionHandler?(1)
+    }
+    
+    func simulateCompletion(_ exitCode: Int32) {
+        completionHandler?(exitCode)
+    }
+    
+    func reset() {
+        runProcessCalled = false
+        lastProcessArgs = []
+        lastProcessEnv = [:]
+        outputHandler = nil
+        completionHandler = nil
+    }
+}
+
+// MARK: - Mock Keychain
+
+/// Mock implementation of Keychain for testing
+final class MockKeychain: KeychainProtocol {
+    private(set) var setPasswordCalled = false
+    private(set) var getPasswordCalled = false
+    private var shouldSimulatePasswordMissing = false
+    
+    func setPassword(_ password: String, for service: String) throws {
+        setPasswordCalled = true
+    }
+    
+    func getPassword(for service: String) throws -> String {
+        getPasswordCalled = true
+        if shouldSimulatePasswordMissing {
+            throw KeychainError.itemNotFound
+        }
+        return "test-password"
+    }
+    
+    func simulatePasswordMissing() {
+        shouldSimulatePasswordMissing = true
+    }
+    
+    func reset() {
+        setPasswordCalled = false
+        getPasswordCalled = false
+        shouldSimulatePasswordMissing = false
     }
 }

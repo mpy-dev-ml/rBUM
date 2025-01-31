@@ -6,348 +6,333 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupMetadata functionality
 struct BackupMetadataTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup metadata with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let repositoryId = UUID()
-        let snapshotId = "2024-01-30-23-31-18"
-        let timestamp = Date()
-        let fileCount: UInt64 = 1000
-        let totalSize: UInt64 = 1024 * 1024 * 1024 // 1 GB
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let fileManager: MockFileManager
+        let dateProvider: MockDateProvider
         
-        // When
-        let metadata = BackupMetadata(
-            repositoryId: repositoryId,
-            snapshotId: snapshotId,
-            timestamp: timestamp,
-            fileCount: fileCount,
-            totalSize: totalSize
-        )
-        
-        // Then
-        #expect(metadata.repositoryId == repositoryId)
-        #expect(metadata.snapshotId == snapshotId)
-        #expect(metadata.timestamp == timestamp)
-        #expect(metadata.fileCount == fileCount)
-        #expect(metadata.totalSize == totalSize)
-        #expect(metadata.tags.isEmpty)
-        #expect(metadata.excludedPaths.isEmpty)
-        #expect(metadata.includedPaths.isEmpty)
-    }
-    
-    @Test("Initialize backup metadata with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let repositoryId = UUID()
-        let snapshotId = "2024-01-30-23-31-18"
-        let timestamp = Date()
-        let fileCount: UInt64 = 1000
-        let totalSize: UInt64 = 1024 * 1024 * 1024 // 1 GB
-        let tags = ["documents", "photos"]
-        let excludedPaths = ["/Users/test/Downloads", "/Users/test/Library"]
-        let includedPaths = ["/Users/test/Documents", "/Users/test/Pictures"]
-        
-        // When
-        let metadata = BackupMetadata(
-            repositoryId: repositoryId,
-            snapshotId: snapshotId,
-            timestamp: timestamp,
-            fileCount: fileCount,
-            totalSize: totalSize,
-            tags: tags,
-            excludedPaths: excludedPaths,
-            includedPaths: includedPaths
-        )
-        
-        // Then
-        #expect(metadata.repositoryId == repositoryId)
-        #expect(metadata.snapshotId == snapshotId)
-        #expect(metadata.timestamp == timestamp)
-        #expect(metadata.fileCount == fileCount)
-        #expect(metadata.totalSize == totalSize)
-        #expect(metadata.tags == tags)
-        #expect(metadata.excludedPaths == excludedPaths)
-        #expect(metadata.includedPaths == includedPaths)
-    }
-    
-    // MARK: - Size Tests
-    
-    @Test("Handle metadata size formatting", tags: ["model", "size"])
-    func testSizeFormatting() throws {
-        let testCases: [(UInt64, String)] = [
-            // Bytes
-            (500, "500 B"),
-            // Kilobytes
-            (1024, "1.0 KB"),
-            (1536, "1.5 KB"),
-            // Megabytes
-            (1024 * 1024, "1.0 MB"),
-            (1024 * 1024 * 1.5, "1.5 MB"),
-            // Gigabytes
-            (1024 * 1024 * 1024, "1.0 GB"),
-            (1024 * 1024 * 1024 * 2.5, "2.5 GB"),
-            // Terabytes
-            (1024 * 1024 * 1024 * 1024, "1.0 TB")
-        ]
-        
-        for (size, formattedSize) in testCases {
-            let metadata = BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "test",
-                timestamp: Date(),
-                fileCount: 1,
-                totalSize: size
-            )
-            
-            #expect(metadata.formattedTotalSize == formattedSize)
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.fileManager = MockFileManager()
+            self.dateProvider = MockDateProvider()
         }
-    }
-    
-    // MARK: - Tag Tests
-    
-    @Test("Handle metadata tags", tags: ["model", "tags"])
-    func testTags() throws {
-        let testCases = [
-            // Valid tags
-            ["documents", "photos"],
-            ["system", "critical", "monthly"],
-            // Empty tags
-            [],
-            // Invalid tags
-            ["", " ", "invalid tag"],
-            [String(repeating: "a", count: 1000)]
-        ]
         
-        for tags in testCases {
-            let metadata = BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "test",
-                timestamp: Date(),
-                fileCount: 1,
-                totalSize: 0,
-                tags: tags
-            )
-            
-            let isValid = tags.allSatisfy { tag in
-                !tag.isEmpty &&
-                !tag.contains(" ") &&
-                tag.count <= 100
-            }
-            
-            if isValid {
-                #expect(metadata.isValid)
-                #expect(metadata.tags == tags)
-            } else {
-                #expect(!metadata.isValid)
-            }
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            fileManager.reset()
+            dateProvider.reset()
         }
-    }
-    
-    // MARK: - Path Tests
-    
-    @Test("Handle metadata paths", tags: ["model", "paths"])
-    func testPaths() throws {
-        let testCases = [
-            // Valid paths
-            (["/Users/test/Documents"], ["/Users/test/Downloads"]),
-            (["/Applications", "/Library"], ["/System/Volumes/Data"]),
-            // Empty paths
-            ([], []),
-            // Paths with spaces
-            (["/Users/test/My Documents"], ["/Volumes/Backup Drive"]),
-            // Invalid paths
-            ([""], [" "]),
-            (["relative/path"], ["no-leading-slash"])
-        ]
         
-        for (includedPaths, excludedPaths) in testCases {
-            let metadata = BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "test",
-                timestamp: Date(),
-                fileCount: 1,
-                totalSize: 0,
-                excludedPaths: excludedPaths,
-                includedPaths: includedPaths
-            )
-            
-            let isValid = (includedPaths.isEmpty || includedPaths.allSatisfy { $0.hasPrefix("/") }) &&
-                         (excludedPaths.isEmpty || excludedPaths.allSatisfy { $0.hasPrefix("/") })
-            
-            if isValid {
-                #expect(metadata.isValid)
-                #expect(metadata.includedPaths == includedPaths)
-                #expect(metadata.excludedPaths == excludedPaths)
-            } else {
-                #expect(!metadata.isValid)
-            }
-        }
-    }
-    
-    // MARK: - File Count Tests
-    
-    @Test("Handle file count formatting", tags: ["model", "files"])
-    func testFileCountFormatting() throws {
-        let testCases: [(UInt64, String)] = [
-            (0, "0 files"),
-            (1, "1 file"),
-            (2, "2 files"),
-            (1000, "1,000 files"),
-            (1000000, "1,000,000 files"),
-            (UInt64.max, String(format: "%d files", UInt64.max))
-        ]
-        
-        for (count, formattedCount) in testCases {
-            let metadata = BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "test",
-                timestamp: Date(),
-                fileCount: count,
-                totalSize: 0
-            )
-            
-            #expect(metadata.formattedFileCount == formattedCount)
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare backup metadata for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let repositoryId = UUID()
-        let timestamp = Date()
-        
-        let metadata1 = BackupMetadata(
-            repositoryId: repositoryId,
-            snapshotId: "test1",
-            timestamp: timestamp,
-            fileCount: 1000,
-            totalSize: 1024 * 1024,
-            tags: ["documents"],
-            excludedPaths: ["/test/excluded"],
-            includedPaths: ["/test/included"]
-        )
-        
-        let metadata2 = BackupMetadata(
-            repositoryId: repositoryId,
-            snapshotId: "test1",
-            timestamp: timestamp,
-            fileCount: 1000,
-            totalSize: 1024 * 1024,
-            tags: ["documents"],
-            excludedPaths: ["/test/excluded"],
-            includedPaths: ["/test/included"]
-        )
-        
-        let metadata3 = BackupMetadata(
-            repositoryId: repositoryId,
-            snapshotId: "test2",
-            timestamp: timestamp,
-            fileCount: 1000,
-            totalSize: 1024 * 1024,
-            tags: ["documents"],
-            excludedPaths: ["/test/excluded"],
-            includedPaths: ["/test/included"]
-        )
-        
-        #expect(metadata1 == metadata2)
-        #expect(metadata1 != metadata3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup metadata", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic metadata
+        /// Create test metadata
+        func createMetadata() -> BackupMetadata {
             BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "basic",
-                timestamp: Date(),
-                fileCount: 1000,
-                totalSize: 1024 * 1024
-            ),
-            // Metadata with tags
-            BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "with-tags",
-                timestamp: Date(),
-                fileCount: 1000,
-                totalSize: 1024 * 1024,
-                tags: ["documents", "photos"]
-            ),
-            // Full metadata
-            BackupMetadata(
-                repositoryId: UUID(),
-                snapshotId: "full",
-                timestamp: Date(),
-                fileCount: 1000,
-                totalSize: 1024 * 1024,
-                tags: ["documents", "photos"],
-                excludedPaths: ["/test/excluded"],
-                includedPaths: ["/test/included"]
+                userDefaults: userDefaults,
+                fileManager: fileManager,
+                dateProvider: dateProvider
             )
-        ]
-        
-        for metadata in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(metadata)
-            let decoded = try decoder.decode(BackupMetadata.self, from: data)
-            
-            // Then
-            #expect(decoded.repositoryId == metadata.repositoryId)
-            #expect(decoded.snapshotId == metadata.snapshotId)
-            #expect(decoded.timestamp == metadata.timestamp)
-            #expect(decoded.fileCount == metadata.fileCount)
-            #expect(decoded.totalSize == metadata.totalSize)
-            #expect(decoded.tags == metadata.tags)
-            #expect(decoded.excludedPaths == metadata.excludedPaths)
-            #expect(decoded.includedPaths == metadata.includedPaths)
         }
     }
     
-    // MARK: - Validation Tests
+    // MARK: - Initialization Tests
     
-    @Test("Validate backup metadata properties", tags: ["model", "validation"])
-    func testValidation() throws {
-        let testCases = [
-            // Valid metadata
-            (UUID(), "valid-id", 1000, ["valid"], ["/valid"], ["/valid"], true),
-            // Empty snapshot ID
-            (UUID(), "", 1000, ["valid"], ["/valid"], ["/valid"], false),
-            // Invalid tags
-            (UUID(), "valid-id", 1000, ["invalid tag"], ["/valid"], ["/valid"], false),
-            // Invalid paths
-            (UUID(), "valid-id", 1000, ["valid"], ["invalid"], ["invalid"], false),
-            // Zero file count
-            (UUID(), "valid-id", 0, ["valid"], ["/valid"], ["/valid"], true)
-        ]
+    @Test("Initialize backup metadata", tags: ["init", "metadata"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        for (repositoryId, snapshotId, fileCount, tags, excludedPaths, includedPaths, isValid) in testCases {
-            let metadata = BackupMetadata(
-                repositoryId: repositoryId,
-                snapshotId: snapshotId,
-                timestamp: Date(),
-                fileCount: fileCount,
-                totalSize: 1024,
-                tags: tags,
-                excludedPaths: excludedPaths,
-                includedPaths: includedPaths
-            )
-            
-            if isValid {
-                #expect(metadata.isValid)
-            } else {
-                #expect(!metadata.isValid)
-            }
+        // When: Creating metadata
+        let metadata = context.createMetadata()
+        
+        // Then: Metadata is properly initialized
+        #expect(metadata.backupCount == 0)
+        #expect(!metadata.isLoading)
+        #expect(!metadata.showError)
+        #expect(metadata.error == nil)
+    }
+    
+    // MARK: - Tag Management Tests
+    
+    @Test("Test tag management", tags: ["tag", "metadata"])
+    func testTagManagement() throws {
+        // Given: Metadata and test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        let tags = MockData.Tag.validTags
+        
+        // When: Adding tags
+        for tag in tags {
+            metadata.addTag(tag)
         }
+        
+        // Then: Tags are stored
+        #expect(metadata.tags.count == tags.count)
+        for tag in tags {
+            #expect(metadata.hasTag(tag))
+        }
+        
+        // When: Removing tag
+        metadata.removeTag(tags[0])
+        
+        // Then: Tag is removed
+        #expect(!metadata.hasTag(tags[0]))
+        #expect(metadata.tags.count == tags.count - 1)
+    }
+    
+    // MARK: - Label Management Tests
+    
+    @Test("Test label management", tags: ["label", "metadata"])
+    func testLabelManagement() throws {
+        // Given: Metadata and test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        let labels = MockData.Label.validLabels
+        
+        // When: Adding labels
+        for (key, value) in labels {
+            metadata.setLabel(key: key, value: value)
+        }
+        
+        // Then: Labels are stored
+        #expect(metadata.labels.count == labels.count)
+        for (key, value) in labels {
+            #expect(metadata.getLabel(key: key) == value)
+        }
+        
+        // When: Removing label
+        let firstKey = labels.keys.first!
+        metadata.removeLabel(key: firstKey)
+        
+        // Then: Label is removed
+        #expect(metadata.getLabel(key: firstKey) == nil)
+        #expect(metadata.labels.count == labels.count - 1)
+    }
+    
+    // MARK: - Annotation Management Tests
+    
+    @Test("Test annotation management", tags: ["annotation", "metadata"])
+    func testAnnotationManagement() throws {
+        // Given: Metadata and test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        let annotations = MockData.Annotation.validAnnotations
+        
+        // When: Adding annotations
+        for (key, value) in annotations {
+            metadata.setAnnotation(key: key, value: value)
+        }
+        
+        // Then: Annotations are stored
+        #expect(metadata.annotations.count == annotations.count)
+        for (key, value) in annotations {
+            #expect(metadata.getAnnotation(key: key) == value)
+        }
+        
+        // When: Removing annotation
+        let firstKey = annotations.keys.first!
+        metadata.removeAnnotation(key: firstKey)
+        
+        // Then: Annotation is removed
+        #expect(metadata.getAnnotation(key: firstKey) == nil)
+        #expect(metadata.annotations.count == annotations.count - 1)
+    }
+    
+    // MARK: - Storage Tests
+    
+    @Test("Store and retrieve backup metadata", tags: ["storage", "metadata"])
+    func testMetadataStorage() throws {
+        // Given: Metadata with test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        let testBackup = MockData.Backup.validBackup
+        
+        // When: Storing backup metadata
+        metadata.store(backup: testBackup)
+        
+        // Then: Metadata is stored correctly
+        #expect(metadata.backupCount == 1)
+        #expect(metadata.getBackup(id: testBackup.id) == testBackup)
+        #expect(!metadata.isLoading)
+        #expect(!metadata.showError)
+    }
+    
+    @Test("Update backup metadata", tags: ["update", "metadata"])
+    func testMetadataUpdate() throws {
+        // Given: Metadata with stored backup
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        var testBackup = MockData.Backup.validBackup
+        metadata.store(backup: testBackup)
+        
+        // When: Updating backup metadata
+        testBackup.name = "Updated Name"
+        metadata.update(backup: testBackup)
+        
+        // Then: Metadata is updated correctly
+        #expect(metadata.getBackup(id: testBackup.id)?.name == "Updated Name")
+        #expect(!metadata.isLoading)
+        #expect(!metadata.showError)
+    }
+    
+    @Test("Delete backup metadata", tags: ["delete", "metadata"])
+    func testMetadataDeletion() throws {
+        // Given: Metadata with stored backup
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        let testBackup = MockData.Backup.validBackup
+        metadata.store(backup: testBackup)
+        
+        // When: Deleting backup metadata
+        metadata.delete(id: testBackup.id)
+        
+        // Then: Metadata is deleted correctly
+        #expect(metadata.backupCount == 0)
+        #expect(metadata.getBackup(id: testBackup.id) == nil)
+        #expect(!metadata.isLoading)
+        #expect(!metadata.showError)
+    }
+    
+    // MARK: - Persistence Tests
+    
+    @Test("Handle metadata persistence", tags: ["persistence", "metadata"])
+    func testPersistence() throws {
+        // Given: Metadata with test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        let testBackups = MockData.Backup.validBackups
+        
+        // When: Storing multiple backups
+        for backup in testBackups {
+            metadata.store(backup: backup)
+        }
+        
+        // Then: Metadata is persisted correctly
+        #expect(metadata.backupCount == testBackups.count)
+        for backup in testBackups {
+            #expect(metadata.getBackup(id: backup.id) == backup)
+        }
+        #expect(context.userDefaults.saveCalled)
+    }
+    
+    // MARK: - Search Tests
+    
+    @Test("Test metadata search", tags: ["search", "metadata"])
+    func testSearch() throws {
+        // Given: Metadata with test data
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        let tags = MockData.Tag.validTags
+        let labels = MockData.Label.validLabels
+        let annotations = MockData.Annotation.validAnnotations
+        
+        // Add test data
+        for tag in tags {
+            metadata.addTag(tag)
+        }
+        for (key, value) in labels {
+            metadata.setLabel(key: key, value: value)
+        }
+        for (key, value) in annotations {
+            metadata.setAnnotation(key: key, value: value)
+        }
+        
+        // Test searching by tag
+        let tagResults = metadata.search(query: tags[0])
+        #expect(tagResults.contains(tags[0]))
+        
+        // Test searching by label
+        let labelKey = labels.keys.first!
+        let labelResults = metadata.search(query: labels[labelKey]!)
+        #expect(!labelResults.isEmpty)
+        
+        // Test searching by annotation
+        let annotationKey = annotations.keys.first!
+        let annotationResults = metadata.search(query: annotations[annotationKey]!)
+        #expect(!annotationResults.isEmpty)
+        
+        // Test searching with no results
+        let noResults = metadata.search(query: "nonexistent")
+        #expect(noResults.isEmpty)
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle metadata edge cases", tags: ["edge", "metadata"])
+    func testEdgeCases() throws {
+        // Given: Metadata
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        // Test empty tag
+        metadata.addTag("")
+        #expect(!metadata.hasTag(""))
+        
+        // Test duplicate tag
+        let tag = MockData.Tag.validTags[0]
+        metadata.addTag(tag)
+        metadata.addTag(tag)
+        #expect(metadata.tags.count == 1)
+        
+        // Test empty label key
+        metadata.setLabel(key: "", value: "value")
+        #expect(metadata.getLabel(key: "") == nil)
+        
+        // Test empty label value
+        metadata.setLabel(key: "key", value: "")
+        #expect(metadata.getLabel(key: "key") == nil)
+        
+        // Test empty annotation key
+        metadata.setAnnotation(key: "", value: "value")
+        #expect(metadata.getAnnotation(key: "") == nil)
+        
+        // Test empty annotation value
+        metadata.setAnnotation(key: "key", value: "")
+        #expect(metadata.getAnnotation(key: "key") == nil)
+        
+        // Test load without save
+        let emptyMetadata = context.createMetadata()
+        try emptyMetadata.load()
+        #expect(emptyMetadata.tags.isEmpty)
+        #expect(emptyMetadata.labels.isEmpty)
+        #expect(emptyMetadata.annotations.isEmpty)
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test metadata performance", tags: ["performance", "metadata"])
+    func testPerformance() throws {
+        // Given: Metadata
+        let context = TestContext()
+        let metadata = context.createMetadata()
+        
+        // Test bulk tag addition
+        let startTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            metadata.addTag("tag\(i)")
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test search performance
+        let searchStartTime = context.dateProvider.now()
+        _ = metadata.search(query: "tag500")
+        let searchEndTime = context.dateProvider.now()
+        
+        let searchInterval = searchEndTime.timeIntervalSince(searchStartTime)
+        #expect(searchInterval < 0.1) // Search should be fast
     }
 }

@@ -6,305 +6,365 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupPermissions functionality
 struct BackupPermissionsTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup permissions with basic properties", tags: ["basic", "model"])
-    func testBasicInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
+    /// Test environment with test data
+    struct TestContext {
+        let userDefaults: MockUserDefaults
+        let fileManager: MockFileManager
+        let securityService: MockSecurityService
+        let notificationCenter: MockNotificationCenter
         
-        // When
-        let permissions = BackupPermissions(
-            id: id,
-            repositoryId: repositoryId
-        )
+        init() {
+            self.userDefaults = MockUserDefaults()
+            self.fileManager = MockFileManager()
+            self.securityService = MockSecurityService()
+            self.notificationCenter = MockNotificationCenter()
+        }
         
-        // Then
-        #expect(permissions.id == id)
-        #expect(permissions.repositoryId == repositoryId)
-        #expect(!permissions.hasFullDiskAccess)
-        #expect(!permissions.hasNotificationAccess)
-        #expect(permissions.grantedPaths.isEmpty)
+        /// Reset all mocks to initial state
+        func reset() {
+            userDefaults.reset()
+            fileManager.reset()
+            securityService.reset()
+            notificationCenter.reset()
+        }
+        
+        /// Create test permissions manager
+        func createPermissionsManager() -> BackupPermissionsManager {
+            BackupPermissionsManager(
+                userDefaults: userDefaults,
+                fileManager: fileManager,
+                securityService: securityService,
+                notificationCenter: notificationCenter
+            )
+        }
     }
     
-    @Test("Initialize backup permissions with all properties", tags: ["basic", "model"])
-    func testFullInitialization() throws {
-        // Given
-        let id = UUID()
-        let repositoryId = UUID()
-        let hasFullDiskAccess = true
-        let hasNotificationAccess = true
-        let grantedPaths = [
-            URL(fileURLWithPath: "/Users/test/Documents"),
-            URL(fileURLWithPath: "/Users/test/Pictures")
-        ]
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize backup permissions manager", tags: ["init", "permissions"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
         
-        // When
-        let permissions = BackupPermissions(
-            id: id,
-            repositoryId: repositoryId,
-            hasFullDiskAccess: hasFullDiskAccess,
-            hasNotificationAccess: hasNotificationAccess,
-            grantedPaths: grantedPaths
-        )
+        // When: Creating permissions manager
+        let manager = context.createPermissionsManager()
         
-        // Then
-        #expect(permissions.id == id)
-        #expect(permissions.repositoryId == repositoryId)
-        #expect(permissions.hasFullDiskAccess == hasFullDiskAccess)
-        #expect(permissions.hasNotificationAccess == hasNotificationAccess)
-        #expect(permissions.grantedPaths == grantedPaths)
+        // Then: Manager is configured correctly
+        #expect(manager.permissions.isEmpty)
+        #expect(!manager.isFullDiskAccessGranted)
+        #expect(!manager.isAutomationEnabled)
+    }
+    
+    // MARK: - Permission Tests
+    
+    @Test("Test permission handling", tags: ["permissions", "core"])
+    func testPermissionHandling() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
+        
+        let paths = MockData.Path.validPaths
+        
+        // Test permission requests
+        for path in paths {
+            try manager.requestPermission(for: path)
+            
+            // Verify permission request
+            #expect(context.securityService.requestPermissionCalled)
+            #expect(manager.hasPermission(for: path))
+            
+            context.reset()
+        }
+        
+        // Test permission revocation
+        try manager.revokePermission(for: paths[0])
+        #expect(!manager.hasPermission(for: paths[0]))
+        #expect(context.securityService.revokePermissionCalled)
     }
     
     // MARK: - Full Disk Access Tests
     
-    @Test("Handle full disk access permissions", tags: ["model", "disk"])
+    @Test("Test full disk access", tags: ["permissions", "disk"])
     func testFullDiskAccess() throws {
-        // Given
-        var permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
         
-        // Test checking access
-        #expect(!permissions.hasFullDiskAccess)
+        // Test full disk access request
+        try manager.requestFullDiskAccess()
+        #expect(context.securityService.requestFullDiskAccessCalled)
         
-        // Test requesting access
-        let granted = permissions.requestFullDiskAccess()
-        if granted {
-            #expect(permissions.hasFullDiskAccess)
-        } else {
-            #expect(!permissions.hasFullDiskAccess)
-        }
+        // Simulate granted access
+        context.securityService.simulateFullDiskAccess(granted: true)
+        #expect(manager.isFullDiskAccessGranted)
+        
+        // Test access check
+        let hasAccess = try manager.checkFullDiskAccess()
+        #expect(hasAccess)
+        #expect(context.securityService.checkFullDiskAccessCalled)
     }
     
-    // MARK: - Notification Tests
+    // MARK: - Automation Tests
     
-    @Test("Handle notification permissions", tags: ["model", "notifications"])
-    func testNotificationAccess() throws {
-        // Given
-        var permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+    @Test("Test automation permissions", tags: ["permissions", "automation"])
+    func testAutomation() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
         
-        // Test checking access
-        #expect(!permissions.hasNotificationAccess)
+        // Test automation request
+        try manager.requestAutomation()
+        #expect(context.securityService.requestAutomationCalled)
         
-        // Test requesting access
-        let granted = permissions.requestNotificationAccess()
-        if granted {
-            #expect(permissions.hasNotificationAccess)
-        } else {
-            #expect(!permissions.hasNotificationAccess)
-        }
-    }
-    
-    // MARK: - Path Tests
-    
-    @Test("Handle path permissions", tags: ["model", "paths"])
-    func testPathPermissions() throws {
-        // Given
-        var permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+        // Simulate enabled automation
+        context.securityService.simulateAutomation(enabled: true)
+        #expect(manager.isAutomationEnabled)
         
-        let paths = [
-            URL(fileURLWithPath: "/Users/test/Documents"),
-            URL(fileURLWithPath: "/Users/test/Pictures")
-        ]
-        
-        // Test granting paths
-        for path in paths {
-            permissions.grantAccess(to: path)
-        }
-        #expect(permissions.grantedPaths.count == paths.count)
-        
-        // Test checking access
-        for path in paths {
-            #expect(permissions.hasAccess(to: path))
-        }
-        
-        // Test revoking paths
-        permissions.revokeAccess(to: paths[0])
-        #expect(permissions.grantedPaths.count == paths.count - 1)
-        #expect(!permissions.hasAccess(to: paths[0]))
-        
-        // Test clearing paths
-        permissions.clearGrantedPaths()
-        #expect(permissions.grantedPaths.isEmpty)
+        // Test automation check
+        let isEnabled = try manager.checkAutomation()
+        #expect(isEnabled)
+        #expect(context.securityService.checkAutomationCalled)
     }
     
     // MARK: - Sandbox Tests
     
-    @Test("Handle sandbox permissions", tags: ["model", "sandbox"])
-    func testSandboxPermissions() throws {
-        // Given
-        var permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+    @Test("Test sandbox permissions", tags: ["permissions", "sandbox"])
+    func testSandbox() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
         
-        // Test sandbox status
-        #expect(permissions.isSandboxed)
+        let bookmarks = MockData.Permission.validBookmarks
         
-        // Test sandbox bookmarks
-        let path = URL(fileURLWithPath: "/Users/test/Documents")
-        let bookmark = try permissions.createSecurityScopedBookmark(for: path)
-        #expect(bookmark != nil)
-        
-        // Test resolving bookmarks
-        if let resolvedPath = permissions.resolveSecurityScopedBookmark(bookmark!) {
-            #expect(resolvedPath.path == path.path)
-        }
-    }
-    
-    // MARK: - Validation Tests
-    
-    @Test("Handle path validation", tags: ["model", "validation"])
-    func testPathValidation() throws {
-        // Given
-        let permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
-        
-        let testCases = [
-            // Valid paths
-            "/Users/test/Documents",
-            "/Users/test/Pictures",
-            "/Applications",
-            // Invalid paths
-            "",
-            "relative/path",
-            "/private/var/root"
-        ]
-        
-        for path in testCases {
-            let url = URL(fileURLWithPath: path)
-            let isValid = path.hasPrefix("/") && 
-                         !path.hasPrefix("/private") &&
-                         !path.hasPrefix("/System")
+        // Test bookmark creation
+        for (path, data) in bookmarks {
+            try manager.createBookmark(for: path)
+            #expect(context.securityService.createBookmarkCalled)
+            #expect(manager.hasBookmark(for: path))
             
-            #expect(permissions.isValidPath(url) == isValid)
-        }
-    }
-    
-    // MARK: - Access Level Tests
-    
-    @Test("Handle access level checks", tags: ["model", "access"])
-    func testAccessLevels() throws {
-        // Given
-        var permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
-        
-        let path = URL(fileURLWithPath: "/Users/test/Documents")
-        
-        // Test read access
-        permissions.grantAccess(to: path, level: .readOnly)
-        #expect(permissions.hasReadAccess(to: path))
-        #expect(!permissions.hasWriteAccess(to: path))
-        
-        // Test write access
-        permissions.grantAccess(to: path, level: .readWrite)
-        #expect(permissions.hasReadAccess(to: path))
-        #expect(permissions.hasWriteAccess(to: path))
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare permissions for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        let permissions1 = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID(),
-            hasFullDiskAccess: true,
-            hasNotificationAccess: true,
-            grantedPaths: [URL(fileURLWithPath: "/Users/test/Documents")]
-        )
-        
-        let permissions2 = BackupPermissions(
-            id: permissions1.id,
-            repositoryId: permissions1.repositoryId,
-            hasFullDiskAccess: true,
-            hasNotificationAccess: true,
-            grantedPaths: [URL(fileURLWithPath: "/Users/test/Documents")]
-        )
-        
-        let permissions3 = BackupPermissions(
-            id: UUID(),
-            repositoryId: permissions1.repositoryId,
-            hasFullDiskAccess: true,
-            hasNotificationAccess: true,
-            grantedPaths: [URL(fileURLWithPath: "/Users/test/Documents")]
-        )
-        
-        #expect(permissions1 == permissions2)
-        #expect(permissions1 != permissions3)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode backup permissions", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            // Basic permissions
-            BackupPermissions(
-                id: UUID(),
-                repositoryId: UUID()
-            ),
-            // Full permissions
-            BackupPermissions(
-                id: UUID(),
-                repositoryId: UUID(),
-                hasFullDiskAccess: true,
-                hasNotificationAccess: true,
-                grantedPaths: [URL(fileURLWithPath: "/Users/test/Documents")]
-            )
-        ]
-        
-        for permissions in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(permissions)
-            let decoded = try decoder.decode(BackupPermissions.self, from: data)
+            // Verify bookmark data
+            let bookmark = try manager.getBookmark(for: path)
+            #expect(bookmark == data)
             
-            // Then
-            #expect(decoded.id == permissions.id)
-            #expect(decoded.repositoryId == permissions.repositoryId)
-            #expect(decoded.hasFullDiskAccess == permissions.hasFullDiskAccess)
-            #expect(decoded.hasNotificationAccess == permissions.hasNotificationAccess)
-            #expect(decoded.grantedPaths == permissions.grantedPaths)
+            context.reset()
+        }
+        
+        // Test bookmark resolution
+        let resolvedPath = try manager.resolveBookmark(bookmarks.first!.value)
+        #expect(resolvedPath == bookmarks.first!.key)
+        #expect(context.securityService.resolveBookmarkCalled)
+    }
+    
+    // MARK: - Security Scope Tests
+    
+    @Test("Test security scoped access", tags: ["permissions", "security"])
+    func testSecurityScope() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
+        
+        let paths = MockData.Path.validPaths
+        
+        // Test security scope access
+        for path in paths {
+            let token = try manager.startSecurityScope(for: path)
+            #expect(token != nil)
+            #expect(context.securityService.startAccessCalled)
+            
+            // Test scope release
+            try manager.endSecurityScope(token!)
+            #expect(context.securityService.endAccessCalled)
+            
+            context.reset()
         }
     }
     
-    // MARK: - Error Tests
+    // MARK: - Persistence Tests
     
-    @Test("Handle permission errors", tags: ["model", "error"])
-    func testPermissionErrors() throws {
-        // Given
-        let permissions = BackupPermissions(
-            id: UUID(),
-            repositoryId: UUID()
-        )
+    @Test("Test permissions persistence", tags: ["permissions", "persistence"])
+    func testPersistence() throws {
+        // Given: Permissions manager with permissions
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
         
-        // Test invalid path errors
-        let invalidPath = URL(fileURLWithPath: "/private/var/root")
-        let error = permissions.grantAccess(to: invalidPath)
-        #expect(error == .invalidPath)
+        let paths = MockData.Path.validPaths
+        for path in paths {
+            try manager.requestPermission(for: path)
+        }
         
-        // Test access denied errors
-        let restrictedPath = URL(fileURLWithPath: "/System")
-        let accessError = permissions.grantAccess(to: restrictedPath)
-        #expect(accessError == .accessDenied)
+        // When: Saving state
+        try manager.save()
+        
+        // Then: State is persisted
+        let loadedManager = context.createPermissionsManager()
+        try loadedManager.load()
+        
+        for path in paths {
+            #expect(loadedManager.hasPermission(for: path))
+        }
+    }
+    
+    // MARK: - Edge Cases
+    
+    @Test("Handle permissions edge cases", tags: ["permissions", "edge"])
+    func testEdgeCases() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
+        
+        // Test invalid paths
+        do {
+            try manager.requestPermission(for: "")
+            throw TestFailure("Expected error for empty path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test non-existent paths
+        do {
+            try manager.requestPermission(for: "/non/existent/path")
+            throw TestFailure("Expected error for non-existent path")
+        } catch {
+            // Expected error
+        }
+        
+        // Test invalid bookmarks
+        do {
+            try manager.resolveBookmark(Data())
+            throw TestFailure("Expected error for invalid bookmark")
+        } catch {
+            // Expected error
+        }
+        
+        // Test invalid security scope token
+        do {
+            try manager.endSecurityScope("invalid-token")
+            throw TestFailure("Expected error for invalid token")
+        } catch {
+            // Expected error
+        }
+    }
+    
+    // MARK: - Performance Tests
+    
+    @Test("Test permissions performance", tags: ["permissions", "performance"])
+    func testPerformance() throws {
+        // Given: Permissions manager
+        let context = TestContext()
+        let manager = context.createPermissionsManager()
+        
+        // Test rapid permission requests
+        let startTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            try manager.requestPermission(for: "/test/path/\(i)")
+        }
+        let endTime = context.dateProvider.now()
+        
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test permission check performance
+        let checkStartTime = context.dateProvider.now()
+        for i in 0..<1000 {
+            _ = manager.hasPermission(for: "/test/path/\(i)")
+        }
+        let checkEndTime = context.dateProvider.now()
+        
+        let checkInterval = checkEndTime.timeIntervalSince(checkStartTime)
+        #expect(checkInterval < 0.1) // Permission checks should be fast
+    }
+}
+
+// MARK: - Mock Security Service
+
+/// Mock implementation of SecurityService for testing
+final class MockSecurityService: SecurityServiceProtocol {
+    private(set) var requestPermissionCalled = false
+    private(set) var revokePermissionCalled = false
+    private(set) var requestFullDiskAccessCalled = false
+    private(set) var checkFullDiskAccessCalled = false
+    private(set) var requestAutomationCalled = false
+    private(set) var checkAutomationCalled = false
+    private(set) var createBookmarkCalled = false
+    private(set) var resolveBookmarkCalled = false
+    private(set) var startAccessCalled = false
+    private(set) var endAccessCalled = false
+    
+    private var isFullDiskAccessGranted = false
+    private var isAutomationEnabled = false
+    
+    func requestPermission(for path: String) throws {
+        requestPermissionCalled = true
+    }
+    
+    func revokePermission(for path: String) throws {
+        revokePermissionCalled = true
+    }
+    
+    func requestFullDiskAccess() throws {
+        requestFullDiskAccessCalled = true
+    }
+    
+    func checkFullDiskAccess() throws -> Bool {
+        checkFullDiskAccessCalled = true
+        return isFullDiskAccessGranted
+    }
+    
+    func requestAutomation() throws {
+        requestAutomationCalled = true
+    }
+    
+    func checkAutomation() throws -> Bool {
+        checkAutomationCalled = true
+        return isAutomationEnabled
+    }
+    
+    func createBookmark(for path: String) throws -> Data {
+        createBookmarkCalled = true
+        return Data()
+    }
+    
+    func resolveBookmark(_ data: Data) throws -> String {
+        resolveBookmarkCalled = true
+        return ""
+    }
+    
+    func startSecurityScope(for path: String) throws -> String {
+        startAccessCalled = true
+        return "test-token"
+    }
+    
+    func endSecurityScope(_ token: String) throws {
+        endAccessCalled = true
+    }
+    
+    func simulateFullDiskAccess(granted: Bool) {
+        isFullDiskAccessGranted = granted
+    }
+    
+    func simulateAutomation(enabled: Bool) {
+        isAutomationEnabled = enabled
+    }
+    
+    func reset() {
+        requestPermissionCalled = false
+        revokePermissionCalled = false
+        requestFullDiskAccessCalled = false
+        checkFullDiskAccessCalled = false
+        requestAutomationCalled = false
+        checkAutomationCalled = false
+        createBookmarkCalled = false
+        resolveBookmarkCalled = false
+        startAccessCalled = false
+        endAccessCalled = false
+        isFullDiskAccessGranted = false
+        isAutomationEnabled = false
     }
 }

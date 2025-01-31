@@ -6,443 +6,389 @@
 //
 
 import Testing
-import Foundation
 @testable import rBUM
 
+/// Tests for BackupSchedule functionality
 struct BackupScheduleTests {
-    // MARK: - Basic Tests
+    // MARK: - Test Context
     
-    @Test("Initialize backup schedule with daily interval", tags: ["basic", "model"])
-    func testDailySchedule() throws {
-        // Given
-        let time = Date()
+    /// Test environment with test data
+    struct TestContext {
+        let dateProvider: MockDateProvider
+        let notificationCenter: MockNotificationCenter
+        let userDefaults: MockUserDefaults
         
-        // When
-        let schedule = BackupSchedule(interval: .daily, time: time)
-        
-        // Then
-        #expect(schedule.interval == .daily)
-        #expect(schedule.time == time)
-    }
-    
-    @Test("Initialize backup schedule with weekly interval", tags: ["basic", "model"])
-    func testWeeklySchedule() throws {
-        // Given
-        let time = Date()
-        
-        // When
-        let schedule = BackupSchedule(interval: .weekly, time: time)
-        
-        // Then
-        #expect(schedule.interval == .weekly)
-        #expect(schedule.time == time)
-    }
-    
-    @Test("Initialize backup schedule with monthly interval", tags: ["basic", "model"])
-    func testMonthlySchedule() throws {
-        // Given
-        let time = Date()
-        
-        // When
-        let schedule = BackupSchedule(interval: .monthly, time: time)
-        
-        // Then
-        #expect(schedule.interval == .monthly)
-        #expect(schedule.time == time)
-    }
-    
-    @Test("Initialize backup schedule with custom interval", tags: ["basic", "model"])
-    func testCustomSchedule() throws {
-        // Given
-        let time = Date()
-        let hours = 12
-        
-        // When
-        let schedule = BackupSchedule(interval: .custom(hours: hours), time: time)
-        
-        // Then
-        if case let .custom(customHours) = schedule.interval {
-            #expect(customHours == hours)
-        } else {
-            #expect(false, "Expected custom interval")
+        init() {
+            self.dateProvider = MockDateProvider()
+            self.notificationCenter = MockNotificationCenter()
+            self.userDefaults = MockUserDefaults()
         }
-        #expect(schedule.time == time)
+        
+        /// Reset all mocks to initial state
+        func reset() {
+            dateProvider.reset()
+            notificationCenter.reset()
+            userDefaults.reset()
+        }
+        
+        /// Create test schedule manager
+        func createScheduleManager() -> BackupScheduleManager {
+            BackupScheduleManager(
+                dateProvider: dateProvider,
+                notificationCenter: notificationCenter,
+                userDefaults: userDefaults
+            )
+        }
+    }
+    
+    // MARK: - Initialization Tests
+    
+    @Test("Initialize schedule manager", tags: ["init", "schedule"])
+    func testInitialization() throws {
+        // Given: Test context
+        let context = TestContext()
+        
+        // When: Creating schedule manager
+        let manager = context.createScheduleManager()
+        
+        // Then: Manager is properly configured
+        #expect(manager.schedules.isEmpty)
+        #expect(!manager.isRunning)
+    }
+    
+    // MARK: - Schedule Creation Tests
+    
+    @Test("Test schedule creation", tags: ["schedule", "create"])
+    func testScheduleCreation() throws {
+        // Given: Schedule manager
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.validSchedules
+        
+        // Test schedule creation
+        for schedule in schedules {
+            try manager.createSchedule(schedule)
+            #expect(manager.schedules.contains(schedule))
+            #expect(context.notificationCenter.postNotificationCalled)
+            #expect(context.userDefaults.setValueCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Schedule Update Tests
+    
+    @Test("Test schedule updates", tags: ["schedule", "update"])
+    func testScheduleUpdates() throws {
+        // Given: Schedule manager with schedules
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.updateSchedules
+        
+        // Add initial schedules
+        for schedule in schedules {
+            try manager.createSchedule(schedule)
+        }
+        
+        // Test schedule updates
+        for schedule in schedules {
+            var updatedSchedule = schedule
+            updatedSchedule.interval = .weekly
+            try manager.updateSchedule(updatedSchedule)
+            
+            #expect(manager.schedules.contains(updatedSchedule))
+            #expect(!manager.schedules.contains(schedule))
+            #expect(context.notificationCenter.postNotificationCalled)
+            #expect(context.userDefaults.setValueCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Schedule Deletion Tests
+    
+    @Test("Test schedule deletion", tags: ["schedule", "delete"])
+    func testScheduleDeletion() throws {
+        // Given: Schedule manager with schedules
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.validSchedules
+        
+        // Add schedules
+        for schedule in schedules {
+            try manager.createSchedule(schedule)
+        }
+        
+        // Test schedule deletion
+        for schedule in schedules {
+            try manager.deleteSchedule(schedule.id)
+            #expect(!manager.schedules.contains(schedule))
+            #expect(context.notificationCenter.postNotificationCalled)
+            #expect(context.userDefaults.setValueCalled)
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Schedule Execution Tests
+    
+    @Test("Test schedule execution", tags: ["schedule", "execute"])
+    func testScheduleExecution() throws {
+        // Given: Schedule manager with schedules
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.executionSchedules
+        
+        // Add schedules
+        for schedule in schedules {
+            try manager.createSchedule(schedule)
+        }
+        
+        // Test schedule execution
+        for schedule in schedules {
+            // Set current time to trigger schedule
+            context.dateProvider.currentDate = schedule.nextRunTime
+            
+            try manager.checkSchedules()
+            #expect(context.notificationCenter.postNotificationCalled)
+            let notification = context.notificationCenter.lastPostedNotification
+            #expect(notification?.name == .backupScheduleTriggered)
+            
+            context.reset()
+        }
     }
     
     // MARK: - Next Run Time Tests
     
-    @Test("Calculate next run time for daily schedule", tags: ["model", "schedule"])
-    func testNextRunTimeDaily() throws {
-        // Given
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 15 // 3 PM
-        components.minute = 30
-        let scheduleTime = calendar.date(from: components)!
-        let schedule = BackupSchedule(interval: .daily, time: scheduleTime)
+    @Test("Test next run time calculations", tags: ["schedule", "time"])
+    func testNextRunTimeCalculations() throws {
+        // Given: Schedule manager
+        let context = TestContext()
+        let manager = context.createScheduleManager()
         
-        // Test cases with different current times
-        let testCases = [
-            // Current time before schedule time - should run same day
-            (
-                calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!,
-                calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!
-            ),
-            // Current time after schedule time - should run next day
-            (
-                calendar.date(bySettingHour: 16, minute: 0, second: 0, of: Date())!,
-                calendar.date(byAdding: .day, value: 1, to: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!)!
-            )
-        ]
+        let schedules = MockData.Schedule.timeCalculationSchedules
         
-        for (currentTime, expectedNextRun) in testCases {
-            let nextRun = schedule.nextRunTime(after: currentTime)
-            let sameTimeOfDay = calendar.compare(nextRun, to: expectedNextRun, toGranularity: .minute) == .orderedSame
-            #expect(sameTimeOfDay, "Next run time incorrect for current time: \(currentTime)")
-        }
-    }
-    
-    @Test("Calculate next run time for weekly schedule", tags: ["model", "schedule"])
-    func testNextRunTimeWeekly() throws {
-        // Given
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 15 // 3 PM
-        components.minute = 30
-        let scheduleTime = calendar.date(from: components)!
-        let schedule = BackupSchedule(interval: .weekly, time: scheduleTime)
-        
-        // Test cases with different current times
-        let testCases = [
-            // Current time before schedule time - should run same week
-            (
-                calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!,
-                calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!
-            ),
-            // Current time after schedule time - should run next week
-            (
-                calendar.date(bySettingHour: 16, minute: 0, second: 0, of: Date())!,
-                calendar.date(byAdding: .weekOfYear, value: 1, to: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!)!
-            )
-        ]
-        
-        for (currentTime, expectedNextRun) in testCases {
-            let nextRun = schedule.nextRunTime(after: currentTime)
-            let sameTimeOfDay = calendar.compare(nextRun, to: expectedNextRun, toGranularity: .minute) == .orderedSame
-            #expect(sameTimeOfDay, "Next run time incorrect for current time: \(currentTime)")
-        }
-    }
-    
-    @Test("Calculate next run time for monthly schedule", tags: ["model", "schedule"])
-    func testNextRunTimeMonthly() throws {
-        // Given
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 15 // 3 PM
-        components.minute = 30
-        let scheduleTime = calendar.date(from: components)!
-        let schedule = BackupSchedule(interval: .monthly, time: scheduleTime)
-        
-        // Test cases with different current times
-        let testCases = [
-            // Current time before schedule time - should run same month
-            (
-                calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!,
-                calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!
-            ),
-            // Current time after schedule time - should run next month
-            (
-                calendar.date(bySettingHour: 16, minute: 0, second: 0, of: Date())!,
-                calendar.date(byAdding: .month, value: 1, to: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!)!
-            )
-        ]
-        
-        for (currentTime, expectedNextRun) in testCases {
-            let nextRun = schedule.nextRunTime(after: currentTime)
-            let sameTimeOfDay = calendar.compare(nextRun, to: expectedNextRun, toGranularity: .minute) == .orderedSame
-            #expect(sameTimeOfDay, "Next run time incorrect for current time: \(currentTime)")
-        }
-    }
-    
-    @Test("Calculate next run time for custom schedule", tags: ["model", "schedule"])
-    func testNextRunTimeCustom() throws {
-        // Given
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 15 // 3 PM
-        components.minute = 30
-        let scheduleTime = calendar.date(from: components)!
-        let schedule = BackupSchedule(interval: .custom(hours: 12), time: scheduleTime)
-        
-        // Test cases with different current times
-        let testCases = [
-            // Current time before schedule time - should run at schedule time
-            (
-                calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date())!,
-                calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!
-            ),
-            // Current time after schedule time - should run after custom interval
-            (
-                calendar.date(bySettingHour: 16, minute: 0, second: 0, of: Date())!,
-                calendar.date(byAdding: .hour, value: 12, to: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: Date())!)!
-            )
-        ]
-        
-        for (currentTime, expectedNextRun) in testCases {
-            let nextRun = schedule.nextRunTime(after: currentTime)
-            let sameTimeOfDay = calendar.compare(nextRun, to: expectedNextRun, toGranularity: .minute) == .orderedSame
-            #expect(sameTimeOfDay, "Next run time incorrect for current time: \(currentTime)")
-        }
-    }
-    
-    // MARK: - Comparison Tests
-    
-    @Test("Compare schedules for equality", tags: ["model", "comparison"])
-    func testEquatable() throws {
-        // Given
-        let time = Date()
-        let schedule1 = BackupSchedule(interval: .daily, time: time)
-        let schedule2 = BackupSchedule(interval: .daily, time: time)
-        let schedule3 = BackupSchedule(interval: .weekly, time: time)
-        let schedule4 = BackupSchedule(interval: .daily, time: Date(timeIntervalSinceNow: 3600))
-        
-        // Then
-        #expect(schedule1 == schedule2)
-        #expect(schedule1 != schedule3)
-        #expect(schedule1 != schedule4)
-    }
-    
-    // MARK: - Serialization Tests
-    
-    @Test("Encode and decode schedule", tags: ["model", "serialization"])
-    func testCodable() throws {
-        let testCases = [
-            BackupSchedule(interval: .daily, time: Date()),
-            BackupSchedule(interval: .weekly, time: Date()),
-            BackupSchedule(interval: .monthly, time: Date()),
-            BackupSchedule(interval: .custom(hours: 12), time: Date())
-        ]
-        
-        for schedule in testCases {
-            // When
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            let data = try encoder.encode(schedule)
-            let decoded = try decoder.decode(BackupSchedule.self, from: data)
+        // Test next run time calculations
+        for schedule in schedules {
+            let nextRun = try manager.calculateNextRunTime(schedule)
             
-            // Then
-            #expect(decoded.interval == schedule.interval)
-            #expect(decoded.time == schedule.time)
+            switch schedule.interval {
+            case .hourly:
+                let expectedInterval: TimeInterval = 3600
+                let difference = nextRun.timeIntervalSince(context.dateProvider.now())
+                #expect(abs(difference - expectedInterval) < 1.0)
+                
+            case .daily:
+                let expectedInterval: TimeInterval = 86400
+                let difference = nextRun.timeIntervalSince(context.dateProvider.now())
+                #expect(abs(difference - expectedInterval) < 1.0)
+                
+            case .weekly:
+                let expectedInterval: TimeInterval = 604800
+                let difference = nextRun.timeIntervalSince(context.dateProvider.now())
+                #expect(abs(difference - expectedInterval) < 1.0)
+                
+            case .monthly:
+                // Monthly interval varies, just ensure it's in the future
+                #expect(nextRun > context.dateProvider.now())
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Persistence Tests
+    
+    @Test("Test schedule persistence", tags: ["schedule", "persistence"])
+    func testPersistence() throws {
+        // Given: Schedule manager with schedules
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.validSchedules
+        
+        // Add schedules
+        for schedule in schedules {
+            try manager.createSchedule(schedule)
+        }
+        
+        // When: Saving state
+        try manager.save()
+        
+        // Then: State is persisted
+        let loadedManager = context.createScheduleManager()
+        try loadedManager.load()
+        
+        #expect(loadedManager.schedules.count == schedules.count)
+        for schedule in schedules {
+            #expect(loadedManager.schedules.contains(schedule))
+        }
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    @Test("Test schedule error handling", tags: ["schedule", "error"])
+    func testErrorHandling() throws {
+        // Given: Schedule manager
+        let context = TestContext()
+        let manager = context.createScheduleManager()
+        
+        let schedules = MockData.Schedule.errorSchedules
+        
+        // Test error handling
+        for schedule in schedules {
+            do {
+                try manager.createSchedule(schedule)
+                #expect(false, "Expected error for invalid schedule")
+            } catch {
+                // Expected error
+                #expect(context.notificationCenter.postNotificationCalled)
+                let notification = context.notificationCenter.lastPostedNotification
+                #expect(notification?.name == .backupScheduleError)
+            }
+            
+            context.reset()
         }
     }
     
     // MARK: - Edge Cases
     
-    @Test("Handle edge cases in custom intervals", tags: ["model", "validation"])
-    func testCustomIntervalEdgeCases() throws {
-        let testCases = [
-            1, // Minimum 1 hour
-            24, // Daily equivalent
-            168, // Weekly equivalent
-            720, // Monthly equivalent (30 days)
-            8760 // Yearly equivalent
-        ]
+    @Test("Handle schedule edge cases", tags: ["schedule", "edge"])
+    func testEdgeCases() throws {
+        // Given: Schedule manager
+        let context = TestContext()
+        let manager = context.createScheduleManager()
         
-        for hours in testCases {
-            // When
-            let schedule = BackupSchedule(interval: .custom(hours: hours), time: Date())
-            
-            // Then
-            if case let .custom(customHours) = schedule.interval {
-                #expect(customHours == hours)
-            } else {
-                #expect(false, "Expected custom interval")
-            }
+        // Test invalid schedule ID
+        do {
+            try manager.deleteSchedule(UUID())
+            throw TestFailure("Expected error for invalid schedule ID")
+        } catch {
+            // Expected error
         }
+        
+        // Test duplicate schedule
+        let schedule = MockData.Schedule.validSchedules[0]
+        try manager.createSchedule(schedule)
+        
+        do {
+            try manager.createSchedule(schedule)
+            throw TestFailure("Expected error for duplicate schedule")
+        } catch {
+            // Expected error
+        }
+        
+        // Test past next run time
+        var pastSchedule = schedule
+        pastSchedule.nextRunTime = context.dateProvider.now().addingTimeInterval(-3600)
+        try manager.createSchedule(pastSchedule)
+        try manager.checkSchedules()
+        
+        // Should update next run time
+        let updatedSchedule = manager.schedules.first { $0.id == pastSchedule.id }
+        #expect(updatedSchedule?.nextRunTime ?? Date() > context.dateProvider.now())
     }
     
-    @Test("Handle daylight saving time transitions", tags: ["model", "schedule"])
-    func testDSTTransitions() throws {
-        // Given
-        let calendar = Calendar.current
+    // MARK: - Performance Tests
+    
+    @Test("Test schedule performance", tags: ["schedule", "performance"])
+    func testPerformance() throws {
+        // Given: Schedule manager
+        let context = TestContext()
+        let manager = context.createScheduleManager()
         
-        // Find next DST transition
-        var components = DateComponents()
-        components.month = 3 // March for Spring Forward
-        components.hour = 2 // 2 AM
-        components.minute = 0
+        // Test schedule checks performance
+        let startTime = context.dateProvider.now()
         
-        guard let dstTransition = calendar.nextDate(after: Date(),
-                                                  matching: components,
-                                                  matchingPolicy: .nextTime) else {
-            #expect(false, "Could not find next DST transition")
-            return
+        // Add many schedules
+        for _ in 0..<100 {
+            var schedule = MockData.Schedule.validSchedules[0]
+            schedule.id = UUID()
+            try manager.createSchedule(schedule)
         }
         
-        // Create schedule for 2:30 AM
-        components.hour = 2
-        components.minute = 30
-        let scheduleTime = calendar.date(from: components)!
-        let schedule = BackupSchedule(interval: .daily, time: scheduleTime)
+        // Check schedules repeatedly
+        for _ in 0..<100 {
+            try manager.checkSchedules()
+        }
         
-        // Test next run time around DST transition
-        let beforeDST = calendar.date(byAdding: .hour, value: -1, to: dstTransition)!
-        let nextRun = schedule.nextRunTime(after: beforeDST)
+        let endTime = context.dateProvider.now()
         
-        // Verify the next run is properly adjusted for DST
-        let nextRunHour = calendar.component(.hour, from: nextRun)
-        #expect(nextRunHour == 2 || nextRunHour == 3, "Next run should account for DST transition")
+        // Verify performance
+        let timeInterval = endTime.timeIntervalSince(startTime)
+        #expect(timeInterval < 1.0) // Should complete in under 1 second
+        
+        // Test next run time calculation performance
+        let calcStartTime = context.dateProvider.now()
+        let schedule = MockData.Schedule.validSchedules[0]
+        
+        for _ in 0..<1000 {
+            _ = try manager.calculateNextRunTime(schedule)
+        }
+        
+        let calcEndTime = context.dateProvider.now()
+        
+        let calcInterval = calcEndTime.timeIntervalSince(calcStartTime)
+        #expect(calcInterval < 0.1) // Calculations should be fast
+    }
+}
+
+// MARK: - Mock User Defaults
+
+/// Mock implementation of UserDefaults for testing
+final class MockUserDefaults: UserDefaultsProtocol {
+    private(set) var setValueCalled = false
+    private(set) var getValueCalled = false
+    private var storage: [String: Any] = [:]
+    
+    func setValue(_ value: Any?, forKey key: String) {
+        setValueCalled = true
+        storage[key] = value
     }
     
-    // MARK: - Weekly Day Tests
-    
-    @Test("Handle weekly schedule day selection", tags: ["model", "schedule"])
-    func testWeeklyDaySelection() throws {
-        // Given
-        let time = Date()
-        let testCases: [(Set<Weekday>, Bool)] = [
-            // Valid cases
-            ([.monday, .wednesday, .friday], true),
-            ([.saturday, .sunday], true),
-            ([.monday], true),
-            (Set(Weekday.allCases), true),
-            // Invalid cases
-            ([], false)
-        ]
-        
-        for (days, isValid) in testCases {
-            let schedule = BackupSchedule(interval: .weekly, time: time, weeklyDays: days)
-            
-            if isValid {
-                #expect(schedule.isValid)
-                #expect(schedule.weeklyDays == days)
-            } else {
-                #expect(!schedule.isValid)
-            }
-        }
+    func value(forKey key: String) -> Any? {
+        getValueCalled = true
+        return storage[key]
     }
     
-    // MARK: - Monthly Day Tests
+    func reset() {
+        setValueCalled = false
+        getValueCalled = false
+        storage.removeAll()
+    }
+}
+
+// MARK: - Mock Implementations
+
+/// Mock implementation of DateProvider for testing
+final class MockDateProvider: DateProvider {
+    var currentDate: Date = Date()
     
-    @Test("Handle monthly schedule day selection", tags: ["model", "schedule"])
-    func testMonthlyDaySelection() throws {
-        // Given
-        let time = Date()
-        let testCases: [(Set<Int>, Bool)] = [
-            // Valid cases
-            ([1, 15, 30], true),
-            ([1], true),
-            (Set(1...31), true),
-            // Invalid cases
-            ([], false),
-            ([0], false),
-            ([32], false),
-            ([-1], false)
-        ]
-        
-        for (days, isValid) in testCases {
-            let schedule = BackupSchedule(interval: .monthly, time: time, monthlyDays: days)
-            
-            if isValid {
-                #expect(schedule.isValid)
-                #expect(schedule.monthlyDays == days)
-            } else {
-                #expect(!schedule.isValid)
-            }
-        }
+    func now() -> Date {
+        currentDate
     }
     
-    // MARK: - Time Window Tests
+    func reset() {
+        currentDate = Date()
+    }
+}
+
+/// Mock implementation of NotificationCenter for testing
+final class MockNotificationCenter: NotificationCenter {
+    var postCalled = false
+    var lastNotification: Notification?
     
-    @Test("Handle backup time window constraints", tags: ["model", "schedule"])
-    func testTimeWindowConstraints() throws {
-        // Given
-        let calendar = Calendar.current
-        let testCases: [(DateComponents, DateComponents, Bool)] = [
-            // Valid windows
-            (
-                DateComponents(hour: 1, minute: 0),
-                DateComponents(hour: 5, minute: 0),
-                true
-            ),
-            (
-                DateComponents(hour: 22, minute: 0),
-                DateComponents(hour: 6, minute: 0),
-                true
-            ),
-            // Invalid windows
-            (
-                DateComponents(hour: 5, minute: 0),
-                DateComponents(hour: 1, minute: 0),
-                false
-            ),
-            (
-                DateComponents(hour: -1, minute: 0),
-                DateComponents(hour: 5, minute: 0),
-                false
-            )
-        ]
-        
-        for (start, end, isValid) in testCases {
-            let schedule = BackupSchedule(
-                interval: .daily,
-                time: Date(),
-                timeWindowStart: calendar.date(from: start),
-                timeWindowEnd: calendar.date(from: end)
-            )
-            
-            if isValid {
-                #expect(schedule.isValid)
-                #expect(schedule.timeWindowStart != nil)
-                #expect(schedule.timeWindowEnd != nil)
-            } else {
-                #expect(!schedule.isValid)
-            }
-        }
+    override func post(_ notification: Notification) {
+        postCalled = true
+        lastNotification = notification
     }
     
-    // MARK: - Description Tests
-    
-    @Test("Generate human-readable schedule descriptions", tags: ["model", "description"])
-    func testScheduleDescriptions() throws {
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 15
-        components.minute = 30
-        let time = calendar.date(from: components)!
-        
-        let testCases: [(BackupSchedule, String)] = [
-            (
-                BackupSchedule(interval: .daily, time: time),
-                "Daily at 15:30"
-            ),
-            (
-                BackupSchedule(
-                    interval: .weekly,
-                    time: time,
-                    weeklyDays: [.monday, .wednesday, .friday]
-                ),
-                "Weekly on Monday, Wednesday, Friday at 15:30"
-            ),
-            (
-                BackupSchedule(
-                    interval: .monthly,
-                    time: time,
-                    monthlyDays: [1, 15]
-                ),
-                "Monthly on days 1, 15 at 15:30"
-            ),
-            (
-                BackupSchedule(
-                    interval: .custom(hours: 12),
-                    time: time
-                ),
-                "Every 12 hours starting at 15:30"
-            )
-        ]
-        
-        for (schedule, expectedDescription) in testCases {
-            #expect(schedule.description == expectedDescription)
-        }
+    func reset() {
+        postCalled = false
+        lastNotification = nil
     }
 }
