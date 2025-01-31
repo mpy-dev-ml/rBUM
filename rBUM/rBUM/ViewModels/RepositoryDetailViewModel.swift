@@ -42,8 +42,8 @@ final class RepositoryDetailViewModel: ObservableObject {
     init(
         repository: Repository,
         resticService: ResticCommandServiceProtocol = ResticCommandService(
-            credentialsManager: KeychainCredentialsManager(),
-            processExecutor: ProcessExecutor()
+            fileManager: .default,
+            logger: Logging.logger(for: .repository)
         ),
         credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
@@ -59,19 +59,32 @@ final class RepositoryDetailViewModel: ObservableObject {
         defer { isChecking = false }
         
         do {
+            // Get repository password
             let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
             
-            // Check repository and store status
-            let status = try await resticService.checkRepository(repository.path, withPassword: password)
-            self.repositoryStatus = status
+            // Create ResticRepository with credentials
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
+            let resticRepo = ResticRepository(
+                name: repository.name,
+                path: repository.path,
+                credentials: credentials
+            )
+            
+            // Check repository
+            try await resticService.check(resticRepo)
             
             // Update last check time
             lastCheck = Date()
             logger.infoMessage("Repository check successful: \(repository.id)")
         } catch {
+            self.error = error
+            self.showError = true
             logger.errorMessage("Repository check failed: \(error.localizedDescription)")
-            self.error = error is ResticError ? error : ResticError.commandFailed(error.localizedDescription)
-            showError = true
         }
     }
     

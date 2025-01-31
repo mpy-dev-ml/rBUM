@@ -49,8 +49,8 @@ final class SnapshotListViewModel: ObservableObject {
     init(
         repository: Repository,
         resticService: ResticCommandServiceProtocol = ResticCommandService(
-            credentialsManager: KeychainCredentialsManager(),
-            processExecutor: ProcessExecutor()
+            fileManager: .default,
+            logger: Logging.logger(for: .repository)
         ),
         credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
     ) {

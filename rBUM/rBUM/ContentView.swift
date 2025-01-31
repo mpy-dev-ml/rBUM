@@ -66,10 +66,7 @@ struct SidebarView: View {
 
 #Preview {
     ContentView(
-        credentialsManager: KeychainCredentialsManager(
-            keychainService: MockKeychainService(),
-            credentialsStorage: MockCredentialsStorage()
-        )
+        credentialsManager: PreviewCredentialsManager()
     )
 }
 
@@ -139,68 +136,47 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         keepYearly: Int?
     ) async throws {}
     
-    func checkRepository(_ repository: URL, withPassword password: String) async throws -> RepositoryStatus {
-        // Return mock status for preview
-        return RepositoryStatus(
-            isValid: true,
-            packsValid: true,
-            indexValid: true,
-            snapshotsValid: true,
-            errors: [],
-            stats: .init(
-                totalSize: 1024 * 1024 * 100,  // 100 MB
-                packFiles: 10,
-                snapshots: 5
-            )
+    func forget(in repository: ResticRepository, snapshots: [ResticSnapshot]) async throws {}
+    
+    func restore(from snapshot: ResticSnapshot, to path: URL, onProgress: ((ResticRestoreProgress) -> Void)? = nil) async throws {}
+    
+    func mount(repository: ResticRepository, on path: URL, onProgress: ((ResticMountProgress) -> Void)? = nil) async throws {}
+    
+    func unmount(repository: ResticRepository, on path: URL) async throws {}
+}
+
+private final class PreviewCredentialsManager: CredentialsManagerProtocol {
+    func store(_ credentials: RepositoryCredentials) async throws {
+        <#code#>
+    }
+    
+    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+        <#code#>
+    }
+    
+    func delete(forId id: UUID) async throws {
+        <#code#>
+    }
+    
+    func getPassword(forRepositoryId id: UUID) async throws -> String {
+        <#code#>
+    }
+    
+    func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
+        <#code#>
+    }
+    
+    func getCredentials(for repository: Repository) throws -> RepositoryCredentials {
+        RepositoryCredentials(
+            repositoryId: repository.id,
+            password: "test",
+            repositoryPath: repository.path.path
         )
     }
     
-    func checkRepository(at path: URL, credentials: RepositoryCredentials) async throws {}
+    func storeCredentials(_ credentials: RepositoryCredentials) throws {}
     
-    func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        credentials: RepositoryCredentials,
-        tags: [String]?,
-        onProgress: ((BackupProgress) -> Void)?,
-        onStatusChange: ((BackupStatus) -> Void)?
-    ) async throws {
-        // Simulate backup progress
-        onStatusChange?(.preparing)
-        
-        // Simulate progress updates
-        let progress = BackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1024 * 1024,
-            processedBytes: 512 * 1024,
-            currentFile: "/test/file.txt",
-            estimatedSecondsRemaining: 30,
-            startTime: Date()
-        )
-        onProgress?(progress)
-        onStatusChange?(.backing(progress))
-        
-        // Simulate completion
-        try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
-        onStatusChange?(.completed)
-    }
-    
-    func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot] {
-        []
-    }
-    
-    func pruneSnapshots(
-        in repository: Repository,
-        credentials: RepositoryCredentials,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
-    ) async throws {
-        // No changes made here
-    }
+    func deleteCredentials(forRepositoryId repositoryId: UUID) throws {}
 }
 
 class ContentViewModel: ObservableObject {
@@ -216,7 +192,7 @@ class ContentViewModel: ObservableObject {
         self.repositoryStorage = RepositoryStorage()
         self.resticService = ResticCommandService(
             fileManager: .default,
-            logger: Logger(subsystem: "dev.mpy.rBUM", category: "ResticCommand")
+            logger: Logging.logger(for: .repository)
         )
         self.repositoryCreationService = RepositoryCreationService(
             resticService: resticService,

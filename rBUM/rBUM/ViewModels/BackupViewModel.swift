@@ -13,8 +13,7 @@ final class BackupViewModel: ObservableObject {
     @Published private(set) var state: ResticBackupStatus = .preparing
     @Published var selectedPaths: [URL] = []
     @Published var showError = false
-    @Published private(set) var currentStatus: BackupStatus?
-    @Published private(set) var currentProgress: BackupProgress?
+    @Published private(set) var currentProgress: ResticBackupProgress?
     
     private let repository: Repository
     private let resticService: ResticCommandServiceProtocol
@@ -41,28 +40,35 @@ final class BackupViewModel: ObservableObject {
             panel.message = "Select files and folders to back up"
             panel.prompt = "Back Up"
             
-            if panel.runModal() == .OK {
-                selectedPaths = panel.urls
-                logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
+            guard await panel.beginSheetModal(for: NSApp.keyWindow!) == .OK else {
+                return
             }
+            
+            selectedPaths = panel.urls
+            logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
         }
     }
     
     func startBackup() async {
-        guard !selectedPaths.isEmpty else { return }
+        guard !selectedPaths.isEmpty else {
+            logger.warningMessage("No paths selected for backup")
+            return
+        }
         
         do {
             // Reset state
-            currentStatus = nil
             currentProgress = nil
             
             // Get repository credentials
-            guard let credentials = try? credentialsManager.getCredentials(for: repository) else {
-                state = .failed(ResticError.credentialsNotFound)
-                return
-            }
+            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
             
-            // Create ResticRepository
+            // Create ResticRepository with credentials
+            let credentials = RepositoryCredentials(
+                repositoryId: repository.id,
+                password: password,
+                repositoryPath: repository.path.path
+            )
+            
             let resticRepo = ResticRepository(
                 name: repository.name,
                 path: repository.path,
@@ -73,19 +79,17 @@ final class BackupViewModel: ObservableObject {
             try await resticService.createBackup(
                 paths: selectedPaths,
                 to: resticRepo,
-                tags: nil,
                 onProgress: { [weak self] progress in
-                    guard let self = self else { return }
-                    if case .backing = self.state {
-                        // Only update progress if we're already in backing state
-                        self.state = .backing(progress)
-                    }
+                    self?.currentProgress = progress
                 },
                 onStatusChange: { [weak self] status in
                     self?.state = status
                 }
             )
+            
+            logger.infoMessage("Backup completed successfully")
         } catch {
+            logger.errorMessage("Backup failed: \(error.localizedDescription)")
             state = .failed(error)
             showError = true
         }
@@ -99,8 +103,8 @@ final class BackupViewModel: ObservableObject {
         switch state {
         case .preparing:
             return "Preparing backup..."
-        case .backing(let progress):
-            return "Backing up \(progress.processedFiles)/\(progress.totalFiles) files (\(Int(progress.byteProgress))%)"
+        case .backing:
+            return "Backing up..."
         case .finalising:
             return "Finalizing backup..."
         case .completed:
@@ -114,8 +118,8 @@ final class BackupViewModel: ObservableObject {
     
     var progressPercentage: Double {
         switch state {
-        case .backing(let progress):
-            return progress.byteProgress
+        case .backing:
+            return currentProgress?.byteProgress ?? 0
         case .completed:
             return 100
         default:
@@ -144,7 +148,6 @@ final class BackupViewModel: ObservableObject {
         state = .preparing
         selectedPaths = []
         showError = false
-        currentStatus = nil
         currentProgress = nil
     }
 }

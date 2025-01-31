@@ -14,92 +14,85 @@ struct BackupView: View {
     init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: BackupViewModel(
             repository: repository,
-            resticService: PreviewResticCommandService(),
-            credentialsManager: PreviewCredentialsManager()
+            resticService: ResticCommandService(
+                fileManager: .default,
+                logger: Logging.logger(for: .repository)
+            ),
+            credentialsManager: KeychainCredentialsManager()
         ))
     }
     
     var body: some View {
         VStack(spacing: 20) {
-            if case .backing(let progress) = viewModel.state {
+            if case .backing = viewModel.state, let progress = viewModel.currentProgress {
                 VStack(spacing: 8) {
-                    ProgressView(value: progress.byteProgress, total: 100) {
+                    ProgressView(value: progress.percentComplete, total: 100) {
                         Text(viewModel.progressMessage)
                             .font(.headline)
                     }
                     .progressViewStyle(.linear)
                     
-                    Text("Elapsed time: \(Int(progress.updatedAt.timeIntervalSince(progress.startTime))) seconds")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-            } else if case .completed = viewModel.state {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.green)
-                    
-                    Text("Backup Completed")
-                        .font(.headline)
+                    HStack {
+                        Text("\(progress.processedFiles)/\(progress.totalFiles) files")
+                        Spacer()
+                        Text("\(Int(progress.percentComplete))%")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
                 .padding()
             } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.blue)
-                    
-                    Text("Select Files to Back Up")
-                        .font(.headline)
-                }
-                .padding()
+                Text(viewModel.progressMessage)
+                    .font(.headline)
+                    .padding()
             }
             
-            Spacer()
-            
-            HStack {
-                Button("Cancel") {
-                    dismiss()
+            if viewModel.selectedPaths.isEmpty {
+                Button("Select Files") {
+                    Task {
+                        await viewModel.selectPaths()
+                    }
                 }
-                .buttonStyle(.bordered)
-                
-                Spacer()
-                
-                if case .backing = viewModel.state {
-                    Button("Cancel Backup") {
-                        Task {
-                            await viewModel.cancelBackup()
+                .buttonStyle(.borderedProminent)
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(viewModel.selectedPaths, id: \.absoluteString) { path in
+                        HStack {
+                            Image(systemName: "doc.fill")
+                            Text(path.lastPathComponent)
+                            Spacer()
                         }
+                        .padding(.horizontal)
                     }
-                    .buttonStyle(.bordered)
-                } else if case .completed = viewModel.state {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .buttonStyle(.bordered)
-                } else {
-                    Button("Select Files") {
-                        Task {
-                            await viewModel.selectPaths()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    
+                }
+                .padding(.vertical)
+                
+                HStack(spacing: 20) {
                     Button("Start Backup") {
                         Task {
                             await viewModel.startBackup()
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.selectedPaths.isEmpty)
+                    .disabled(viewModel.state.isActive)
+                    
+                    if viewModel.state.isActive {
+                        Button("Cancel") {
+                            Task {
+                                await viewModel.cancelBackup()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
             }
-            .padding()
         }
-        .frame(width: 400, height: 300)
+        .frame(width: 400)
+        .padding()
         .alert("Backup Failed", isPresented: $viewModel.showError) {
-            Button("OK") { }
+            Button("OK") {
+                dismiss()
+            }
         } message: {
             if case .failed(let error) = viewModel.state {
                 Text(error.localizedDescription)
