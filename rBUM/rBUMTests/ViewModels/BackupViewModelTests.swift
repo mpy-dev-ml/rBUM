@@ -7,20 +7,20 @@ struct BackupViewModelTests {
     
     /// Test environment with test data
     struct TestContext {
-        let backupService: MockBackupService
-        let resticService: MockResticService
-        let notificationCenter: MockNotificationCenter
-        let progressTracker: MockProgressTracker
-        let dateProvider: MockDateProvider
-        let userDefaults: MockUserDefaults
+        let backupService: TestMocks.MockBackupService
+        let resticService: TestMocks.MockResticService
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let progressTracker: TestMocks.MockProgressTracker
+        let dateProvider: TestMocks.MockDateProvider
+        let userDefaults: TestMocks.MockUserDefaults
         
         init() {
-            self.backupService = MockBackupService()
-            self.resticService = MockResticService()
-            self.notificationCenter = MockNotificationCenter()
-            self.progressTracker = MockProgressTracker()
-            self.dateProvider = MockDateProvider()
-            self.userDefaults = MockUserDefaults()
+            self.backupService = TestMocks.MockBackupService()
+            self.resticService = TestMocks.MockResticService()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.progressTracker = TestMocks.MockProgressTracker()
+            self.dateProvider = TestMocks.MockDateProvider()
+            self.userDefaults = TestMocks.MockUserDefaults()
         }
         
         /// Reset all mocks to initial state

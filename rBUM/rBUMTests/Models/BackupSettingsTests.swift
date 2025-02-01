@@ -14,14 +14,14 @@ struct BackupSettingsTests {
     
     /// Test environment with test data
     struct TestContext {
-        let userDefaults: MockUserDefaults
-        let notificationCenter: MockNotificationCenter
-        let fileManager: MockFileManager
+        let userDefaults: TestMocks.MockUserDefaults
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let fileManager: TestMocks.MockFileManager
         
         init() {
-            self.userDefaults = MockUserDefaults()
-            self.notificationCenter = MockNotificationCenter()
-            self.fileManager = MockFileManager()
+            self.userDefaults = TestMocks.MockUserDefaults()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.fileManager = TestMocks.MockFileManager()
         }
         
         /// Reset all mocks to initial state
@@ -63,7 +63,7 @@ struct BackupSettingsTests {
     
     // MARK: - Initialization Tests
     
-    @Test("Initialize with default values", tags: ["init", "settings"])
+    @Test("Initialize with default values", ["init", "settings"] as! TestTrait)
     func testDefaultInitialization() throws {
         // Given: Default settings parameters
         let context = TestContext()
@@ -84,7 +84,7 @@ struct BackupSettingsTests {
         #expect(settings.excludeCaches)
     }
     
-    @Test("Initialize with custom values", tags: ["init", "settings"])
+    @Test("Initialize with custom values", ["init", "settings"] as! TestTrait)
     func testCustomInitialization() throws {
         // Given: Custom settings parameters
         let context = TestContext()
@@ -118,7 +118,7 @@ struct BackupSettingsTests {
     
     // MARK: - Persistence Tests
     
-    @Test("Save and load settings", tags: ["persistence", "settings"])
+    @Test("Save and load settings", ["persistence", "settings"] as! TestTrait)
     func testPersistence() throws {
         // Given: Settings with custom values
         let context = TestContext()
@@ -154,7 +154,7 @@ struct BackupSettingsTests {
     
     // MARK: - Validation Tests
     
-    @Test("Validate settings", tags: ["validation", "settings"])
+    @Test("Validate settings", ["validation", "settings"] as! TestTrait)
     func testValidation() throws {
         // Given: Settings with various configurations
         let context = TestContext()
@@ -196,7 +196,7 @@ struct BackupSettingsTests {
     
     // MARK: - Notification Tests
     
-    @Test("Handle notifications", tags: ["notification", "settings"])
+    @Test("Handle notifications", ["notification", "settings"] as! TestTrait)
     func testNotifications() throws {
         // Given: Settings with different notification configurations
         let context = TestContext()
@@ -222,7 +222,7 @@ struct BackupSettingsTests {
     
     // MARK: - Exclusion Tests
     
-    @Test("Handle file exclusions", tags: ["exclusion", "settings"])
+    @Test("Handle file exclusions", ["exclusion", "settings"] as! TestTrait)
     func testExclusions() throws {
         // Given: Settings with different exclusion configurations
         let context = TestContext()
@@ -251,7 +251,7 @@ struct BackupSettingsTests {
     
     // MARK: - Edge Cases
     
-    @Test("Handle edge cases", tags: ["edge", "settings"])
+    @Test("Handle edge cases", ["edge", "settings"] as! TestTrait)
     func testEdgeCases() throws {
         // Given: Edge case scenarios
         let context = TestContext()
@@ -277,7 +277,7 @@ struct BackupSettingsTests {
         #expect(!settings.shouldExclude(""))
         
         // Test nil UserDefaults
-        let nilDefaults = MockUserDefaults()
+        let nilDefaults = TestMocks.MockUserDefaults()
         nilDefaults.removeObject(forKey: BackupSettings.defaultsKey)
         let loadedSettings = BackupSettings.load(from: nilDefaults)
         #expect(loadedSettings == nil)
@@ -287,7 +287,7 @@ struct BackupSettingsTests {
 // MARK: - Mock Implementations
 
 /// Mock implementation of UserDefaults for testing
-final class MockUserDefaults: UserDefaults {
+final class TestMocks.MockUserDefaults: UserDefaults {
     var storage: [String: Any] = [:]
     
     override func set(_ value: Any?, forKey defaultName: String) {
@@ -312,7 +312,7 @@ final class MockUserDefaults: UserDefaults {
 }
 
 /// Mock implementation of NotificationCenter for testing
-final class MockNotificationCenter: NotificationCenter {
+final class TestMocks.MockNotificationCenter: NotificationCenter {
     var postCalled = false
     var lastNotification: Notification?
     
@@ -328,7 +328,7 @@ final class MockNotificationCenter: NotificationCenter {
 }
 
 /// Mock implementation of FileManager for testing
-final class MockFileManager: FileManager {
+final class TestMocks.MockFileManager: FileManager {
     var files: [String: (isHidden: Bool, isSystem: Bool)] = [:]
     
     override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {

@@ -14,12 +14,12 @@ struct BackupErrorTests {
     
     /// Test environment with test data
     struct TestContext {
-        let userDefaults: MockUserDefaults
-        let notificationCenter: MockNotificationCenter
+        let userDefaults: TestMocks.MockUserDefaults
+        let notificationCenter: TestMocks.MockNotificationCenter
         
         init() {
-            self.userDefaults = MockUserDefaults()
-            self.notificationCenter = MockNotificationCenter()
+            self.userDefaults = TestMocks.MockUserDefaults()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
         }
         
         /// Reset all mocks to initial state

@@ -1,16 +1,18 @@
-//
-//  BackupSecurityTests.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
+import Foundation
 import Testing
 @testable import rBUM
 
 /// Tests for BackupSecurity functionality
 struct BackupSecurityTests {
     // MARK: - Test Context
+    
+    /// Type aliases for mock implementations
+    private typealias TestMocks = TestMocksModule.TestMocks
+    private typealias MockKeychain = TestMocks.MockKeychain
+    private typealias MockSecurityService = TestMocks.MockSecurityService
+    private typealias MockNotificationCenter = TestMocks.MockNotificationCenter
+    private typealias MockDateProvider = TestMocks.MockDateProvider
+    private typealias MockFileManager = TestMocks.MockFileManager
     
     /// Test environment with test data
     struct TestContext {
@@ -51,7 +53,7 @@ struct BackupSecurityTests {
     
     // MARK: - Initialization Tests
     
-    @Test("Initialize security manager", tags: ["init", "security"])
+    @Test("Initialize security manager", ["init", "security"] as! TestTrait)
     func testInitialization() throws {
         // Given: Test context
         let context = TestContext()
@@ -66,7 +68,7 @@ struct BackupSecurityTests {
     
     // MARK: - Credential Tests
     
-    @Test("Test credential management", tags: ["security", "credentials"])
+    @Test("Test credential management", ["security", "credentials"] as! TestTrait)
     func testCredentialManagement() throws {
         // Given: Security manager
         let context = TestContext()
@@ -92,7 +94,7 @@ struct BackupSecurityTests {
     
     // MARK: - Key Management Tests
     
-    @Test("Test key management", tags: ["security", "keys"])
+    @Test("Test key management", ["security", "keys"] as! TestTrait)
     func testKeyManagement() throws {
         // Given: Security manager
         let context = TestContext()
@@ -123,7 +125,7 @@ struct BackupSecurityTests {
     
     // MARK: - Encryption Tests
     
-    @Test("Test encryption operations", tags: ["security", "encryption"])
+    @Test("Test encryption operations", ["security", "encryption"] as! TestTrait)
     func testEncryptionOperations() throws {
         // Given: Security manager
         let context = TestContext()
@@ -149,7 +151,7 @@ struct BackupSecurityTests {
     
     // MARK: - Repository Security Tests
     
-    @Test("Test repository security", tags: ["security", "repository"])
+    @Test("Test repository security", ["security", "repository"] as! TestTrait)
     func testRepositorySecurity() throws {
         // Given: Security manager
         let context = TestContext()
@@ -182,7 +184,7 @@ struct BackupSecurityTests {
     
     // MARK: - Cache Security Tests
     
-    @Test("Test cache security", tags: ["security", "cache"])
+    @Test("Test cache security", ["security", "cache"] as! TestTrait)
     func testCacheSecurity() throws {
         // Given: Security manager
         let context = TestContext()
@@ -209,7 +211,7 @@ struct BackupSecurityTests {
     
     // MARK: - Error Handling Tests
     
-    @Test("Test security error handling", tags: ["security", "error"])
+    @Test("Test security error handling", ["security", "error"] as! TestTrait)
     func testErrorHandling() throws {
         // Given: Security manager
         let context = TestContext()
@@ -235,7 +237,7 @@ struct BackupSecurityTests {
     
     // MARK: - Edge Cases
     
-    @Test("Handle security edge cases", tags: ["security", "edge"])
+    @Test("Handle security edge cases", ["security", "edge"] as! TestTrait)
     func testEdgeCases() throws {
         // Given: Security manager
         let context = TestContext()
@@ -270,7 +272,7 @@ struct BackupSecurityTests {
     
     // MARK: - Performance Tests
     
-    @Test("Test security performance", tags: ["security", "performance"])
+    @Test("Test security performance", ["security", "performance"] as! TestTrait)
     func testPerformance() throws {
         // Given: Security manager
         let context = TestContext()
@@ -301,67 +303,5 @@ struct BackupSecurityTests {
         
         let keyInterval = keyEndTime.timeIntervalSince(keyStartTime)
         #expect(keyInterval < 0.5) // Key generation should be relatively fast
-    }
-}
-
-// MARK: - Mock Security Service
-
-/// Mock implementation of SecurityService for testing
-final class MockSecurityService: SecurityServiceProtocol {
-    private(set) var encryptCalled = false
-    private(set) var decryptCalled = false
-    private(set) var generateKeyCalled = false
-    private(set) var verifyKeyCalled = false
-    private(set) var initializeSecurityCalled = false
-    private(set) var verifySecurityCalled = false
-    private(set) var lockCalled = false
-    private(set) var unlockCalled = false
-    
-    func encrypt(_ data: Data) throws -> Data {
-        encryptCalled = true
-        return data // Mock implementation
-    }
-    
-    func decrypt(_ data: Data) throws -> Data {
-        decryptCalled = true
-        return data // Mock implementation
-    }
-    
-    func generateKey() throws -> String {
-        generateKeyCalled = true
-        return "mock-key"
-    }
-    
-    func verifyKey(_ key: String) throws -> Bool {
-        verifyKeyCalled = true
-        return true
-    }
-    
-    func initializeSecurity() throws {
-        initializeSecurityCalled = true
-    }
-    
-    func verifySecurity() throws -> Bool {
-        verifySecurityCalled = true
-        return true
-    }
-    
-    func lock() throws {
-        lockCalled = true
-    }
-    
-    func unlock() throws {
-        unlockCalled = true
-    }
-    
-    func reset() {
-        encryptCalled = false
-        decryptCalled = false
-        generateKeyCalled = false
-        verifyKeyCalled = false
-        initializeSecurityCalled = false
-        verifySecurityCalled = false
-        lockCalled = false
-        unlockCalled = false
     }
 }

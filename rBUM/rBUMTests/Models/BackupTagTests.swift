@@ -14,14 +14,14 @@ struct BackupTagTests {
     
     /// Test environment with test data
     struct TestContext {
-        let notificationCenter: MockNotificationCenter
-        let dateProvider: MockDateProvider
-        let fileManager: MockFileManager
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let dateProvider: TestMocks.MockDateProvider
+        let fileManager: TestMocks.MockFileManager
         
         init() {
-            self.notificationCenter = MockNotificationCenter()
-            self.dateProvider = MockDateProvider()
-            self.fileManager = MockFileManager()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.dateProvider = TestMocks.MockDateProvider()
+            self.fileManager = TestMocks.MockFileManager()
         }
         
         /// Reset all mocks to initial state

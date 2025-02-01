@@ -7,20 +7,20 @@ struct RepositoryTests {
     
     /// Test environment with test data
     struct TestContext {
-        let resticService: MockResticService
-        let notificationCenter: MockNotificationCenter
-        let dateProvider: MockDateProvider
-        let fileManager: MockFileManager
-        let securityService: MockSecurityService
-        let keychain: MockKeychain
+        let resticService: TestMocks.MockResticService
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let dateProvider: TestMocks.MockDateProvider
+        let fileManager: TestMocks.MockFileManager
+        let securityService: TestMocks.MockSecurityService
+        let keychain: TestMocks.MockKeychain
         
         init() {
-            self.resticService = MockResticService()
-            self.notificationCenter = MockNotificationCenter()
-            self.dateProvider = MockDateProvider()
-            self.fileManager = MockFileManager()
-            self.securityService = MockSecurityService()
-            self.keychain = MockKeychain()
+            self.resticService = TestMocks.MockResticService()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.dateProvider = TestMocks.MockDateProvider()
+            self.fileManager = TestMocks.MockFileManager()
+            self.securityService = TestMocks.MockSecurityService()
+            self.keychain = TestMocks.MockKeychain()
         }
         
         /// Reset all mocks to initial state

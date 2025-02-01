@@ -14,14 +14,14 @@ struct BackupSourceTests {
     
     /// Test environment with test data
     struct TestContext {
-        let fileManager: MockFileManager
-        let notificationCenter: MockNotificationCenter
-        let dateProvider: MockDateProvider
+        let fileManager: TestMocks.MockFileManager
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let dateProvider: TestMocks.MockDateProvider
         
         init() {
-            self.fileManager = MockFileManager()
-            self.notificationCenter = MockNotificationCenter()
-            self.dateProvider = MockDateProvider()
+            self.fileManager = TestMocks.MockFileManager()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.dateProvider = TestMocks.MockDateProvider()
         }
         
         /// Reset all mocks to initial state
@@ -43,7 +43,7 @@ struct BackupSourceTests {
     
     // MARK: - Initialization Tests
     
-    @Test("Initialize source manager", tags: ["init", "source"])
+    @Test("Initialize source manager", ["init", "source"] as! TestTrait)
     func testInitialization() throws {
         // Given: Test context
         let context = TestContext()
@@ -58,7 +58,7 @@ struct BackupSourceTests {
     
     // MARK: - Source Creation Tests
     
-    @Test("Test source creation", tags: ["source", "create"])
+    @Test("Test source creation", ["source", "create"] as! TestTrait)
     func testSourceCreation() throws {
         // Given: Source manager
         let context = TestContext()
@@ -85,7 +85,7 @@ struct BackupSourceTests {
     
     // MARK: - Source Listing Tests
     
-    @Test("Test source listing", tags: ["source", "list"])
+    @Test("Test source listing", ["source", "list"] as! TestTrait)
     func testSourceListing() throws {
         // Given: Source manager
         let context = TestContext()
@@ -114,7 +114,7 @@ struct BackupSourceTests {
     
     // MARK: - Source Update Tests
     
-    @Test("Test source updates", tags: ["source", "update"])
+    @Test("Test source updates", ["source", "update"] as! TestTrait)
     func testSourceUpdates() throws {
         // Given: Source manager
         let context = TestContext()
@@ -144,7 +144,7 @@ struct BackupSourceTests {
     
     // MARK: - Source Deletion Tests
     
-    @Test("Test source deletion", tags: ["source", "delete"])
+    @Test("Test source deletion", ["source", "delete"] as! TestTrait)
     func testSourceDeletion() throws {
         // Given: Source manager
         let context = TestContext()
@@ -171,7 +171,7 @@ struct BackupSourceTests {
     
     // MARK: - Source Validation Tests
     
-    @Test("Test source validation", tags: ["source", "validate"])
+    @Test("Test source validation", ["source", "validate"] as! TestTrait)
     func testSourceValidation() throws {
         // Given: Source manager
         let context = TestContext()
@@ -198,7 +198,7 @@ struct BackupSourceTests {
     
     // MARK: - Error Handling Tests
     
-    @Test("Test source error handling", tags: ["source", "error"])
+    @Test("Test source error handling", ["source", "error"] as! TestTrait)
     func testErrorHandling() throws {
         // Given: Source manager
         let context = TestContext()
@@ -224,7 +224,7 @@ struct BackupSourceTests {
     
     // MARK: - Edge Cases
     
-    @Test("Handle source edge cases", tags: ["source", "edge"])
+    @Test("Handle source edge cases", ["source", "edge"] as! TestTrait)
     func testEdgeCases() throws {
         // Given: Source manager
         let context = TestContext()
@@ -259,7 +259,7 @@ struct BackupSourceTests {
     
     // MARK: - Performance Tests
     
-    @Test("Test source performance", tags: ["source", "performance"])
+    @Test("Test source performance", ["source", "performance"] as! TestTrait)
     func testPerformance() throws {
         // Given: Source manager
         let context = TestContext()

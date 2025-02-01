@@ -16,14 +16,14 @@ struct RepositoryCreationViewModelTests {
     /// Test environment with mocked dependencies
     struct TestContext {
         let viewModel: RepositoryCreationViewModel
-        let mockCreationService: MockRepositoryCreationService
-        let mockFileManager: MockFileManager
-        let mockNotificationCenter: MockNotificationCenter
+        let mockCreationService: TestMocks.MockRepositoryCreationService
+        let mockFileManager: TestMocks.MockFileManager
+        let mockNotificationCenter: TestMocks.MockNotificationCenter
         
         init() {
-            self.mockCreationService = MockRepositoryCreationService()
-            self.mockFileManager = MockFileManager()
-            self.mockNotificationCenter = MockNotificationCenter()
+            self.mockCreationService = TestMocks.MockRepositoryCreationService()
+            self.mockFileManager = TestMocks.MockFileManager()
+            self.mockNotificationCenter = TestMocks.MockNotificationCenter()
             self.viewModel = RepositoryCreationViewModel(
                 creationService: mockCreationService,
                 fileManager: mockFileManager,
@@ -166,7 +166,7 @@ struct RepositoryCreationViewModelTests {
 // MARK: - Mock Implementations
 
 /// Mock implementation of RepositoryCreationService for testing
-final class MockRepositoryCreationService: RepositoryCreationServiceProtocol {
+final class TestMocks.MockRepositoryCreationService: RepositoryCreationServiceProtocol {
     var createCalled = false
     var createResult: Repository?
     var shouldFail = false
@@ -196,7 +196,7 @@ final class MockRepositoryCreationService: RepositoryCreationServiceProtocol {
 }
 
 /// Mock implementation of FileManager for testing
-final class MockFileManager: FileManager {
+final class TestMocks.MockFileManager: FileManager {
     var directoryExists: [String: Bool] = [:]
     var pathExists = true
     var isDirectory = true
@@ -216,7 +216,7 @@ final class MockFileManager: FileManager {
 }
 
 /// Mock implementation of NotificationCenter for testing
-final class MockNotificationCenter: NotificationCenter {
+final class TestMocks.MockNotificationCenter: NotificationCenter {
     var postNotificationCalled = false
     var lastNotification: Notification?
     

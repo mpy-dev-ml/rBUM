@@ -14,16 +14,16 @@ struct BackupSnapshotTests {
     
     /// Test environment with test data
     struct TestContext {
-        let resticService: MockResticService
-        let notificationCenter: MockNotificationCenter
-        let dateProvider: MockDateProvider
-        let fileManager: MockFileManager
+        let resticService: TestMocks.MockResticService
+        let notificationCenter: TestMocks.MockNotificationCenter
+        let dateProvider: TestMocks.MockDateProvider
+        let fileManager: TestMocks.MockFileManager
         
         init() {
-            self.resticService = MockResticService()
-            self.notificationCenter = MockNotificationCenter()
-            self.dateProvider = MockDateProvider()
-            self.fileManager = MockFileManager()
+            self.resticService = TestMocks.MockResticService()
+            self.notificationCenter = TestMocks.MockNotificationCenter()
+            self.dateProvider = TestMocks.MockDateProvider()
+            self.fileManager = TestMocks.MockFileManager()
         }
         
         /// Reset all mocks to initial state
@@ -47,7 +47,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Initialization Tests
     
-    @Test("Initialize snapshot manager", tags: ["init", "snapshot"])
+    @Test("Initialize snapshot manager", ["init", "snapshot"] as! TestTrait)
     func testInitialization() throws {
         // Given: Test context
         let context = TestContext()
@@ -62,7 +62,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Snapshot Creation Tests
     
-    @Test("Test snapshot creation", tags: ["snapshot", "create"])
+    @Test("Test snapshot creation", ["snapshot", "create"] as! TestTrait)
     func testSnapshotCreation() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -89,7 +89,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Snapshot Listing Tests
     
-    @Test("Test snapshot listing", tags: ["snapshot", "list"])
+    @Test("Test snapshot listing", ["snapshot", "list"] as! TestTrait)
     func testSnapshotListing() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -114,7 +114,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Snapshot Restoration Tests
     
-    @Test("Test snapshot restoration", tags: ["snapshot", "restore"])
+    @Test("Test snapshot restoration", ["snapshot", "restore"] as! TestTrait)
     func testSnapshotRestoration() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -140,7 +140,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Snapshot Deletion Tests
     
-    @Test("Test snapshot deletion", tags: ["snapshot", "delete"])
+    @Test("Test snapshot deletion", ["snapshot", "delete"] as! TestTrait)
     func testSnapshotDeletion() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -169,7 +169,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Snapshot Comparison Tests
     
-    @Test("Test snapshot comparison", tags: ["snapshot", "compare"])
+    @Test("Test snapshot comparison", ["snapshot", "compare"] as! TestTrait)
     func testSnapshotComparison() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -194,7 +194,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Error Handling Tests
     
-    @Test("Test snapshot error handling", tags: ["snapshot", "error"])
+    @Test("Test snapshot error handling", ["snapshot", "error"] as! TestTrait)
     func testErrorHandling() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -220,7 +220,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Edge Cases
     
-    @Test("Handle snapshot edge cases", tags: ["snapshot", "edge"])
+    @Test("Handle snapshot edge cases", ["snapshot", "edge"] as! TestTrait)
     func testEdgeCases() throws {
         // Given: Snapshot manager
         let context = TestContext()
@@ -255,7 +255,7 @@ struct BackupSnapshotTests {
     
     // MARK: - Performance Tests
     
-    @Test("Test snapshot performance", tags: ["snapshot", "performance"])
+    @Test("Test snapshot performance", ["snapshot", "performance"] as! TestTrait)
     func testPerformance() throws {
         // Given: Snapshot manager
         let context = TestContext()

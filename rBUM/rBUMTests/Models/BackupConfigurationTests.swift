@@ -5,12 +5,20 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
+import Foundation
 import Testing
 @testable import rBUM
+import TestMocksModule
 
 /// Tests for BackupConfiguration functionality
 struct BackupConfigurationTests {
     // MARK: - Test Context
+    
+    /// Type aliases for mock implementations
+    private typealias TestMocks = TestMocksModule.TestMocks
+    private typealias MockUserDefaults = TestMocks.MockUserDefaults
+    private typealias MockFileManager = TestMocks.MockFileManager
+    private typealias MockNotificationCenter = TestMocks.MockNotificationCenter
     
     /// Test environment with test data
     struct TestContext {
@@ -245,7 +253,7 @@ struct BackupConfigurationTests {
 // MARK: - Mock Implementations
 
 /// Mock implementation of UserDefaults for testing
-final class MockUserDefaults: UserDefaults {
+final class TestMocks.MockUserDefaults: UserDefaults {
     var storage: [String: Any] = [:]
     
     override func set(_ value: Any?, forKey defaultName: String) {
@@ -270,7 +278,7 @@ final class MockUserDefaults: UserDefaults {
 }
 
 /// Mock implementation of FileManager for testing
-final class MockFileManager: FileManager {
+final class TestMocks.MockFileManager: FileManager {
     var files: [String: Bool] = [:]
     
     override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
@@ -287,7 +295,7 @@ final class MockFileManager: FileManager {
 }
 
 /// Mock implementation of NotificationCenter for testing
-final class MockNotificationCenter: NotificationCenter {
+final class TestMocks.MockNotificationCenter: NotificationCenter {
     var postCalled = false
     var lastNotification: Notification?
     
