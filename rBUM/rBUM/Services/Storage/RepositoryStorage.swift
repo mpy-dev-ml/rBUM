@@ -69,15 +69,44 @@ enum RepositoryStorageError: LocalizedError, Equatable {
 /// Manages repository metadata persistence
 final class RepositoryStorage: RepositoryStorageProtocol {
     func store(_ repository: Repository) throws {
-        <#code#>
+        try save(repository)
     }
     
     func list() throws -> [Repository] {
-        <#code#>
+        guard fileManager.fileExists(atPath: storageURL.path) else {
+            return []
+        }
+        
+        do {
+            let data = try Data(contentsOf: storageURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode([Repository].self, from: data)
+        } catch {
+            logger.errorMessage("Failed to read repositories: \(error.localizedDescription)")
+            throw RepositoryStorageError.fileOperationFailed("read")
+        }
     }
     
     func delete(forId id: UUID) throws {
-        <#code#>
+        var repositories = try list()
+        guard repositories.contains(where: { $0.id == id }) else {
+            throw RepositoryStorageError.repositoryNotFound(id)
+        }
+        
+        repositories.removeAll { $0.id == id }
+        
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let data = try encoder.encode(repositories)
+            try data.write(to: storageURL, options: .atomic)
+            logger.infoMessage("Deleted repository: \(id)")
+        } catch {
+            logger.errorMessage("Failed to delete repository: \(error.localizedDescription)")
+            throw RepositoryStorageError.fileOperationFailed("delete")
+        }
     }
     
     private let fileManager: FileManager

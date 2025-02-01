@@ -11,7 +11,7 @@ public enum ResticBackupStatus: Codable {
     /// Backup completed successfully
     case completed
     /// Backup failed with an error
-    case failed(Error)
+    case failed(ResticBackupError)
     /// Backup was cancelled by the user
     case cancelled
     
@@ -110,5 +110,52 @@ public struct ResticMountProgress: Codable, Equatable {
         self.mountPoint = mountPoint
         self.startTime = startTime
         self.updatedAt = updatedAt
+    }
+}
+
+/// Represents the JSON response from restic backup command
+struct ResticBackupResponse: Codable {
+    let messageType: String
+    let filesNew: Int
+    let filesChanged: Int
+    let filesUnmodified: Int
+    let dataBlobs: Int
+    let treeBlobs: Int
+    let dataMiBs: Double
+    let treeMiBs: Double
+    let currentFile: String
+    let totalFiles: Int
+    let filesDone: Int
+    let totalBytes: Int64
+    let bytesDone: Int64
+    let errorCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case messageType = "message_type"
+        case filesNew = "files_new"
+        case filesChanged = "files_changed"
+        case filesUnmodified = "files_unmodified"
+        case dataBlobs = "data_blobs"
+        case treeBlobs = "tree_blobs"
+        case dataMiBs = "data_added"
+        case treeMiBs = "total_files_processed"
+        case currentFile = "current_files"
+        case totalFiles = "total_files"
+        case filesDone = "files_done"
+        case totalBytes = "total_bytes"
+        case bytesDone = "bytes_done"
+        case errorCount = "error_count"
+    }
+    
+    func toBackupProgress(startTime: Date) -> ResticBackupProgress {
+        return ResticBackupProgress(
+            totalFiles: totalFiles,
+            processedFiles: filesDone,
+            totalBytes: totalBytes,
+            processedBytes: bytesDone,
+            currentFile: currentFile,
+            startTime: startTime,
+            updatedAt: Date()
+        )
     }
 }

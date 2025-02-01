@@ -123,7 +123,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
         var allArguments = arguments
         
         // Add repository path
-        allArguments.insert(credentials.repositoryPath.path, at: 0)
+        allArguments.insert(credentials.repositoryPath, at: 0)
         allArguments.insert("--repo", at: 0)
         
         // Create process
@@ -176,7 +176,13 @@ class ResticCommandService: ResticCommandServiceProtocol {
         guard let data = line.data(using: .utf8) else { return nil }
         
         do {
-            let response = try JSONDecoder().decode(ResticBackupResponse.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let response = try decoder.decode(ResticBackupResponse.self, from: data)
+            
+            // Only process "status" messages
+            guard response.messageType == "status" else { return nil }
+            
             return response.toBackupProgress(startTime: Date())
         } catch {
             self.logger.debug("Failed to parse backup progress: \(error.localizedDescription)")
@@ -201,7 +207,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
         let credentials = RepositoryCredentials(
             repositoryId: UUID(),
             password: password,
-            repositoryPath: path
+            repositoryPath: path.path
         )
         
         try await executeCommand(arguments, credentials: credentials)
@@ -252,7 +258,18 @@ class ResticCommandService: ResticCommandServiceProtocol {
             )
             onStatusChange?(.completed)
         } catch {
-            onStatusChange?(.failed(error))
+            if let resticError = error as? ResticError {
+                onStatusChange?(.failed(ResticBackupError(
+                    type: .operationInterrupted,
+                    message: resticError.localizedDescription,
+                    details: "Restic command failed during backup operation"
+                )))
+            } else {
+                onStatusChange?(.failed(ResticBackupError(
+                    type: .unclassifiedError,
+                    message: error.localizedDescription
+                )))
+            }
             throw error
         }
     }

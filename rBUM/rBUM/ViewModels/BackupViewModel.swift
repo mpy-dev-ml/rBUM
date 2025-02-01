@@ -31,7 +31,7 @@ final class BackupViewModel: ObservableObject {
     }
     
     func selectPaths() async {
-        await MainActor.run {
+        await MainActor.run { @MainActor in
             let panel = NSOpenPanel()
             panel.allowsMultipleSelection = true
             panel.canChooseDirectories = true
@@ -40,18 +40,20 @@ final class BackupViewModel: ObservableObject {
             panel.message = "Select files and folders to back up"
             panel.prompt = "Back Up"
             
-            guard await panel.beginSheetModal(for: NSApp.keyWindow!) == .OK else {
-                return
+            Task {
+                guard await panel.beginSheetModal(for: NSApp.keyWindow!) == .OK else {
+                    return
+                }
+                
+                selectedPaths = panel.urls
+                logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
             }
-            
-            selectedPaths = panel.urls
-            logger.infoMessage("Selected \(selectedPaths.count) paths for backup")
         }
     }
     
     func startBackup() async {
         guard !selectedPaths.isEmpty else {
-            logger.warningMessage("No paths selected for backup")
+            logger.infoMessage("No paths selected for backup")
             return
         }
         
@@ -79,6 +81,7 @@ final class BackupViewModel: ObservableObject {
             try await resticService.createBackup(
                 paths: selectedPaths,
                 to: resticRepo,
+                tags: nil,  // No tags for now, can be added as a feature later
                 onProgress: { [weak self] progress in
                     self?.currentProgress = progress
                 },
@@ -90,7 +93,14 @@ final class BackupViewModel: ObservableObject {
             logger.infoMessage("Backup completed successfully")
         } catch {
             logger.errorMessage("Backup failed: \(error.localizedDescription)")
-            state = .failed(error)
+            if let backupError = error as? ResticBackupError {
+                state = .failed(backupError)
+            } else {
+                state = .failed(ResticBackupError(
+                    type: .unclassifiedError,
+                    message: error.localizedDescription
+                ))
+            }
             showError = true
         }
     }
@@ -118,8 +128,8 @@ final class BackupViewModel: ObservableObject {
     
     var progressPercentage: Double {
         switch state {
-        case .backing:
-            return currentProgress?.byteProgress ?? 0
+        case .backing(let progress):
+            return progress.percentComplete
         case .completed:
             return 100
         default:
@@ -140,7 +150,7 @@ final class BackupViewModel: ObservableObject {
     
     private func handleBackupFailed(_ error: Error) {
         logger.errorMessage("Backup failed: \(error.localizedDescription)")
-        state = .failed(error)
+        state = .failed(error as! ResticBackupError)
         showError = true
     }
     

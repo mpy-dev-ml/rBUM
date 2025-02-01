@@ -11,16 +11,12 @@ import SwiftUI
 struct RepositoryDetailView: View {
     @StateObject private var viewModel: RepositoryDetailViewModel
     @State private var showPasswordSheet = false
-    private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: CredentialsManagerProtocol
+    @Environment(\.dismiss) private var dismiss
     
     /// Creates a view to manage a specific repository
     init(
         repository: Repository,
-        resticService: ResticCommandServiceProtocol = ResticCommandService(
-            fileManager: .default,
-            logger: Logging.logger(for: .repository)
-        ),
+        resticService: ResticCommandServiceProtocol = ResticCommandService(),
         credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
         _viewModel = StateObject(wrappedValue: RepositoryDetailViewModel(
@@ -28,90 +24,156 @@ struct RepositoryDetailView: View {
             resticService: resticService,
             credentialsManager: credentialsManager
         ))
-        self.resticService = resticService
-        self.credentialsManager = credentialsManager
     }
     
     var body: some View {
+        contentView
+            .navigationTitle(viewModel.repository.name)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    backupButton
+                }
+            }
+            .alert("Error", isPresented: $viewModel.showError) {
+                Button("OK") {
+                    viewModel.showError = false
+                }
+            } message: {
+                if let error = viewModel.error {
+                    Text(error.localizedDescription)
+                }
+            }
+            .task {
+                await viewModel.checkRepository()
+            }
+    }
+    
+    @ViewBuilder
+    private var contentView: some View {
         TabView(selection: $viewModel.selectedTab) {
-            // Overview tab
-            Form {
-                Section("Repository Status") {
-                    HStack {
-                        Label {
-                            Text(viewModel.isChecking ? "Checking..." : "Status")
-                        } icon: {
-                            if viewModel.isChecking {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "circle.fill")
-                                    .foregroundStyle(viewModel.statusColor)
-                            }
-                        }
-                    }
-                }
-                
-                Section("General") {
-                    LabeledContent("Name", value: viewModel.repository.name)
-                    LabeledContent("Path", value: viewModel.repository.path.path())
-                    LabeledContent("Created", value: viewModel.repository.createdAt.formatted())
-                    
-                    if let lastCheck = viewModel.lastCheck {
-                        LabeledContent("Last Check", value: lastCheck.formatted())
-                    }
-                }
-            }
-            .tabItem {
-                Label(
-                    RepositoryDetailViewModel.Tab.overview.rawValue,
-                    systemImage: RepositoryDetailViewModel.Tab.overview.icon
-                )
-            }
-            .tag(RepositoryDetailViewModel.Tab.overview)
+            OverviewTabView(viewModel: viewModel)
+                .tabItem { tabLabel(for: .overview) }
+                .tag(RepositoryDetailViewModel.Tab.overview)
             
-            // Snapshots tab
-            NavigationLink(destination: SnapshotListView(repository: viewModel.repository)) {
-                Label("Snapshots", systemImage: "clock.arrow.circlepath")
-            }
-            .tabItem {
-                Label(
-                    RepositoryDetailViewModel.Tab.snapshots.rawValue,
-                    systemImage: RepositoryDetailViewModel.Tab.snapshots.icon
-                )
-            }
-            .tag(RepositoryDetailViewModel.Tab.snapshots)
+            SnapshotsTabView(viewModel: viewModel)
+                .tabItem { tabLabel(for: .snapshots) }
+                .tag(RepositoryDetailViewModel.Tab.snapshots)
             
-            // Settings tab
-            Text("Settings")
-                .tabItem {
-                    Label(
-                        RepositoryDetailViewModel.Tab.settings.rawValue,
-                        systemImage: RepositoryDetailViewModel.Tab.settings.icon
-                    )
-                }
+            SettingsTabView()
+                .tabItem { tabLabel(for: .settings) }
                 .tag(RepositoryDetailViewModel.Tab.settings)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink(destination: BackupView(repository: viewModel.repository)) {
-                    Label("Backup", systemImage: "arrow.clockwise.circle")
-                }
-            }
+    }
+    
+    private var backupButton: some View {
+        NavigationLink(destination: BackupView(repository: viewModel.repository)) {
+            Label("Backup", systemImage: "arrow.clockwise.circle")
         }
-        .navigationTitle(viewModel.repository.name)
-        .alert("Error", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.showError = false
-            }
-        } message: {
-            if let error = viewModel.error {
-                Text(error.localizedDescription)
-            }
+        .accessibilityLabel("Start backup")
+        .accessibilityHint("Navigate to backup creation screen")
+    }
+    
+    private func tabLabel(for tab: RepositoryDetailViewModel.Tab) -> some View {
+        Label(tab.rawValue, systemImage: tab.icon)
+    }
+}
+
+private struct OverviewTabView: View {
+    @ObservedObject var viewModel: RepositoryDetailViewModel
+    
+    var body: some View {
+        Form {
+            RepositoryStatusSection(viewModel: viewModel)
+            RepositoryDetailsSection(viewModel: viewModel)
         }
-        .task {
-            await viewModel.checkRepository()
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct RepositoryStatusSection: View {
+    @ObservedObject var viewModel: RepositoryDetailViewModel
+    
+    var body: some View {
+        Section("Repository Status") {
+            statusLabel
         }
+    }
+    
+    private var statusLabel: some View {
+        Label {
+            Text(viewModel.isChecking ? "Checking..." : "Status")
+        } icon: {
+            statusIcon
+        }
+        .accessibilityLabel(viewModel.isChecking ? "Checking repository status" : "Repository status")
+    }
+    
+    @ViewBuilder
+    private var statusIcon: some View {
+        if viewModel.isChecking {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: "circle.fill")
+                .foregroundStyle(viewModel.statusColor)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct RepositoryDetailsSection: View {
+    @ObservedObject var viewModel: RepositoryDetailViewModel
+    
+    var body: some View {
+        Section("General") {
+            generalInfoGroup
+            lastCheckInfo
+        }
+    }
+    
+    private var generalInfoGroup: some View {
+        Group {
+            LabeledContent("Name", value: viewModel.repository.name)
+                .accessibilityLabel("Repository name: \(viewModel.repository.name)")
+            
+            LabeledContent("Path", value: viewModel.repository.path.path)
+                .accessibilityLabel("Repository path: \(viewModel.repository.path.path)")
+            
+            LabeledContent("Created") {
+                Text(viewModel.repository.createdAt.formatted(.dateTime))
+            }
+            .accessibilityLabel("Created on \(viewModel.repository.createdAt.formatted(.dateTime))")
+        }
+    }
+    
+    @ViewBuilder
+    private var lastCheckInfo: some View {
+        if let lastCheck = viewModel.lastCheck {
+            LabeledContent("Last Check") {
+                Text(lastCheck.formatted(.dateTime))
+            }
+            .accessibilityLabel("Last checked on \(lastCheck.formatted(.dateTime))")
+        }
+    }
+}
+
+private struct SnapshotsTabView: View {
+    @ObservedObject var viewModel: RepositoryDetailViewModel
+    
+    var body: some View {
+        NavigationLink(destination: SnapshotListView(repository: viewModel.repository)) {
+            Label("Snapshots", systemImage: "clock.arrow.circlepath")
+        }
+        .accessibilityLabel("View snapshots")
+        .accessibilityHint("Navigate to list of repository snapshots")
+    }
+}
+
+private struct SettingsTabView: View {
+    var body: some View {
+        Text("Settings")
+            .accessibilityLabel("Repository settings")
     }
 }
 

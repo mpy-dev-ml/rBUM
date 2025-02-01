@@ -15,10 +15,7 @@ struct SnapshotListView: View {
     init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: SnapshotListViewModel(
             repository: repository,
-            resticService: ResticCommandService(
-                credentialsManager: KeychainCredentialsManager(),
-                processExecutor: ProcessExecutor()
-            ),
+            resticService: ResticCommandService(),  // Use default parameters
             credentialsManager: KeychainCredentialsManager()
         ))
     }

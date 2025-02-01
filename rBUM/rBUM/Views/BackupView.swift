@@ -150,23 +150,37 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
 
 private final class PreviewCredentialsManager: CredentialsManagerProtocol {
     func store(_ credentials: RepositoryCredentials) async throws {
-        <#code#>
+        // No-op for preview
     }
     
     func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
-        <#code#>
+        // Return mock credentials for preview
+        return RepositoryCredentials(
+            repositoryId: id,
+            password: "preview",
+            repositoryPath: "/preview/repository"
+        )
+    }
+    
+    func update(_ credentials: RepositoryCredentials) async throws {
+        // No-op for preview
     }
     
     func delete(forId id: UUID) async throws {
-        <#code#>
+        // No-op for preview
     }
     
     func getPassword(forRepositoryId id: UUID) async throws -> String {
-        <#code#>
+        // Return mock password for preview
+        return "preview"
     }
     
     func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
-        <#code#>
+        RepositoryCredentials(
+            repositoryId: id,
+            password: password,
+            repositoryPath: path
+        )
     }
     
     func getCredentials(for repository: Repository) throws -> RepositoryCredentials {

@@ -22,11 +22,7 @@ final class RepositoryListViewModel: ObservableObject {
     
     convenience init() {
         let credentialsManager = KeychainCredentialsManager()
-        let processExecutor = ProcessExecutor()
-        let resticService = ResticCommandService(
-            credentialsManager: credentialsManager,
-            processExecutor: processExecutor
-        )
+        let resticService = ResticCommandService()  // Use default parameters
         let repositoryStorage = RepositoryStorage()
         let repositoryCreationService = RepositoryCreationService(
             resticService: resticService,

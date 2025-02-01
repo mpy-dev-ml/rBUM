@@ -75,10 +75,26 @@ final class SnapshotListViewModel: ObservableObject {
             )
             
             // List snapshots
-            snapshots = try await resticService.listSnapshots(
-                in: repository,
-                credentials: credentials
+            let resticSnapshots = try await resticService.listSnapshots(
+                in: ResticRepository(
+                    name: repository.name,
+                    path: repository.path,
+                    credentials: credentials
+                )
             )
+            
+            // Convert ResticSnapshot to Snapshot
+            snapshots = resticSnapshots.map { resticSnapshot in
+                Snapshot(
+                    id: resticSnapshot.id,
+                    time: resticSnapshot.time,
+                    hostname: resticSnapshot.hostname,
+                    username: ProcessInfo.processInfo.userName,  // Use current user as fallback
+                    paths: resticSnapshot.paths,
+                    tags: resticSnapshot.tags ?? [],
+                    sizeInBytes: 0  // Size will be fetched separately if needed
+                )
+            }
             
             snapshots.sort { $0.time > $1.time } // Sort by newest first
             logger.infoMessage("Loaded \(snapshots.count) snapshots")
@@ -114,10 +130,16 @@ final class SnapshotListViewModel: ObservableObject {
                 repositoryPath: repository.path.path
             )
             
+            // Create ResticRepository
+            let resticRepo = ResticRepository(
+                name: repository.name,
+                path: repository.path,
+                credentials: credentials
+            )
+            
             // Prune snapshots
             try await resticService.pruneSnapshots(
-                in: repository,
-                credentials: credentials,
+                in: resticRepo,
                 keepLast: pruneOptions.keepLast,
                 keepDaily: pruneOptions.keepDaily,
                 keepWeekly: pruneOptions.keepWeekly,
