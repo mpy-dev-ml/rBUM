@@ -17,13 +17,13 @@ final class BackupViewModel: ObservableObject {
     
     private let repository: Repository
     private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: CredentialsManagerProtocol
+    private let credentialsManager: KeychainCredentialsManagerProtocol
     private let logger = Logging.logger(for: .backup)
     
     init(
         repository: Repository,
         resticService: ResticCommandServiceProtocol,
-        credentialsManager: CredentialsManagerProtocol
+        credentialsManager: KeychainCredentialsManagerProtocol
     ) {
         self.repository = repository
         self.resticService = resticService

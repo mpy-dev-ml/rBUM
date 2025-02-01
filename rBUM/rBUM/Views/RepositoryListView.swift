@@ -42,6 +42,16 @@ struct RepositoryListView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showAddSheet) {
+                // Refresh repositories when sheet is dismissed
+                Task {
+                    await viewModel.loadRepositories()
+                }
+            } content: {
+                NavigationStack {
+                    RepositoryCreationView(creationService: viewModel.repositoryCreationService)
+                }
+            }
             .alert("Delete Repository", isPresented: $showingDeleteAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) {
@@ -53,19 +63,8 @@ struct RepositoryListView: View {
                 }
             } message: {
                 if let repository = repositoryToDelete {
-                    Text("Are you sure you want to delete '\(repository.name)'? This action cannot be undone.")
+                    Text("Are you sure you want to delete '\(repository.name)'? This cannot be undone.")
                 }
-            }
-            .sheet(isPresented: $showAddSheet) {
-                RepositoryCreationView(creationService: viewModel.repositoryCreationService)
-                    .onChange(of: showAddSheet) { oldValue, newValue in
-                        if !newValue {
-                            // Sheet was dismissed, check for new repository
-                            Task {
-                                await viewModel.loadRepositories()
-                            }
-                        }
-                    }
             }
             .task {
                 await viewModel.loadRepositories()

@@ -8,58 +8,90 @@
 import Foundation
 
 /// Represents a Restic backup repository
-public struct Repository: Identifiable, Codable, Hashable {
-    public let id: UUID
-    public var name: String        // Repository display name
-    public var path: URL          // Local path to repository
-    public var lastBackup: Date?  // Most recent backup date
-    public var backupCount: Int   // Number of backups
-    public var totalSize: Int64   // Total size in bytes
-    public var createdAt: Date    // Creation timestamp
-    public var modifiedAt: Date   // Last modified timestamp
-    public let credentials: RepositoryCredentials  // Repository credentials
+public struct Repository: Identifiable, Codable, Equatable {
+    public let id: String
+    public let name: String        // Repository display name
+    public let path: String          // Local path to repository
+    public let createdAt: Date    // Creation timestamp
     
-    /// Keychain service name for repository credentials
-    public var keychainService: String {
-        "dev.mpy.rBUM.repository.\(id.uuidString)"
-    }
-    
-    /// Keychain account name for repository credentials
-    public var keychainAccount: String {
-        path.path
-    }
-    
-    public init(id: UUID = UUID(), name: String, path: URL, credentials: RepositoryCredentials) {
+    public init(id: String = UUID().uuidString,
+                name: String,
+                path: String,
+                createdAt: Date = Date()) {
         self.id = id
         self.name = name
         self.path = path
-        self.credentials = credentials
-        self.backupCount = 0
-        self.totalSize = 0
-        self.createdAt = Date()
-        self.modifiedAt = Date()
+        self.createdAt = createdAt
     }
     
-    // MARK: - Hashable
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
+    // MARK: - Security-Scoped Resource Handling
+    
+    public func startAccessing() -> Bool {
+        guard let url = URL(string: path) else { return false }
+        return url.startAccessingSecurityScopedResource()
     }
     
-    public static func == (lhs: Repository, rhs: Repository) -> Bool {
-        lhs.id == rhs.id
+    public func stopAccessing() {
+        guard let url = URL(string: path) else { return }
+        url.stopAccessingSecurityScopedResource()
     }
 }
 
-// MARK: - Repository Storage
-extension Repository {
-    /// The default directory for storing repositories
-    public static var defaultStorageDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Repositories", isDirectory: true)
-    }
+// MARK: - Repository Errors
+
+public enum RepositoryError: LocalizedError, Equatable {
+    // Creation errors
+    case invalidPath(String)
+    case pathAlreadyExists
+    case creationFailed(String)
+    case importFailed(String)
+    case repositoryAlreadyExists
+    case invalidRepository
     
-    /// The directory for this repository's data
-    public var storageDirectory: URL {
-        Self.defaultStorageDirectory.appendingPathComponent(id.uuidString, isDirectory: true)
+    // Storage errors
+    case bookmarkCreationFailed
+    case bookmarkResolutionFailed
+    case encodingFailed
+    case decodingFailed
+    case fileOperationFailed(String)
+    
+    // Authentication errors
+    case invalidPassword
+    case resticError(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        // Creation errors
+        case .invalidPath(let reason):
+            return "Invalid repository path: \(reason)"
+        case .pathAlreadyExists:
+            return "A file or directory already exists at this path"
+        case .creationFailed(let reason):
+            return "Failed to create repository: \(reason)"
+        case .importFailed(let reason):
+            return "Failed to import repository: \(reason)"
+        case .repositoryAlreadyExists:
+            return "A repository already exists at this location"
+        case .invalidRepository:
+            return "The specified path is not a valid Restic repository"
+            
+        // Storage errors
+        case .bookmarkCreationFailed:
+            return "Failed to create security-scoped bookmark"
+        case .bookmarkResolutionFailed:
+            return "Failed to resolve security-scoped bookmark"
+        case .encodingFailed:
+            return "Failed to encode repository data"
+        case .decodingFailed:
+            return "Failed to decode repository data"
+        case .fileOperationFailed(let message):
+            return "File operation failed: \(message)"
+            
+        // Authentication errors
+        case .invalidPassword:
+            return "Invalid repository password"
+        case .resticError(let message):
+            return "Restic error: \(message)"
+        }
     }
 }

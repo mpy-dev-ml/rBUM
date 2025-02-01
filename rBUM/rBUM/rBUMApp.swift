@@ -13,7 +13,7 @@ private let logger = Logger(subsystem: "dev.mpy.rBUM", category: "App")
 @main
 struct rBUMApp: App {
     private let processExecutor = ProcessExecutor()
-    private let credentialsManager: CredentialsManagerProtocol
+    private let credentialsManager: KeychainCredentialsManagerProtocol
     private let repositoryStorage: RepositoryStorageProtocol
     private let resticService: ResticCommandServiceProtocol
     private let repositoryCreationService: RepositoryCreationServiceProtocol

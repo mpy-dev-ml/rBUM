@@ -10,6 +10,7 @@ import SwiftUI
 struct RepositoryCreationView: View {
     @StateObject private var viewModel: RepositoryCreationViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showSuccess = false
     
     init(creationService: RepositoryCreationServiceProtocol) {
         _viewModel = StateObject(wrappedValue: RepositoryCreationViewModel(creationService: creationService))
@@ -31,16 +32,22 @@ struct RepositoryCreationView: View {
                     .textFieldStyle(.roundedBorder)
                 
                 HStack {
-                    TextField("Repository Path", text: $viewModel.path)
+                    TextField("Repository Path", text: .constant(viewModel.path))
                         .textFieldStyle(.roundedBorder)
+                        .disabled(true)
                     
                     Button(action: viewModel.selectPath) {
-                        Image(systemName: "folder")
-                            .foregroundColor(.accentColor)
+                        Label(viewModel.path.isEmpty ? "Select Location" : "Change Location", 
+                              systemImage: "folder")
                     }
                 }
             } header: {
                 Text("Repository Details")
+            } footer: {
+                Text(viewModel.mode == .create 
+                     ? "Choose where to create the new repository"
+                     : "Select an existing repository to import")
+                    .font(.caption)
             }
             
             Section {
@@ -83,21 +90,23 @@ struct RepositoryCreationView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
-        .fileImporter(
-            isPresented: $viewModel.showFilePicker,
-            allowedContentTypes: [.folder]
-        ) { result in
-            switch result {
-            case .success(let url):
-                viewModel.path = url.path()
-            case .failure(let error):
-                viewModel.state = .error(error)
-                viewModel.showError = true
+        .alert("Success", isPresented: $showSuccess) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            if case .success(let repository) = viewModel.state {
+                Text("""
+                    Repository successfully \(viewModel.mode == .create ? "created" : "imported")!
+                    
+                    Location: \(repository.path)
+                    ID: \(repository.id)
+                    """)
             }
         }
         .onChange(of: viewModel.state) { oldValue, newValue in
             if case .success = newValue {
-                dismiss()
+                showSuccess = true
             }
         }
     }

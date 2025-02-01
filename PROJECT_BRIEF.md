@@ -14,6 +14,39 @@ rBUM is built as a GUI wrapper around Restic, developed by Alexander Neumann and
 
 Our goal is to complement Restic by providing a native macOS interface, not to replace or modify its core functionality. All backup operations are performed by Restic itself, ensuring that users benefit from its security guarantees and performance optimisations.
 
+### Dependency Management
+
+rBUM requires Restic to be installed on the system. We handle this dependency through:
+- Automatic detection of Restic installation
+- Support for multiple installation methods:
+  * Homebrew (recommended)
+  * Manual binary installation
+  * Custom path specification
+- Version compatibility checking
+- Secure binary verification
+- User guidance for installation and updates
+
+### Sandboxing and Security
+
+The app operates within macOS's sandbox environment for enhanced security. This requires special considerations:
+
+1. Restic Execution:
+   - Temporary entitlements for accessing Homebrew-installed restic
+   - Secure path resolution and validation
+   - Proper permission handling for binary execution
+
+2. File System Access:
+   - User-selected read/write permissions
+   - Downloads folder access
+   - Security-scoped bookmarks for persistent access
+
+3. Keychain Integration:
+   - Secure credential storage
+   - App-specific keychain access group
+   - Password handling best practices
+
+The app will guide users through any permission requirements and maintain secure access to necessary resources.
+
 ## MVP Phase (5 Days)
 ### Day 1: Basic Structure and Restic Integration
 - [x] Basic Xcode project setup
@@ -116,6 +149,141 @@ Our goal is to complement Restic by providing a native macOS interface, not to r
 - [x] Memory optimizations
   - [x] Removed unused variables
   - [x] Efficient resource management
+
+## Architecture and Implementation
+
+### Core Components
+
+#### Repository Management
+- Repository Model:
+  * Essential properties (id, name, path)
+  * Clean separation of concerns
+  * Proper error handling
+- RepositoryCredentials:
+  * Secure password storage
+  * Integration with macOS Keychain
+  * Privacy-aware logging
+- Repository Services:
+  * RepositoryCreationService for initialization/import
+  * ResticCommandService for Restic operations
+  * Proper protocol-oriented design
+
+#### Security Implementation
+- Credentials Management:
+  * KeychainCredentialsManager for secure password storage
+  * Standardized format: "dev.mpy.rBUM.repository.{id}"
+  * Repository paths as keychain account names
+  * Privacy annotations in logging
+- Sandbox Compliance:
+  * Security-scoped bookmarks for file access
+  * Proper entitlements configuration:
+    - File system access
+    - Keychain access
+    - Network operations
+    - Process execution
+  * Safe process execution handling
+
+#### Service Architecture
+- Repository Services:
+  * RepositoryCreationService: Creation and import
+  * RepositoryStorage: Metadata persistence
+  * ResticCommandService: Command execution
+  * KeychainCredentialsManager: Secure storage
+  * CredentialsStorage: Metadata management
+- Clear separation of concerns
+- Protocol-based interfaces
+- Comprehensive error handling
+
+#### ViewModels
+- Main ViewModels:
+  * ContentViewModel: App coordination
+  * RepositoryListViewModel: List management
+  * RepositoryCreationViewModel: Creation/import
+  * RepositoryDetailViewModel: Single repository
+  * SnapshotListViewModel: Snapshot operations
+  * BackupViewModel: Backup management
+- MVVM Architecture:
+  * Clear separation of UI and business logic
+  * SwiftUI integration
+  * Proper state management
+
+#### Error Handling
+- Consolidated Error Types:
+  * RepositoryError: Repository operations
+  * CredentialsError: Credential management
+  * ResticError: Command execution
+- Features:
+  * Proper localization
+  * Descriptive error messages
+  * Privacy-aware logging
+  * User-friendly presentation
+
+#### UI Organization
+- Navigation:
+  * SidebarView for main navigation
+  * Split view interface
+  * Detail views for management
+- Repository Operations:
+  * Creation/import workflow
+  * Backup management
+  * Snapshot handling
+- Modern SwiftUI Design:
+  * Native macOS look and feel
+  * Proper window management
+  * Responsive layout
+
+### Best Practices
+- Protocol-Oriented Design:
+  * Clear interfaces
+  * Testable components
+  * Dependency injection
+- Security:
+  * Secure credential storage
+  * Privacy-aware logging
+  * Proper sandbox compliance
+- Code Quality:
+  * Comprehensive error handling
+  * Type-safe API design
+  * SwiftUI best practices
+- Testing:
+  * Unit test coverage
+  * UI testing
+  * Mock services
+
+### Current Implementation Status
+
+#### Completed Features
+- Repository Management:
+  * Creation and import
+  * Secure credential storage
+  * Path management
+  * Error handling
+- Security Framework:
+  * Keychain integration
+  * Sandbox compliance
+  * Privacy-aware logging
+- UI Components:
+  * Navigation structure
+  * Repository views
+  * Creation workflow
+
+#### In Progress
+- Backup Management:
+  * Backup creation
+  * Progress monitoring
+  * Error handling
+- Snapshot Management:
+  * List view
+  * Operations (prune, restore)
+  * Filtering and search
+
+#### Next Steps
+1. Complete backup implementation
+2. Add snapshot restore functionality
+3. Implement scheduled backups
+4. Add advanced filtering options
+5. Enhance error recovery
+6. Improve performance monitoring
 
 ## Major Development Areas
 
@@ -402,5 +570,35 @@ Features that could be deferred if needed:
 - Bi-weekly progress assessment
 - Monthly security reviews
 - User testing at 50% and 80% completion
+
+## Post-MVP Enhancements
+
+### Dependency Management
+- [ ] Restic Installation Management
+  - [ ] Automatic installation detection
+  - [ ] Multiple installation methods support
+  - [ ] Version compatibility checking
+  - [ ] Installation guidance UI
+  - [ ] Binary verification
+- [ ] Preferences Integration
+  - [ ] Custom path configuration
+  - [ ] Installation method selection
+  - [ ] Version management
+  - [ ] Update notifications
+- [ ] Security Features
+  - [ ] Checksum verification
+  - [ ] GPG signature validation
+  - [ ] Update security
+  - [ ] Audit logging
+
+### Performance Optimisation
+- [ ] Optimise backup performance
+  - [ ] Parallel processing
+  - [ ] Data compression
+  - [ ] Incremental backups
+- [ ] Optimise UI performance
+  - [ ] Lazy loading
+  - [ ] Caching
+  - [ ] Optimised data structures
 
 This brief will be updated as the project progresses and more detailed requirements are discovered.

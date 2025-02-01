@@ -47,10 +47,22 @@ final class RepositoryListViewModel: ObservableObject {
     
     func loadRepositories() async {
         do {
-            repositories = try repositoryStorage.list()
-            logger.infoMessage("Loaded \(repositories.count) repositories")
+            var storedRepos = try repositoryStorage.list()
+            
+            // Verify each repository still exists
+            storedRepos = storedRepos.filter { repository in
+                let exists = FileManager.default.fileExists(atPath: repository.path)
+                if !exists {
+                    logger.warning("Repository at \(repository.path) no longer exists, removing from storage")
+                    try? repositoryStorage.delete(repository)
+                }
+                return exists
+            }
+            
+            repositories = storedRepos
+            logger.infoMessage("Loaded \(repositories.count) valid repositories")
         } catch {
-            logger.errorMessage("Failed to load repositories: \(error.localizedDescription)")
+            logger.error("Failed to load repositories: \(error.localizedDescription)")
             self.error = error
             showError = true
         }
@@ -58,13 +70,11 @@ final class RepositoryListViewModel: ObservableObject {
     
     func deleteRepository(_ repository: Repository) async {
         do {
-            try repositoryStorage.delete(forId: repository.id)
-            if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
-                repositories.remove(at: index)
-            }
+            try repositoryStorage.delete(repository)
+            await loadRepositories()  // Refresh list after deletion
             logger.infoMessage("Deleted repository: \(repository.id)")
         } catch {
-            logger.errorMessage("Failed to delete repository: \(error.localizedDescription)")
+            logger.error("Failed to delete repository: \(error.localizedDescription)")
             self.error = error
             showError = true
         }

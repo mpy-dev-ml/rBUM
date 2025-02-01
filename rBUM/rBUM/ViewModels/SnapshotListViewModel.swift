@@ -42,7 +42,7 @@ final class SnapshotListViewModel: ObservableObject {
     @Published var pruneOptions = PruneOptions()
     
     private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: CredentialsManagerProtocol
+    private let credentialsManager: KeychainCredentialsManagerProtocol
     private let logger = Logging.logger(for: .repository)
     private let calendar = Calendar.current
     
@@ -52,7 +52,7 @@ final class SnapshotListViewModel: ObservableObject {
             fileManager: .default,
             logger: Logging.logger(for: .repository)
         ),
-        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
         self.repository = repository
         self.resticService = resticService
@@ -121,14 +121,8 @@ final class SnapshotListViewModel: ObservableObject {
     
     func pruneSnapshots() async {
         do {
-            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
-            
-            // Create credentials for pruning
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
-            )
+            // Get credentials for repository
+            let credentials = try await credentialsManager.retrieve(forId: repository.id)
             
             // Create Repository with credentials
             let repoWithCredentials = Repository(

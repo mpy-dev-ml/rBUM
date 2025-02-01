@@ -9,163 +9,160 @@ import Foundation
 import os
 import Security
 
-/// Implementation of CredentialsManagerProtocol that uses the macOS Keychain for secure storage
-final class KeychainCredentialsManager: CredentialsManagerProtocol {
+/// Protocol for managing secure storage of repository credentials
+protocol KeychainCredentialsManagerProtocol {
+    /// Store credentials securely
+    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws
+    
+    /// Retrieve credentials for a repository
+    func retrieve(forId id: String) async throws -> RepositoryCredentials
+    
+    /// Delete credentials for a repository
+    func delete(forId id: String) async throws
+    
+    /// List all stored credentials
+    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)]
+}
+
+/// Implementation of KeychainCredentialsManagerProtocol that uses the macOS Keychain for secure storage
+final class KeychainCredentialsManager: KeychainCredentialsManagerProtocol {
     private let keychainService: KeychainServiceProtocol
     private let credentialsStorage: CredentialsStorageProtocol
-    private let logger: os.Logger
+    private let logger: Logger
+    private let serviceName = "dev.mpy.rBUM.repository"
     
     init(
         keychainService: KeychainServiceProtocol = KeychainService(),
-        credentialsStorage: CredentialsStorageProtocol = CredentialsStorage(),
-        logger: os.Logger = Logging.logger(for: .keychain)
+        credentialsStorage: CredentialsStorageProtocol = CredentialsStorage()
     ) {
         self.keychainService = keychainService
         self.credentialsStorage = credentialsStorage
-        self.logger = logger
+        self.logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "dev.mpy.rBUM",
+                           category: "Keychain")
     }
     
-    func store(_ credentials: RepositoryCredentials) async throws {
+    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws {
         do {
             // Store password in keychain
             try await keychainService.storePassword(
                 credentials.password,
-                service: credentials.keychainService,
-                account: credentials.keychainAccount
+                service: "\(serviceName).\(id)",
+                account: credentials.repositoryPath
             )
-            logger.info("Successfully saved password to keychain")
+            logger.info("Saved password to keychain for repository: \(id, privacy: .private)")
             
             // Store credentials metadata
-            try credentialsStorage.store(credentials)
+            try credentialsStorage.store(credentials, forRepositoryId: id)
             
-            logger.info("Stored credentials for repository: \(credentials.repositoryId)")
+            logger.info("Stored credentials for repository: \(id, privacy: .private)")
         } catch {
-            logger.error("Failed to store credentials: \(error.localizedDescription)")
+            logger.error("Failed to store credentials: \(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
     
-    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+    func retrieve(forId id: String) async throws -> RepositoryCredentials {
         do {
             // Verify credentials metadata exists
             guard let credentials = try credentialsStorage.retrieve(forRepositoryId: id) else {
+                logger.error("Credentials not found for repository: \(id, privacy: .private)")
                 throw CredentialsError.notFound
             }
             
             // Retrieve password from keychain
             let password = try await keychainService.retrievePassword(
-                service: credentials.keychainService,
-                account: credentials.keychainAccount
+                service: "\(serviceName).\(id)",
+                account: credentials.repositoryPath
             )
-            logger.info("Successfully retrieved password from keychain")
             
             // Create new credentials with retrieved password
-            return RepositoryCredentials(
-                repositoryId: credentials.repositoryId,
-                password: password,
+            let updatedCredentials = RepositoryCredentials(
                 repositoryPath: credentials.repositoryPath,
-                keyFileName: credentials.keyFileName
+                password: password
             )
+            
+            logger.info("Retrieved credentials for repository: \(id, privacy: .private)")
+            return updatedCredentials
         } catch {
-            logger.error("Failed to retrieve credentials: \(error.localizedDescription)")
+            logger.error("Failed to retrieve credentials: \(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
     
-    func update(_ credentials: RepositoryCredentials) async throws {
+    func delete(forId id: String) async throws {
         do {
-            // Retrieve existing credentials metadata
-            guard let existingCredentials = try credentialsStorage.retrieve(forRepositoryId: credentials.repositoryId) else {
-                throw CredentialsError.notFound
-            }
-            
-            // Update password in keychain
-            try await keychainService.updatePassword(
-                credentials.password,
-                service: existingCredentials.keychainService,
-                account: existingCredentials.keychainAccount
-            )
-            logger.info("Successfully updated password in keychain")
-            
-            // Update credentials metadata
-            try credentialsStorage.update(credentials)
-            
-            logger.info("Updated credentials for repository: \(credentials.repositoryId)")
-        } catch {
-            logger.error("Failed to update credentials: \(error.localizedDescription)")
-            throw error
-        }
-    }
-    
-    func delete(forId id: UUID) async throws {
-        do {
-            // Retrieve credentials metadata
+            // Get credentials to get repository path
             guard let credentials = try credentialsStorage.retrieve(forRepositoryId: id) else {
+                logger.error("Credentials not found for repository: \(id, privacy: .private)")
                 throw CredentialsError.notFound
             }
             
-            // Delete password from keychain
+            // Delete from keychain
             try await keychainService.deletePassword(
-                service: credentials.keychainService,
-                account: credentials.keychainAccount
+                service: "\(serviceName).\(id)",
+                account: credentials.repositoryPath
             )
-            logger.info("Successfully deleted password from keychain")
             
-            // Delete credentials metadata
+            // Delete metadata
             try credentialsStorage.delete(forRepositoryId: id)
             
-            logger.info("Deleted credentials for repository: \(id)")
+            logger.info("Deleted credentials for repository: \(id, privacy: .private)")
         } catch {
-            logger.error("Failed to delete credentials: \(error.localizedDescription)")
+            logger.error("Failed to delete credentials: \(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
     
-    func getPassword(forRepositoryId id: UUID) async throws -> String {
-        // Get metadata
-        guard let credentials = try credentialsStorage.retrieve(forRepositoryId: id) else {
-            throw KeychainError.itemNotFound
+    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
+        do {
+            let storedCredentials = try credentialsStorage.list()
+            
+            // For each stored credential, retrieve its password from keychain
+            return try await withThrowingTaskGroup(of: (String, RepositoryCredentials).self) { group in
+                for (repositoryId, storedCredentials) in storedCredentials {
+                    group.addTask {
+                        let password = try await self.keychainService.retrievePassword(
+                            service: "\(self.serviceName).\(repositoryId)",
+                            account: storedCredentials.repositoryPath
+                        )
+                        
+                        let credentials = RepositoryCredentials(
+                            repositoryPath: storedCredentials.repositoryPath,
+                            password: password
+                        )
+                        
+                        return (repositoryId, credentials)
+                    }
+                }
+                
+                var results: [(String, RepositoryCredentials)] = []
+                for try await result in group {
+                    results.append(result)
+                }
+                
+                return results
+            }
+        } catch {
+            logger.error("Failed to list credentials: \(error.localizedDescription, privacy: .public)")
+            throw error
         }
-        
-        // Get password from Keychain
-        return try await keychainService.retrievePassword(
-            service: credentials.keychainService,
-            account: credentials.repositoryPath
-        )
-    }
-    
-    func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: id,
-            password: password,
-            repositoryPath: path
-        )
     }
 }
 
 /// Errors specific to credentials operations
 enum CredentialsError: LocalizedError {
     case notFound
-    case invalidPassword
-    case storeFailed(String)
-    case retrieveFailed(String)
-    case deleteFailed(String)
-    case updateFailed(String)
+    case invalidData
+    case keychainError(String)
     
     var errorDescription: String? {
         switch self {
         case .notFound:
             return "Credentials not found"
-        case .invalidPassword:
-            return "Invalid password"
-        case .storeFailed(let reason):
-            return "Failed to store credentials: \(reason)"
-        case .retrieveFailed(let reason):
-            return "Failed to retrieve credentials: \(reason)"
-        case .deleteFailed(let reason):
-            return "Failed to delete credentials: \(reason)"
-        case .updateFailed(let reason):
-            return "Failed to update credentials: \(reason)"
+        case .invalidData:
+            return "Invalid credentials data"
+        case .keychainError(let message):
+            return "Keychain error: \(message)"
         }
     }
 }

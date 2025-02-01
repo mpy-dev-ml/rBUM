@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel: ContentViewModel
     
-    init(credentialsManager: CredentialsManagerProtocol) {
+    init(credentialsManager: KeychainCredentialsManagerProtocol) {
         _viewModel = StateObject(wrappedValue: ContentViewModel(credentialsManager: credentialsManager))
     }
     
@@ -161,44 +161,24 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     func unmount(repository: Repository, on path: URL) async throws {}
 }
 
-private final class PreviewCredentialsManager: CredentialsManagerProtocol {
-    func store(_ credentials: RepositoryCredentials) async throws {
+private final class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
+    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws {
         // No-op for preview
     }
     
-    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
-        // Return mock credentials for preview
-        return RepositoryCredentials(repositoryId: id, password: "preview", repositoryPath: "/preview/repository")
+    func retrieve(forId id: String) async throws -> RepositoryCredentials {
+        // Return dummy data for preview
+        return RepositoryCredentials(repositoryPath: "/tmp/preview", password: "preview")
     }
     
-    func delete(forId id: UUID) async throws {
+    func delete(forId id: String) async throws {
         // No-op for preview
     }
     
-    func getPassword(forRepositoryId id: UUID) async throws -> String {
-        // Return mock password for preview
-        return "preview"
+    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
+        // Return empty list for preview
+        return []
     }
-    
-    func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: id,
-            password: password,
-            repositoryPath: path
-        )
-    }
-    
-    func getCredentials(for repository: Repository) throws -> RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: repository.id,
-            password: "test",
-            repositoryPath: repository.path.path
-        )
-    }
-    
-    func storeCredentials(_ credentials: RepositoryCredentials) throws {}
-    
-    func deleteCredentials(forRepositoryId repositoryId: UUID) throws {}
 }
 
 class ContentViewModel: ObservableObject {
@@ -207,9 +187,9 @@ class ContentViewModel: ObservableObject {
     let repositoryStorage: RepositoryStorageProtocol
     let repositoryCreationService: RepositoryCreationServiceProtocol
     let resticService: ResticCommandServiceProtocol
-    let credentialsManager: CredentialsManagerProtocol
+    let credentialsManager: KeychainCredentialsManagerProtocol
     
-    init(credentialsManager: CredentialsManagerProtocol) {
+    init(credentialsManager: KeychainCredentialsManagerProtocol) {
         self.credentialsManager = credentialsManager
         self.repositoryStorage = RepositoryStorage()
         self.resticService = ResticCommandService(
