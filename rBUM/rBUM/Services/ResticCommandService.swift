@@ -77,16 +77,16 @@ protocol ResticCommandServiceProtocol {
     func initializeRepository(at path: URL, password: String) async throws
     
     /// List all snapshots in a repository
-    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot]
+    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot]
     
     /// Create a new backup
-    func createBackup(paths: [URL], to repository: ResticRepository, tags: [String]?, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws
+    func createBackup(paths: [URL], to repository: Repository, tags: [String]?, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws
     
     /// Prune old snapshots from a repository
-    func pruneSnapshots(in repository: ResticRepository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws
+    func pruneSnapshots(in repository: Repository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws
     
     /// Check repository integrity
-    func check(_ repository: ResticRepository) async throws
+    func check(_ repository: Repository) async throws
 }
 
 /// Restic command execution service
@@ -210,10 +210,10 @@ class ResticCommandService: ResticCommandServiceProtocol {
             repositoryPath: path.path
         )
         
-        try await executeCommand(arguments, credentials: credentials)
+        _ = try await executeCommand(arguments, credentials: credentials)
     }
     
-    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
+    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         let arguments = ["snapshots", "--json"]
         
         let output = try await executeCommand(arguments, credentials: repository.credentials)
@@ -221,7 +221,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
         return try JSONDecoder().decode([ResticSnapshot].self, from: Data(output.utf8))
     }
     
-    func createBackup(paths: [URL], to repository: ResticRepository, tags: [String]? = nil, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
+    func createBackup(paths: [URL], to repository: Repository, tags: [String]? = nil, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
         guard !paths.isEmpty else {
             throw ResticError.invalidArgument("No paths specified for backup")
         }
@@ -244,7 +244,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
         onStatusChange?(.preparing)
         
         do {
-            try await executeCommand(
+            _ = try await executeCommand(
                 arguments,
                 credentials: repository.credentials,
                 onOutput: { line in
@@ -274,7 +274,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
         }
     }
     
-    func pruneSnapshots(in repository: ResticRepository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
+    func pruneSnapshots(in repository: Repository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
         var arguments = ["forget", "--prune"]
         
         if let keepLast = keepLast {
@@ -302,17 +302,17 @@ class ResticCommandService: ResticCommandServiceProtocol {
             arguments.append(String(keepYearly))
         }
         
-        try await executeCommand(arguments, credentials: repository.credentials)
+        _ = try await executeCommand(arguments, credentials: repository.credentials)
     }
     
-    func check(_ repository: ResticRepository) async throws {
+    func check(_ repository: Repository) async throws {
         let arguments = [
             "check",
             "--json"
         ]
         
         let output = try await executeCommand(arguments, credentials: repository.credentials)
-        guard let outputData = output.data(using: String.Encoding.utf8) else {
+        if output.data(using: .utf8) == nil {
             throw ResticError.commandError("Invalid output format")
         }
     }

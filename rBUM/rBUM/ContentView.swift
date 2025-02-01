@@ -82,26 +82,42 @@ private final class PreviewRepositoryStorage: RepositoryStorageProtocol {
 
 private final class PreviewRepositoryCreationService: RepositoryCreationServiceProtocol {
     func createRepository(name: String, path: URL, password: String) async throws -> Repository {
-        Repository(name: name, path: path)
+        Repository(
+            name: name,
+            path: path,
+            credentials: RepositoryCredentials(
+                repositoryId: UUID(),
+                password: password,
+                repositoryPath: path.path
+            )
+        )
     }
     
     func importRepository(name: String, path: URL, password: String) async throws -> Repository {
-        Repository(name: name, path: path)
+        Repository(
+            name: name,
+            path: path,
+            credentials: RepositoryCredentials(
+                repositoryId: UUID(),
+                password: password,
+                repositoryPath: path.path
+            )
+        )
     }
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
-    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
+    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         return []
     }
     
     func initializeRepository(at path: URL, password: String) async throws {}
     
-    func check(_ repository: ResticRepository) async throws {}
+    func check(_ repository: Repository) async throws {}
     
     func createBackup(
         paths: [URL],
-        to repository: ResticRepository,
+        to repository: Repository,
         tags: [String]? = nil,
         onProgress: ((ResticBackupProgress) -> Void)? = nil,
         onStatusChange: ((ResticBackupStatus) -> Void)? = nil
@@ -128,7 +144,7 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     }
     
     func pruneSnapshots(
-        in repository: ResticRepository,
+        in repository: Repository,
         keepLast: Int?,
         keepDaily: Int?,
         keepWeekly: Int?,
@@ -136,13 +152,13 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         keepYearly: Int?
     ) async throws {}
     
-    func forget(in repository: ResticRepository, snapshots: [ResticSnapshot]) async throws {}
+    func forget(in repository: Repository, snapshots: [ResticSnapshot]) async throws {}
     
     func restore(from snapshot: ResticSnapshot, to path: URL, onProgress: ((ResticRestoreProgress) -> Void)? = nil) async throws {}
     
-    func mount(repository: ResticRepository, on path: URL, onProgress: ((ResticMountProgress) -> Void)? = nil) async throws {}
+    func mount(repository: Repository, on path: URL, onProgress: ((ResticMountProgress) -> Void)? = nil) async throws {}
     
-    func unmount(repository: ResticRepository, on path: URL) async throws {}
+    func unmount(repository: Repository, on path: URL) async throws {}
 }
 
 private final class PreviewCredentialsManager: CredentialsManagerProtocol {

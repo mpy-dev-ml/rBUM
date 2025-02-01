@@ -116,10 +116,17 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
             }
         }
         
-        // Create repository
+        // Create repository with credentials
+        let credentials = RepositoryCredentials(
+            repositoryId: UUID(),
+            password: password,
+            repositoryPath: path.path
+        )
+        
         let repository = Repository(
             name: name,
-            path: path
+            path: path,
+            credentials: credentials
         )
         
         do {
@@ -158,22 +165,15 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
             throw RepositoryCreationError.repositoryAlreadyExists
         }
         
-        // Create repository
-        let repository = Repository(
-            name: name,
-            path: path
-        )
-        
-        // Create credentials
+        // Create repository with credentials
         let credentials = RepositoryCredentials(
-            repositoryId: repository.id,
+            repositoryId: UUID(),
             password: password,
             repositoryPath: path.path,
             keyFileName: nil
         )
         
-        // Create restic repository
-        let resticRepository = ResticRepository(
+        let repository = Repository(
             name: name,
             path: path,
             credentials: credentials
@@ -181,7 +181,7 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         
         do {
             // Verify repository with restic
-            try await resticService.check(resticRepository)
+            try await resticService.check(repository)
             
             // Store repository metadata
             try repositoryStorage.store(repository)

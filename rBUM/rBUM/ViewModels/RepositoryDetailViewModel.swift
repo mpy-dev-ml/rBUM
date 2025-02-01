@@ -62,21 +62,21 @@ final class RepositoryDetailViewModel: ObservableObject {
             // Get repository password
             let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
             
-            // Create ResticRepository with credentials
+            // Create Repository with credentials
             let credentials = RepositoryCredentials(
                 repositoryId: repository.id,
                 password: password,
                 repositoryPath: repository.path.path
             )
             
-            let resticRepo = ResticRepository(
+            let repoWithCredentials = Repository(
                 name: repository.name,
                 path: repository.path,
                 credentials: credentials
             )
             
             // Check repository
-            try await resticService.check(resticRepo)
+            try await resticService.check(repoWithCredentials)
             
             // Update last check time
             lastCheck = Date()

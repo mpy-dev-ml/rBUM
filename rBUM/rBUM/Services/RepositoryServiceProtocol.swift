@@ -21,16 +21,3 @@ protocol RepositoryServiceProtocol {
     /// - Returns: True if repository exists at path
     func exists(atPath path: URL, excludingId: UUID?) async throws -> Bool
 }
-
-/// Represents a backup repository
-struct Repository: Identifiable, Codable, Equatable {
-    let id: UUID
-    let name: String
-    let path: URL
-    
-    init(id: UUID = UUID(), name: String, path: URL) {
-        self.id = id
-        self.name = name
-        self.path = path
-    }
-}

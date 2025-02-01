@@ -64,14 +64,14 @@ final class BackupViewModel: ObservableObject {
             // Get repository credentials
             let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
             
-            // Create ResticRepository with credentials
+            // Create Repository with credentials
             let credentials = RepositoryCredentials(
                 repositoryId: repository.id,
                 password: password,
                 repositoryPath: repository.path.path
             )
             
-            let resticRepo = ResticRepository(
+            let repoWithCredentials = Repository(
                 name: repository.name,
                 path: repository.path,
                 credentials: credentials
@@ -80,7 +80,7 @@ final class BackupViewModel: ObservableObject {
             // Start backup
             try await resticService.createBackup(
                 paths: selectedPaths,
-                to: resticRepo,
+                to: repoWithCredentials,
                 tags: nil,  // No tags for now, can be added as a feature later
                 onProgress: { [weak self] progress in
                     self?.currentProgress = progress

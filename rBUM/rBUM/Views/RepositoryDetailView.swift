@@ -75,6 +75,7 @@ struct RepositoryDetailView: View {
     
     private func tabLabel(for tab: RepositoryDetailViewModel.Tab) -> some View {
         Label(tab.rawValue, systemImage: tab.icon)
+            .labelStyle(.iconOnly)
     }
 }
 
@@ -132,40 +133,51 @@ private struct RepositoryDetailsSection: View {
         }
     }
     
+    @ViewBuilder
     private var generalInfoGroup: some View {
-        Group {
-            LabeledContent {
-                Text(viewModel.repository.name)
-            } label: {
-                Text("Name")
-            }
+        VStack(alignment: .leading) {
+            LabeledContent<Text, Text>(
+                content: { Text(viewModel.repository.name) },
+                label: { Text("Name") }
+            )
             .accessibilityLabel("Repository name: \(viewModel.repository.name)")
             
-            LabeledContent {
-                Text(viewModel.repository.path.path)
-            } label: {
-                Text("Path")
-            }
+            LabeledContent<Text, Text>(
+                content: { Text(viewModel.repository.path.path) },
+                label: { Text("Path") }
+            )
             .accessibilityLabel("Repository path: \(viewModel.repository.path.path)")
             
-            LabeledContent {
-                Text(viewModel.repository.createdAt.formatted(.dateTime))
-            } label: {
-                Text("Created")
+            if let lastBackup = viewModel.repository.lastBackup {
+                LabeledContent<Text, Text>(
+                    content: { Text(lastBackup.formatted(date: .abbreviated, time: .shortened)) },
+                    label: { Text("Last Backup") }
+                )
+                .accessibilityLabel("Last backup on \(lastBackup.formatted(date: .abbreviated, time: .shortened))")
             }
-            .accessibilityLabel("Created on \(viewModel.repository.createdAt.formatted(.dateTime))")
+            
+            LabeledContent<Text, Text>(
+                content: { Text("\(viewModel.repository.backupCount)") },
+                label: { Text("Backups") }
+            )
+            .accessibilityLabel("Number of backups: \(viewModel.repository.backupCount)")
+            
+            LabeledContent<Text, Text>(
+                content: { Text(ByteCountFormatter.string(fromByteCount: Int64(viewModel.repository.totalSize), countStyle: .file)) },
+                label: { Text("Total Size") }
+            )
+            .accessibilityLabel("Total size: \(ByteCountFormatter.string(fromByteCount: Int64(viewModel.repository.totalSize), countStyle: .file))")
         }
     }
     
     @ViewBuilder
     private var lastCheckInfo: some View {
         if let lastCheck = viewModel.lastCheck {
-            LabeledContent {
-                Text(lastCheck.formatted(.dateTime))
-            } label: {
-                Text("Last Check")
-            }
-            .accessibilityLabel("Last checked on \(lastCheck.formatted(.dateTime))")
+            LabeledContent<Text, Text>(
+                content: { Text(lastCheck.formatted(date: .abbreviated, time: .shortened)) },
+                label: { Text("Last Check") }
+            )
+            .accessibilityLabel("Last checked on \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
         }
     }
 }
@@ -192,7 +204,15 @@ private struct SettingsTabView: View {
 struct RepositoryDetailView_Previews: PreviewProvider {
     static var previews: some View {
         RepositoryDetailView(
-            repository: Repository(name: "Test", path: URL(fileURLWithPath: "/tmp/test"))
+            repository: Repository(
+                name: "Test Repository",
+                path: URL(fileURLWithPath: "/tmp/test"),
+                credentials: RepositoryCredentials(
+                    repositoryId: UUID(),
+                    password: "test-password",
+                    repositoryPath: "/tmp/test"
+                )
+            )
         )
     }
 }

@@ -76,7 +76,7 @@ final class SnapshotListViewModel: ObservableObject {
             
             // List snapshots
             let resticSnapshots = try await resticService.listSnapshots(
-                in: ResticRepository(
+                in: Repository(
                     name: repository.name,
                     path: repository.path,
                     credentials: credentials
@@ -130,8 +130,8 @@ final class SnapshotListViewModel: ObservableObject {
                 repositoryPath: repository.path.path
             )
             
-            // Create ResticRepository
-            let resticRepo = ResticRepository(
+            // Create Repository with credentials
+            let repoWithCredentials = Repository(
                 name: repository.name,
                 path: repository.path,
                 credentials: credentials
@@ -139,7 +139,7 @@ final class SnapshotListViewModel: ObservableObject {
             
             // Prune snapshots
             try await resticService.pruneSnapshots(
-                in: resticRepo,
+                in: repoWithCredentials,
                 keepLast: pruneOptions.keepLast,
                 keepDaily: pruneOptions.keepDaily,
                 keepWeekly: pruneOptions.keepWeekly,

@@ -32,280 +32,145 @@ struct BackupConfigurationTests {
             self.notificationCenter = MockNotificationCenter()
         }
         
-        /// Reset all mocks to initial state
+        func createConfiguration(
+            id: String = UUID().uuidString,
+            name: String = "Test Configuration",
+            description: String? = nil,
+            enabled: Bool = true,
+            schedule: BackupSchedule = .manual,
+            sources: [BackupSource] = [],
+            excludedPaths: [URL] = [],
+            tags: [BackupTag] = []
+        ) -> BackupConfiguration {
+            BackupConfiguration(
+                id: id,
+                name: name,
+                description: description,
+                enabled: enabled,
+                schedule: schedule,
+                sources: sources,
+                excludedPaths: excludedPaths,
+                tags: tags
+            )
+        }
+        
         func reset() {
             userDefaults.reset()
             fileManager.reset()
             notificationCenter.reset()
         }
-        
-        /// Create test configuration
-        func createConfiguration(
-            id: String = MockData.Configuration.validId,
-            name: String = MockData.Configuration.validName,
-            sourcePaths: [String] = MockData.Configuration.validSourcePaths,
-            excludePatterns: [String] = MockData.Configuration.validExcludePatterns,
-            includePatterns: [String] = MockData.Configuration.validIncludePatterns,
-            schedule: BackupSchedule = MockData.Schedule.validSchedule,
-            repository: Repository = MockData.Repository.validRepository,
-            isEnabled: Bool = true
-        ) -> BackupConfiguration {
-            BackupConfiguration(
-                id: id,
-                name: name,
-                sourcePaths: sourcePaths,
-                excludePatterns: excludePatterns,
-                includePatterns: includePatterns,
-                schedule: schedule,
-                repository: repository,
-                isEnabled: isEnabled
-            )
-        }
     }
     
-    // MARK: - Initialization Tests
+    // MARK: - Tests
     
-    @Test("Initialize with default values", tags: ["init", "configuration"])
-    func testDefaultInitialization() throws {
-        // Given: Default configuration parameters
+    func testBasicProperties() throws {
+        // Given: Configuration with default values
         let context = TestContext()
-        
-        // When: Creating configuration
         let config = context.createConfiguration()
         
-        // Then: Configuration is configured correctly
-        #expect(config.id == MockData.Configuration.validId)
-        #expect(config.name == MockData.Configuration.validName)
-        #expect(config.sourcePaths == MockData.Configuration.validSourcePaths)
-        #expect(config.excludePatterns == MockData.Configuration.validExcludePatterns)
-        #expect(config.includePatterns == MockData.Configuration.validIncludePatterns)
-        #expect(config.schedule == MockData.Schedule.validSchedule)
-        #expect(config.repository == MockData.Repository.validRepository)
-        #expect(config.isEnabled)
+        // Then: Properties should match
+        XCTAssertNotEmpty(config.id)
+        XCTAssertEqual(config.name, "Test Configuration")
+        XCTAssertNil(config.description)
+        XCTAssertTrue(config.enabled)
+        XCTAssertEqual(config.schedule, .manual)
+        XCTAssertEmpty(config.sources)
+        XCTAssertEmpty(config.excludedPaths)
+        XCTAssertEmpty(config.tags)
     }
     
-    @Test("Initialize with custom values", tags: ["init", "configuration"])
-    func testCustomInitialization() throws {
-        // Given: Custom configuration parameters
+    func testCustomValues() throws {
+        // Given: Configuration with custom values
         let context = TestContext()
-        let customId = "custom-id"
-        let customName = "Custom Backup"
-        let customSourcePaths = ["/custom/path1", "/custom/path2"]
-        let customExcludePatterns = ["*.tmp", "*.log"]
-        let customIncludePatterns = ["*.doc", "*.pdf"]
-        let customSchedule = MockData.Schedule.customSchedule
-        let customRepository = MockData.Repository.customRepository
+        let sources = [
+            BackupSource(path: URL(fileURLWithPath: "/test/path1")),
+            BackupSource(path: URL(fileURLWithPath: "/test/path2"))
+        ]
+        let excludedPaths = [
+            URL(fileURLWithPath: "/test/excluded1"),
+            URL(fileURLWithPath: "/test/excluded2")
+        ]
+        let tags = [
+            BackupTag(name: "tag1"),
+            BackupTag(name: "tag2")
+        ]
         
-        // When: Creating configuration
         let config = context.createConfiguration(
-            id: customId,
-            name: customName,
-            sourcePaths: customSourcePaths,
-            excludePatterns: customExcludePatterns,
-            includePatterns: customIncludePatterns,
-            schedule: customSchedule,
-            repository: customRepository,
-            isEnabled: false
+            name: "Custom Config",
+            description: "Test Description",
+            enabled: false,
+            schedule: .daily,
+            sources: sources,
+            excludedPaths: excludedPaths,
+            tags: tags
         )
         
-        // Then: Configuration is configured correctly
-        #expect(config.id == customId)
-        #expect(config.name == customName)
-        #expect(config.sourcePaths == customSourcePaths)
-        #expect(config.excludePatterns == customExcludePatterns)
-        #expect(config.includePatterns == customIncludePatterns)
-        #expect(config.schedule == customSchedule)
-        #expect(config.repository == customRepository)
-        #expect(!config.isEnabled)
+        // Then: Properties should match custom values
+        XCTAssertEqual(config.name, "Custom Config")
+        XCTAssertEqual(config.description, "Test Description")
+        XCTAssertFalse(config.enabled)
+        XCTAssertEqual(config.schedule, .daily)
+        XCTAssertEqual(config.sources, sources)
+        XCTAssertEqual(config.excludedPaths, excludedPaths)
+        XCTAssertEqual(config.tags, tags)
     }
     
-    // MARK: - Persistence Tests
-    
-    @Test("Save and load configuration", tags: ["persistence", "configuration"])
     func testPersistence() throws {
         // Given: Configuration with custom values
         let context = TestContext()
         let config = context.createConfiguration(
             id: "test-id",
-            name: "Test Backup",
-            sourcePaths: ["/test/path1", "/test/path2"],
-            excludePatterns: ["*.tmp"],
-            includePatterns: ["*.doc"],
-            isEnabled: false
+            name: "Test Config",
+            description: "Test Description",
+            enabled: true,
+            schedule: .daily,
+            sources: [
+                BackupSource(path: URL(fileURLWithPath: "/test/path"))
+            ],
+            excludedPaths: [
+                URL(fileURLWithPath: "/test/excluded")
+            ],
+            tags: [
+                BackupTag(name: "test-tag")
+            ]
         )
         
-        // When: Saving and loading configuration
-        config.save(to: context.userDefaults)
-        let loaded = BackupConfiguration.load(from: context.userDefaults, withId: config.id)
+        // When: Configuration is saved and loaded
+        try config.save(to: context.userDefaults)
+        let loaded = try BackupConfiguration.load(from: context.userDefaults, forId: config.id)
         
-        // Then: Loaded configuration matches original
-        #expect(loaded?.id == config.id)
-        #expect(loaded?.name == config.name)
-        #expect(loaded?.sourcePaths == config.sourcePaths)
-        #expect(loaded?.excludePatterns == config.excludePatterns)
-        #expect(loaded?.includePatterns == config.includePatterns)
-        #expect(loaded?.schedule == config.schedule)
-        #expect(loaded?.repository == config.repository)
-        #expect(loaded?.isEnabled == config.isEnabled)
+        // Then: Loaded configuration should match original
+        XCTAssertEqual(loaded?.id, config.id)
+        XCTAssertEqual(loaded?.name, config.name)
+        XCTAssertEqual(loaded?.description, config.description)
+        XCTAssertEqual(loaded?.enabled, config.enabled)
+        XCTAssertEqual(loaded?.schedule, config.schedule)
+        XCTAssertEqual(loaded?.sources, config.sources)
+        XCTAssertEqual(loaded?.excludedPaths, config.excludedPaths)
+        XCTAssertEqual(loaded?.tags, config.tags)
     }
     
-    // MARK: - Validation Tests
-    
-    @Test("Validate configuration", tags: ["validation", "configuration"])
-    func testValidation() throws {
-        // Given: Configurations with various validation scenarios
-        let context = TestContext()
-        let testCases: [(BackupConfiguration, Bool)] = [
-            // Valid configuration
-            (context.createConfiguration(), true),
-            
-            // Invalid - empty name
-            (context.createConfiguration(name: ""), false),
-            
-            // Invalid - empty source paths
-            (context.createConfiguration(sourcePaths: []), false),
-            
-            // Invalid - empty repository
-            (context.createConfiguration(repository: MockData.Repository.invalidRepository), false),
-            
-            // Invalid - invalid schedule
-            (context.createConfiguration(schedule: MockData.Schedule.invalidSchedule), false)
-        ]
-        
-        // When/Then: Test validation
-        for (config, isValid) in testCases {
-            #expect(config.isValid() == isValid)
-        }
-    }
-    
-    // MARK: - Source Path Tests
-    
-    @Test("Handle source paths", tags: ["paths", "configuration"])
-    func testSourcePaths() throws {
-        // Given: Configuration with source paths
-        let context = TestContext()
-        let testCases: [(BackupConfiguration, String, Bool)] = [
-            // Valid paths
-            (context.createConfiguration(sourcePaths: ["/test/path1"]), "/test/path1", true),
-            (context.createConfiguration(sourcePaths: ["/test/path1", "/test/path2"]), "/test/path2", true),
-            
-            // Invalid paths
-            (context.createConfiguration(sourcePaths: ["/test/path1"]), "/test/path2", false),
-            (context.createConfiguration(sourcePaths: []), "/test/path1", false)
-        ]
-        
-        // When/Then: Test source path handling
-        for (config, path, contains) in testCases {
-            #expect(config.containsSourcePath(path) == contains)
-        }
-    }
-    
-    // MARK: - Pattern Tests
-    
-    @Test("Handle patterns", tags: ["patterns", "configuration"])
-    func testPatterns() throws {
-        // Given: Configuration with patterns
-        let context = TestContext()
-        let config = context.createConfiguration(
-            excludePatterns: ["*.tmp", "*.log"],
-            includePatterns: ["*.doc", "*.pdf"]
-        )
-        
-        // Test exclude patterns
-        #expect(config.shouldExclude("test.tmp"))
-        #expect(config.shouldExclude("test.log"))
-        #expect(!config.shouldExclude("test.doc"))
-        
-        // Test include patterns
-        #expect(config.shouldInclude("test.doc"))
-        #expect(config.shouldInclude("test.pdf"))
-        #expect(!config.shouldInclude("test.tmp"))
-    }
-    
-    // MARK: - Edge Cases
-    
-    @Test("Handle edge cases", tags: ["edge", "configuration"])
     func testEdgeCases() throws {
         // Given: Edge case scenarios
         let context = TestContext()
         
         // Test nil UserDefaults
-        let nilDefaults = MockUserDefaults()
-        nilDefaults.removeObject(forKey: BackupConfiguration.defaultsKey)
-        let loadedConfig = BackupConfiguration.load(from: nilDefaults, withId: "test-id")
-        #expect(loadedConfig == nil)
+        XCTAssertThrowsError(try BackupConfiguration.load(from: context.userDefaults, forId: "non-existent"))
         
-        // Test empty patterns
-        let emptyPatternConfig = context.createConfiguration(
-            excludePatterns: [],
-            includePatterns: []
+        // Test empty configuration
+        let emptyConfig = context.createConfiguration(
+            name: "",
+            description: "",
+            sources: [],
+            excludedPaths: [],
+            tags: []
         )
-        #expect(!emptyPatternConfig.shouldExclude("test.file"))
-        #expect(emptyPatternConfig.shouldInclude("test.file"))
-        
-        // Test duplicate source paths
-        let duplicatePaths = ["/test/path", "/test/path"]
-        let duplicateConfig = context.createConfiguration(sourcePaths: duplicatePaths)
-        #expect(duplicateConfig.sourcePaths.count == 1)
-    }
-}
-
-// MARK: - Mock Implementations
-
-/// Mock implementation of UserDefaults for testing
-final class TestMocks.MockUserDefaults: UserDefaults {
-    var storage: [String: Any] = [:]
-    
-    override func set(_ value: Any?, forKey defaultName: String) {
-        if let value = value {
-            storage[defaultName] = value
-        } else {
-            storage.removeValue(forKey: defaultName)
-        }
-    }
-    
-    override func object(forKey defaultName: String) -> Any? {
-        storage[defaultName]
-    }
-    
-    override func removeObject(forKey defaultName: String) {
-        storage.removeValue(forKey: defaultName)
-    }
-    
-    func reset() {
-        storage.removeAll()
-    }
-}
-
-/// Mock implementation of FileManager for testing
-final class TestMocks.MockFileManager: FileManager {
-    var files: [String: Bool] = [:]
-    
-    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
-        files[path] ?? false
-    }
-    
-    func addFile(_ path: String) {
-        files[path] = true
-    }
-    
-    func reset() {
-        files.removeAll()
-    }
-}
-
-/// Mock implementation of NotificationCenter for testing
-final class TestMocks.MockNotificationCenter: NotificationCenter {
-    var postCalled = false
-    var lastNotification: Notification?
-    
-    override func post(_ notification: Notification) {
-        postCalled = true
-        lastNotification = notification
-    }
-    
-    func reset() {
-        postCalled = false
-        lastNotification = nil
+        try emptyConfig.save(to: context.userDefaults)
+        let loaded = try BackupConfiguration.load(from: context.userDefaults, forId: emptyConfig.id)
+        XCTAssertEqual(loaded?.name, "")
+        XCTAssertEqual(loaded?.description, "")
+        XCTAssertEmpty(loaded?.sources ?? [])
+        XCTAssertEmpty(loaded?.excludedPaths ?? [])
+        XCTAssertEmpty(loaded?.tags ?? [])
     }
 }

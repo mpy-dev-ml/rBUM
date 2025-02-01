@@ -193,7 +193,7 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         return repositories.first { $0.id == id }
     }
     
-    public func loadAll() throws -> [ResticRepository] {
+    public func loadAll() throws -> [Repository] {
         guard fileManager.fileExists(atPath: storageURL.path) else {
             return []
         }
@@ -202,14 +202,14 @@ final class RepositoryStorage: RepositoryStorageProtocol {
             let data = try Data(contentsOf: storageURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode([ResticRepository].self, from: data)
+            return try decoder.decode([Repository].self, from: data)
         } catch {
             logger.errorMessage("Failed to read repositories: \(error.localizedDescription)")
             throw RepositoryStorageError.fileOperationFailed("read")
         }
     }
     
-    public func delete(_ repository: ResticRepository) throws {
+    public func delete(_ repository: Repository) throws {
         var repositories = try list()
         repositories.removeAll { $0.id == repository.id }
         

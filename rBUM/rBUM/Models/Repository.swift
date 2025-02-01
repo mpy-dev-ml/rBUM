@@ -8,7 +8,7 @@
 import Foundation
 
 /// Represents a Restic backup repository
-public struct ResticRepository: Identifiable, Codable, Hashable {
+public struct Repository: Identifiable, Codable, Hashable {
     public let id: UUID
     public var name: String        // Repository display name
     public var path: URL          // Local path to repository
@@ -45,13 +45,13 @@ public struct ResticRepository: Identifiable, Codable, Hashable {
         hasher.combine(id)
     }
     
-    public static func == (lhs: ResticRepository, rhs: ResticRepository) -> Bool {
+    public static func == (lhs: Repository, rhs: Repository) -> Bool {
         lhs.id == rhs.id
     }
 }
 
 // MARK: - Repository Storage
-extension ResticRepository {
+extension Repository {
     /// The default directory for storing repositories
     public static var defaultStorageDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

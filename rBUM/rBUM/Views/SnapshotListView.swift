@@ -315,7 +315,15 @@ private struct PruneSheetView: View {
 struct SnapshotListView_Previews: PreviewProvider {
     static var previews: some View {
         SnapshotListView(
-            repository: Repository(name: "Test", path: URL(fileURLWithPath: "/tmp/test"))
+            repository: Repository(
+                name: "Test",
+                path: URL(fileURLWithPath: "/tmp/test"),
+                credentials: RepositoryCredentials(
+                    repositoryId: UUID(),
+                    password: "test-password",
+                    repositoryPath: "/tmp/test"
+                )
+            )
         )
     }
 }

@@ -102,17 +102,17 @@ struct BackupView: View {
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
-    func listSnapshots(in repository: ResticRepository) async throws -> [ResticSnapshot] {
+    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         return []
     }
     
     func initializeRepository(at path: URL, password: String) async throws {}
     
-    func check(_ repository: ResticRepository) async throws {}
+    func check(_ repository: Repository) async throws {}
     
     func createBackup(
         paths: [URL],
-        to repository: ResticRepository,
+        to repository: Repository,
         tags: [String]? = nil,
         onProgress: ((ResticBackupProgress) -> Void)? = nil,
         onStatusChange: ((ResticBackupStatus) -> Void)? = nil
@@ -139,7 +139,7 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     }
     
     func pruneSnapshots(
-        in repository: ResticRepository,
+        in repository: Repository,
         keepLast: Int?,
         keepDaily: Int?,
         keepWeekly: Int?,
@@ -201,7 +201,12 @@ private final class PreviewCredentialsManager: CredentialsManagerProtocol {
 #Preview {
     BackupView(repository: Repository(
         name: "Test Repository",
-        path: URL(fileURLWithPath: "/test/repo")
+        path: URL(fileURLWithPath: "/test/repo"),
+        credentials: RepositoryCredentials(
+            repositoryId: UUID(),
+            password: "test-password",
+            repositoryPath: "/test/repo"
+        )
     ))
     .frame(width: 400, height: 500)
 }

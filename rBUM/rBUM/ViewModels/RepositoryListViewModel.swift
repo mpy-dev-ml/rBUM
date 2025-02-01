@@ -21,7 +21,6 @@ final class RepositoryListViewModel: ObservableObject {
     private let logger = Logging.logger(for: .repository)
     
     convenience init() {
-        let credentialsManager = KeychainCredentialsManager()
         let resticService = ResticCommandService()  // Use default parameters
         let repositoryStorage = RepositoryStorage()
         let repositoryCreationService = RepositoryCreationService(
