@@ -43,7 +43,7 @@ final class SnapshotListViewModel: ObservableObject {
     
     private let resticService: ResticCommandServiceProtocol
     private let credentialsManager: KeychainCredentialsManagerProtocol
-    private let logger = Logging.logger(for: .repository)
+    private let logger = Logging.logger(for: .snapshots)
     private let calendar = Calendar.current
     
     init(
@@ -65,23 +65,20 @@ final class SnapshotListViewModel: ObservableObject {
         defer { isLoading = false }
         
         do {
-            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            // Get repository credentials
+            let credentials = try await credentialsManager.retrieve(forId: repository.id)
             
-            // Create credentials for listing snapshots
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
+            // Create Repository with credentials
+            let repoWithCredentials = Repository(
+                id: repository.id,
+                name: repository.name,
+                path: repository.path,
+                createdAt: repository.createdAt,
+                credentials: credentials
             )
             
             // List snapshots
-            let resticSnapshots = try await resticService.listSnapshots(
-                in: Repository(
-                    name: repository.name,
-                    path: repository.path,
-                    credentials: credentials
-                )
-            )
+            let resticSnapshots = try await resticService.listSnapshots(in: repoWithCredentials)
             
             // Convert ResticSnapshot to Snapshot
             snapshots = resticSnapshots.map { resticSnapshot in
@@ -89,7 +86,7 @@ final class SnapshotListViewModel: ObservableObject {
                     id: resticSnapshot.id,
                     time: resticSnapshot.time,
                     hostname: resticSnapshot.hostname,
-                    username: ProcessInfo.processInfo.userName,  // Use current user as fallback
+                    username: ProcessInfo.processInfo.userName,
                     paths: resticSnapshot.paths,
                     tags: resticSnapshot.tags ?? [],
                     sizeInBytes: 0  // Size will be fetched separately if needed

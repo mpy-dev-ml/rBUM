@@ -1,13 +1,6 @@
-//
-//  BackupConfigurationTests.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Foundation
-import Testing
 @testable import rBUM
+import Testing
 import TestMocksModule
 
 /// Tests for BackupConfiguration functionality
@@ -18,28 +11,25 @@ struct BackupConfigurationTests {
     private typealias TestMocks = TestMocksModule.TestMocks
     private typealias MockUserDefaults = TestMocks.MockUserDefaults
     private typealias MockFileManager = TestMocks.MockFileManager
-    private typealias MockNotificationCenter = TestMocks.MockNotificationCenter
     
     /// Test environment with test data
-    struct TestContext {
+    private struct TestContext {
         let userDefaults: MockUserDefaults
         let fileManager: MockFileManager
-        let notificationCenter: MockNotificationCenter
         
         init() {
-            self.userDefaults = MockUserDefaults()
-            self.fileManager = MockFileManager()
-            self.notificationCenter = MockNotificationCenter()
+            userDefaults = MockUserDefaults()
+            fileManager = MockFileManager()
         }
         
         func createConfiguration(
-            id: String = UUID().uuidString,
+            id: UUID = UUID(),
             name: String = "Test Configuration",
             description: String? = nil,
             enabled: Bool = true,
-            schedule: BackupSchedule = .manual,
+            schedule: BackupSchedule? = nil,
             sources: [BackupSource] = [],
-            excludedPaths: [URL] = [],
+            excludedPaths: [String] = [],
             tags: [BackupTag] = []
         ) -> BackupConfiguration {
             BackupConfiguration(
@@ -53,124 +43,111 @@ struct BackupConfigurationTests {
                 tags: tags
             )
         }
-        
-        func reset() {
-            userDefaults.reset()
-            fileManager.reset()
-            notificationCenter.reset()
-        }
     }
     
     // MARK: - Tests
     
-    func testBasicProperties() throws {
-        // Given: Configuration with default values
+    @Test("Test default values", ["configuration", "default"] as! TestTrait)
+    func testDefaultValues() throws {
+        // Given: Test context
         let context = TestContext()
+        
+        // When: Creating configuration with defaults
         let config = context.createConfiguration()
         
         // Then: Properties should match
-        XCTAssertNotEmpty(config.id)
-        XCTAssertEqual(config.name, "Test Configuration")
-        XCTAssertNil(config.description)
-        XCTAssertTrue(config.enabled)
-        XCTAssertEqual(config.schedule, .manual)
-        XCTAssertEmpty(config.sources)
-        XCTAssertEmpty(config.excludedPaths)
-        XCTAssertEmpty(config.tags)
+        #expect(!config.id.uuidString.isEmpty)
+        #expect(config.name == "Test Configuration")
+        #expect(config.description == nil)
+        #expect(config.enabled == true)
+        #expect(config.schedule == nil)
+        #expect(config.sources.isEmpty)
+        #expect(config.excludedPaths.isEmpty)
+        #expect(config.tags.isEmpty)
     }
     
+    @Test("Test custom values", ["configuration", "custom"] as! TestTrait)
     func testCustomValues() throws {
-        // Given: Configuration with custom values
+        // Given: Test context and data
         let context = TestContext()
+        let id = UUID()
+        let name = "Custom Config"
+        let desc = "Test description"
+        let enabled = false
+        let schedule = BackupSchedule(interval: .daily, time: Date())
         let sources = [
-            BackupSource(path: URL(fileURLWithPath: "/test/path1")),
-            BackupSource(path: URL(fileURLWithPath: "/test/path2"))
+            BackupSource(path: "/path/1"),
+            BackupSource(path: "/path/2")
         ]
-        let excludedPaths = [
-            URL(fileURLWithPath: "/test/excluded1"),
-            URL(fileURLWithPath: "/test/excluded2")
-        ]
-        let tags = [
-            BackupTag(name: "tag1"),
-            BackupTag(name: "tag2")
-        ]
+        let excludedPaths = ["/exclude/1", "/exclude/2"]
+        let tags = [BackupTag(name: "tag1"), BackupTag(name: "tag2")]
         
+        // When: Creating configuration with custom values
         let config = context.createConfiguration(
-            name: "Custom Config",
-            description: "Test Description",
-            enabled: false,
-            schedule: .daily,
+            id: id,
+            name: name,
+            description: desc,
+            enabled: enabled,
+            schedule: schedule,
             sources: sources,
             excludedPaths: excludedPaths,
             tags: tags
         )
         
-        // Then: Properties should match custom values
-        XCTAssertEqual(config.name, "Custom Config")
-        XCTAssertEqual(config.description, "Test Description")
-        XCTAssertFalse(config.enabled)
-        XCTAssertEqual(config.schedule, .daily)
-        XCTAssertEqual(config.sources, sources)
-        XCTAssertEqual(config.excludedPaths, excludedPaths)
-        XCTAssertEqual(config.tags, tags)
+        // Then: Properties should match
+        #expect(config.id == id)
+        #expect(config.name == name)
+        #expect(config.description == desc)
+        #expect(config.enabled == enabled)
+        #expect(config.schedule?.interval == schedule.interval)
+        #expect(config.schedule?.time == schedule.time)
+        #expect(config.sources == sources)
+        #expect(config.excludedPaths == excludedPaths)
+        #expect(config.tags == tags)
     }
     
+    @Test("Test persistence", ["configuration", "persistence"] as! TestTrait)
     func testPersistence() throws {
-        // Given: Configuration with custom values
+        // Given: Test context and configuration
         let context = TestContext()
-        let config = context.createConfiguration(
-            id: "test-id",
-            name: "Test Config",
-            description: "Test Description",
-            enabled: true,
-            schedule: .daily,
-            sources: [
-                BackupSource(path: URL(fileURLWithPath: "/test/path"))
-            ],
-            excludedPaths: [
-                URL(fileURLWithPath: "/test/excluded")
-            ],
-            tags: [
-                BackupTag(name: "test-tag")
-            ]
-        )
+        let config = context.createConfiguration()
         
-        // When: Configuration is saved and loaded
+        // When: Saving and loading
         try config.save(to: context.userDefaults)
         let loaded = try BackupConfiguration.load(from: context.userDefaults, forId: config.id)
         
-        // Then: Loaded configuration should match original
-        XCTAssertEqual(loaded?.id, config.id)
-        XCTAssertEqual(loaded?.name, config.name)
-        XCTAssertEqual(loaded?.description, config.description)
-        XCTAssertEqual(loaded?.enabled, config.enabled)
-        XCTAssertEqual(loaded?.schedule, config.schedule)
-        XCTAssertEqual(loaded?.sources, config.sources)
-        XCTAssertEqual(loaded?.excludedPaths, config.excludedPaths)
-        XCTAssertEqual(loaded?.tags, config.tags)
+        // Then: Properties should match
+        #expect(loaded?.id == config.id)
+        #expect(loaded?.name == config.name)
+        #expect(loaded?.description == config.description)
+        #expect(loaded?.enabled == config.enabled)
+        #expect(loaded?.schedule == config.schedule)
+        #expect(loaded?.sources == config.sources)
+        #expect(loaded?.excludedPaths == config.excludedPaths)
+        #expect(loaded?.tags == config.tags)
     }
     
+    @Test("Test edge cases", ["configuration", "edge"] as! TestTrait)
     func testEdgeCases() throws {
-        // Given: Edge case scenarios
+        // Given: Test context
         let context = TestContext()
-        
-        // Test nil UserDefaults
-        XCTAssertThrowsError(try BackupConfiguration.load(from: context.userDefaults, forId: "non-existent"))
         
         // Test empty configuration
         let emptyConfig = context.createConfiguration(
             name: "",
             description: "",
-            sources: [],
-            excludedPaths: [],
-            tags: []
+            enabled: false
         )
+        
+        // When: Saving and loading empty config
         try emptyConfig.save(to: context.userDefaults)
         let loaded = try BackupConfiguration.load(from: context.userDefaults, forId: emptyConfig.id)
-        XCTAssertEqual(loaded?.name, "")
-        XCTAssertEqual(loaded?.description, "")
-        XCTAssertEmpty(loaded?.sources ?? [])
-        XCTAssertEmpty(loaded?.excludedPaths ?? [])
-        XCTAssertEmpty(loaded?.tags ?? [])
+        
+        // Then: Properties should match
+        #expect(loaded?.name == "")
+        #expect(loaded?.description == "")
+        #expect(loaded?.sources.isEmpty)
+        #expect(loaded?.excludedPaths.isEmpty)
+        #expect(loaded?.tags.isEmpty)
     }
 }

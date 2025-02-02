@@ -317,11 +317,10 @@ struct SnapshotListView_Previews: PreviewProvider {
         SnapshotListView(
             repository: Repository(
                 name: "Test",
-                path: URL(fileURLWithPath: "/tmp/test"),
+                path: "/tmp/test",
                 credentials: RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "test-password",
-                    repositoryPath: "/tmp/test"
+                    repositoryPath: "/tmp/test",
+                    password: "test-password"
                 )
             )
         )

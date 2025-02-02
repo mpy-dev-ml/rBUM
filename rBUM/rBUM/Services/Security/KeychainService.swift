@@ -7,6 +7,7 @@
 
 import Foundation
 import Security
+import os
 
 /// Errors that can occur during Keychain operations
 enum KeychainError: LocalizedError, Equatable {
@@ -78,9 +79,22 @@ protocol KeychainServiceProtocol {
 
 /// Manages secure storage using macOS Keychain
 final class KeychainService: KeychainServiceProtocol {
+    private let logger: Logger
+    private let accessGroup: String?  // Optional Keychain access group
+    private let isTest: Bool          // Test mode flag
+    
+    init(accessGroup: String? = nil, isTest: Bool = false) {
+        self.accessGroup = accessGroup
+        self.isTest = isTest
+        self.logger = Logging.logger(for: .keychain)
+    }
+    
     func update(_ data: Data, service: String, account: String) async throws {
+        logger.debug("Updating keychain item for service: \(service, privacy: .public)")
+        
         // First verify the item exists
         if !(try await itemExists(forService: service, account: account)) {
+            logger.error("Item not found for service: \(service, privacy: .public)")
             throw KeychainError.itemNotFound
         }
         
@@ -89,23 +103,21 @@ final class KeychainService: KeychainServiceProtocol {
         
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         try handleKeychainStatus(status, operation: "update")
+        
+        logger.debug("Successfully updated keychain item for service: \(service, privacy: .public)")
     }
     
     func delete(service: String, account: String) async throws {
+        logger.debug("Deleting keychain item for service: \(service, privacy: .public)")
+        
         // First verify the item exists
         if !(try await itemExists(forService: service, account: account)) {
+            logger.error("Item not found for service: \(service, privacy: .public)")
             throw KeychainError.itemNotFound
         }
         
         forceDelete(forService: service, account: account)
-    }
-    
-    private let accessGroup: String?  // Optional Keychain access group
-    private let isTest: Bool          // Test mode flag
-    
-    init(accessGroup: String? = nil, isTest: Bool = false) {
-        self.accessGroup = accessGroup
-        self.isTest = isTest
+        logger.debug("Successfully deleted keychain item for service: \(service, privacy: .public)")
     }
     
     private func baseQuery(forService service: String, account: String) -> [String: Any] {
@@ -167,6 +179,8 @@ final class KeychainService: KeychainServiceProtocol {
     }
     
     func store(_ data: Data, service: String, account: String) async throws {
+        logger.debug("Storing keychain item for service: \(service, privacy: .public)")
+        
         // First try to delete any existing item
         forceDelete(forService: service, account: account)
         
@@ -175,9 +189,13 @@ final class KeychainService: KeychainServiceProtocol {
         
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         try handleKeychainStatus(status, operation: "store")
+        
+        logger.debug("Successfully stored keychain item for service: \(service, privacy: .public)")
     }
     
     func retrieve(service: String, account: String) async throws -> Data {
+        logger.debug("Retrieving keychain item for service: \(service, privacy: .public)")
+        
         var query = baseQuery(forService: service, account: account)
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecReturnData as String] = true
@@ -190,10 +208,13 @@ final class KeychainService: KeychainServiceProtocol {
             throw KeychainError.unexpectedItemData
         }
         
+        logger.debug("Successfully retrieved keychain item for service: \(service, privacy: .public)")
         return data
     }
     
     func storePassword(_ password: String, service: String, account: String) async throws {
+        logger.debug("Storing password in keychain for service: \(service, privacy: .public)")
+        
         guard let data = password.data(using: .utf8) else {
             throw KeychainError.dataConversionError
         }
@@ -214,10 +235,13 @@ final class KeychainService: KeychainServiceProtocol {
                 }
                 throw KeychainError.unexpectedStatus(status)
             }
+            self.logger.debug("Successfully stored password in keychain for service: \(service, privacy: .public)")
         }.value
     }
     
     func retrievePassword(service: String, account: String) async throws -> String {
+        logger.debug("Retrieving password from keychain for service: \(service, privacy: .public)")
+        
         // Keychain operations can be slow, so we run them in a background task
         return try await Task.detached(priority: .userInitiated) {
             let query: [String: Any] = [
@@ -242,11 +266,14 @@ final class KeychainService: KeychainServiceProtocol {
                 throw KeychainError.dataConversionError
             }
             
+            self.logger.debug("Successfully retrieved password from keychain for service: \(service, privacy: .public)")
             return password
         }.value
     }
     
     func updatePassword(_ password: String, service: String, account: String) async throws {
+        logger.debug("Updating password in keychain for service: \(service, privacy: .public)")
+        
         guard let data = password.data(using: .utf8) else {
             throw KeychainError.dataConversionError
         }
@@ -270,10 +297,13 @@ final class KeychainService: KeychainServiceProtocol {
                 }
                 throw KeychainError.unexpectedStatus(status)
             }
+            self.logger.debug("Successfully updated password in keychain for service: \(service, privacy: .public)")
         }.value
     }
     
     func deletePassword(service: String, account: String) async throws {
+        logger.debug("Deleting password from keychain for service: \(service, privacy: .public)")
+        
         // Keychain operations can be slow, so we run them in a background task
         return try await Task.detached(priority: .userInitiated) {
             let query: [String: Any] = [
@@ -289,6 +319,7 @@ final class KeychainService: KeychainServiceProtocol {
                 }
                 throw KeychainError.unexpectedStatus(status)
             }
+            self.logger.debug("Successfully deleted password from keychain for service: \(service, privacy: .public)")
         }.value
     }
 }

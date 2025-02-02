@@ -7,6 +7,7 @@
 
 import Testing
 @testable import rBUM
+import Foundation
 
 /// Tests for ConfigurationStorage functionality
 struct ConfigurationStorageTests {
@@ -14,278 +15,112 @@ struct ConfigurationStorageTests {
     
     /// Test environment with test data
     struct TestContext {
-        let fileManager: MockFileManager
-        let notificationCenter: MockNotificationCenter
+        let fileManager: TestMocksModule.TestMocks.MockFileManager
+        let notificationCenter: TestMocksModule.TestMocks.MockNotificationCenter
         let encoder: JSONEncoder
         let decoder: JSONDecoder
-        let userDefaults: MockUserDefaults
         
         init() {
-            self.fileManager = MockFileManager()
-            self.notificationCenter = MockNotificationCenter()
+            self.fileManager = TestMocksModule.TestMocks.MockFileManager()
+            self.notificationCenter = TestMocksModule.TestMocks.MockNotificationCenter()
             self.encoder = JSONEncoder()
             self.decoder = JSONDecoder()
-            self.userDefaults = MockUserDefaults()
         }
         
         /// Reset all mocks to initial state
         func reset() {
             fileManager.reset()
             notificationCenter.reset()
-            userDefaults.reset()
         }
         
         /// Create test configuration storage
         func createStorage() -> ConfigurationStorage {
             ConfigurationStorage(
-                fileManager: fileManager,
-                notificationCenter: notificationCenter,
-                encoder: encoder,
-                decoder: decoder,
-                userDefaults: userDefaults
+                fileManager: fileManager as FileManagerProtocol,
+                notificationCenter: notificationCenter
             )
         }
     }
     
     // MARK: - Storage Tests
     
-    @Test("Test configuration storage operations", tags: ["storage", "config"])
-    func testStorageOperations() throws {
+    @Test("Test basic configuration storage", ["storage", "config"] as! TestTrait)
+    func testBasicStorage() throws {
         // Given: Configuration storage
         let context = TestContext()
         let storage = context.createStorage()
         
-        let testCases = MockData.Configuration.storageData
+        // When: Save new configuration
+        let config = Configuration.default
+        try storage.save(config)
         
-        // Test storage operations
-        for testCase in testCases {
-            // Store configuration
-            try storage.store(testCase.config)
-            #expect(context.fileManager.writeDataCalled)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            // Load configuration
-            let loaded = try storage.load(testCase.config.id)
-            #expect(loaded == testCase.config)
-            #expect(context.fileManager.readDataCalled)
-            
-            // Update configuration
-            var updated = testCase.config
-            updated.name = "Updated Configuration"
-            try storage.update(updated)
-            #expect(context.fileManager.writeDataCalled)
-            
-            // Delete configuration
-            try storage.delete(updated.id)
-            #expect(context.fileManager.deleteFileCalled)
-            
-            context.reset()
-        }
+        // Then: Configuration was saved
+        #expect(context.fileManager.writeDataCalled)
+        
+        // When: Load configuration
+        let loaded = try storage.load()
+        
+        // Then: Configuration matches
+        #expect(loaded == config)
+        
+        // Then: Notification was posted
+        #expect(context.notificationCenter.lastPostedName == .configurationDidChange)
     }
     
-    // MARK: - Validation Tests
-    
-    @Test("Test configuration validation", tags: ["validation", "config"])
-    func testConfigurationValidation() throws {
-        // Given: Configuration storage
+    @Test("Test configuration reset", ["storage", "config"] as! TestTrait)
+    func testConfigurationReset() throws {
+        // Given: Configuration storage with saved config
         let context = TestContext()
         let storage = context.createStorage()
+        let config = Configuration.default
+        try storage.save(config)
         
-        let testCases = MockData.Configuration.validationData
+        // When: Reset configuration
+        try storage.reset()
         
-        // Test validation
-        for testCase in testCases {
-            do {
-                // Validate configuration
-                try storage.validate(testCase.config)
-                
-                if !testCase.expectedValid {
-                    throw TestFailure("Expected validation error for invalid data")
-                }
-            } catch {
-                if testCase.expectedValid {
-                    throw TestFailure("Unexpected validation error: \(error)")
-                }
-                
-                #expect(context.notificationCenter.postNotificationCalled)
-                let notification = context.notificationCenter.lastPostedNotification
-                #expect(notification?.name == .configurationValidationError)
-            }
-            
-            context.reset()
-        }
+        // Then: Configuration was reset to default
+        let loaded = try storage.load()
+        #expect(loaded == Configuration.default)
+        
+        // Then: Notification was posted
+        #expect(context.notificationCenter.lastPostedName == .configurationDidChange)
     }
     
-    // MARK: - Default Configuration Tests
-    
-    @Test("Test default configuration", tags: ["defaults", "config"])
-    func testDefaultConfiguration() throws {
-        // Given: Configuration storage
-        let context = TestContext()
-        let storage = context.createStorage()
-        
-        let testCases = MockData.Configuration.defaultData
-        
-        // Test default configurations
-        for testCase in testCases {
-            // Set user defaults
-            context.userDefaults.mockDefaults = testCase.defaults
-            
-            // Load default configuration
-            let config = try storage.loadDefault()
-            
-            // Verify default configuration
-            #expect(config.settings == testCase.expectedSettings)
-            #expect(config.preferences == testCase.expectedPreferences)
-            
-            // Store as default
-            try storage.storeDefault(config)
-            #expect(context.userDefaults.setValueCalled)
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - Migration Tests
-    
-    @Test("Test configuration migration", tags: ["migration", "config"])
-    func testConfigurationMigration() throws {
-        // Given: Configuration storage
-        let context = TestContext()
-        let storage = context.createStorage()
-        
-        let testCases = MockData.Configuration.migrationData
-        
-        // Test migration
-        for testCase in testCases {
-            // Setup old data
-            context.fileManager.mockData = testCase.oldData
-            
-            // Perform migration
-            try storage.migrate()
-            
-            // Verify migration
-            let migratedData = context.fileManager.lastWrittenData
-            #expect(migratedData == testCase.expectedData)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - Error Handling Tests
-    
-    @Test("Test configuration error handling", tags: ["error", "config"])
+    @Test("Test error handling", ["storage", "config", "error"] as! TestTrait)
     func testErrorHandling() throws {
-        // Given: Configuration storage
+        // Given: Configuration storage with error
         let context = TestContext()
+        context.fileManager.simulateError(ConfigurationStorageError.fileOperationFailed("write"))
         let storage = context.createStorage()
         
-        let errorCases = MockData.Configuration.errorCases
-        
-        // Test error handling
-        for errorCase in errorCases {
-            do {
-                // Simulate error condition
-                context.fileManager.simulateError = errorCase.error
-                
-                // Attempt operation
-                try errorCase.operation(storage)
-                
-                throw TestFailure("Expected error for \(errorCase)")
-            } catch {
-                // Verify error handling
-                #expect(context.notificationCenter.postNotificationCalled)
-                let notification = context.notificationCenter.lastPostedNotification
-                #expect(notification?.name == .configurationStorageError)
-                
-                // Verify error details
-                if let configError = error as? ConfigurationError {
-                    #expect(configError.code == errorCase.expectedErrorCode)
-                }
-            }
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - Performance Tests
-    
-    @Test("Test configuration performance", tags: ["performance", "config"])
-    func testPerformance() throws {
-        // Given: Configuration storage
-        let context = TestContext()
-        let storage = context.createStorage()
-        
-        let startTime = Date()
-        
-        // Perform multiple operations
-        for i in 0..<100 {
-            let config = BackupConfiguration(
-                id: UUID(),
-                name: "Test Config \(i)",
-                settings: BackupSettings(),
-                schedule: BackupSchedule()
-            )
-            try storage.store(config)
-            _ = try storage.load(config.id)
-            try storage.delete(config.id)
+        // When: Try to save configuration
+        do {
+            try storage.save(Configuration.default)
+            throw TestFailure("Expected error")
+        } catch ConfigurationStorageError.fileOperationFailed {
+            // Expected error
         }
         
-        let endTime = Date()
-        
-        // Verify performance
-        let timeInterval = endTime.timeIntervalSince(startTime)
-        #expect(timeInterval < 5.0) // Should complete in under 5 seconds
-        
-        // Test individual operation performance
-        let config = BackupConfiguration(
-            id: UUID(),
-            name: "Test Config",
-            settings: BackupSettings(),
-            schedule: BackupSchedule()
-        )
-        
-        let operationStart = Date()
-        try storage.store(config)
-        _ = try storage.load(config.id)
-        try storage.delete(config.id)
-        let operationEnd = Date()
-        
-        let operationInterval = operationEnd.timeIntervalSince(operationStart)
-        #expect(operationInterval < 0.1) // Individual operations should be fast
+        // Then: No notification was posted
+        #expect(context.notificationCenter.lastPostedName == nil)
     }
     
     // MARK: - Backup Tests
     
-    @Test("Test configuration backup", tags: ["backup", "config"])
+    @Test("Test configuration backup", ["backup", "config"] as! TestTrait)
     func testConfigurationBackup() throws {
         // Given: Configuration storage
         let context = TestContext()
         let storage = context.createStorage()
         
-        let testCases = MockData.Configuration.backupData
+        // When: Save configuration
+        let config = Configuration.default
+        try storage.save(config)
         
-        // Test backup operations
-        for testCase in testCases {
-            // Create backup
-            try storage.createBackup()
-            #expect(context.fileManager.copyFileCalled)
-            
-            // Verify backup
-            let backupExists = context.fileManager.fileExists(atPath: testCase.backupPath)
-            #expect(backupExists)
-            
-            // Restore from backup
-            try storage.restoreFromBackup()
-            #expect(context.fileManager.copyFileCalled)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            // Verify restored data
-            let restoredData = try storage.load(testCase.config.id)
-            #expect(restoredData == testCase.config)
-            
-            context.reset()
-        }
+        // Then: File exists
+        var isDirectory = ObjCBool(false)
+        let exists = context.fileManager.fileExists(atPath: "/mock/\(FileManager.SearchPathDirectory.applicationSupportDirectory.rawValue)/config.json", isDirectory: &isDirectory)
+        #expect(exists)
+        #expect(!isDirectory.boolValue)
     }
 }

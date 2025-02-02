@@ -65,8 +65,7 @@ final class CredentialsStorage: CredentialsStorageProtocol {
     
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        self.logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "dev.mpy.rBUM", 
-                           category: "Credentials")
+        self.logger = Logging.logger(for: .security)
         
         // Set up credentials directory in Application Support
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

@@ -8,7 +8,7 @@
 import Foundation
 
 /// Represents application-wide configuration settings
-struct Configuration: Codable {
+struct Configuration: Codable, Equatable {
     /// Default backup schedule interval in minutes (0 = manual only)
     var defaultBackupInterval: Int
     

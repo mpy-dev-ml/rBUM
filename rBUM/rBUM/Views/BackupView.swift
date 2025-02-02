@@ -102,21 +102,20 @@ struct BackupView: View {
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
+    func initRepository(credentials: RepositoryCredentials) async throws {
+        // No-op for preview
+    }
+    
+    func checkRepository(credentials: RepositoryCredentials) async throws {
+        // No-op for preview
+    }
+    
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
+        // Return empty list for preview
         return []
     }
     
-    func initializeRepository(at path: URL, password: String) async throws {}
-    
-    func check(_ repository: Repository) async throws {}
-    
-    func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        tags: [String]? = nil,
-        onProgress: ((ResticBackupProgress) -> Void)? = nil,
-        onStatusChange: ((ResticBackupStatus) -> Void)? = nil
-    ) async throws {
+    func createBackup(paths: [URL], to repository: Repository, tags: [String]?, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
         // Simulate backup progress
         onStatusChange?(.preparing)
         
@@ -138,62 +137,40 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         onStatusChange?(.completed)
     }
     
-    func pruneSnapshots(
-        in repository: Repository,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
-    ) async throws {}
+    func pruneSnapshots(in repository: Repository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
+        // No-op for preview
+    }
+    
+    func check(_ repository: Repository) async throws {
+        // No-op for preview
+    }
+    
+    func initializeRepository(at path: URL, password: String) async throws {
+        // No-op for preview
+    }
 }
 
-private final class PreviewCredentialsManager: CredentialsManagerProtocol {
-    func store(_ credentials: RepositoryCredentials) async throws {
+private final class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
+    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws {
         // No-op for preview
     }
     
-    func retrieve(forId id: UUID) async throws -> RepositoryCredentials {
+    func retrieve(forId id: String) async throws -> RepositoryCredentials {
         // Return mock credentials for preview
         return RepositoryCredentials(
-            repositoryId: id,
-            password: "preview",
-            repositoryPath: "/preview/repository"
+            repositoryPath: "/preview/repository",
+            password: "preview"
         )
     }
     
-    func update(_ credentials: RepositoryCredentials) async throws {
+    func delete(forId id: String) async throws {
         // No-op for preview
     }
     
-    func delete(forId id: UUID) async throws {
-        // No-op for preview
+    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
+        // Return empty list for preview
+        return []
     }
-    
-    func getPassword(forRepositoryId id: UUID) async throws -> String {
-        // Return mock password for preview
-        return "preview"
-    }
-    
-    func createCredentials(id: UUID, path: String, password: String) -> RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: id,
-            password: password,
-            repositoryPath: path
-        )
-    }
-    
-    func getCredentials(for repository: Repository) throws -> RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryId: repository.id,
-            password: "test",
-            repositoryPath: repository.path.path
-        )
-    }
-    
-    func storeCredentials(_ credentials: RepositoryCredentials) throws {}
-    
-    func deleteCredentials(forRepositoryId repositoryId: UUID) throws {}
 }
 
 // MARK: - Preview
@@ -201,11 +178,10 @@ private final class PreviewCredentialsManager: CredentialsManagerProtocol {
 #Preview {
     BackupView(repository: Repository(
         name: "Test Repository",
-        path: URL(fileURLWithPath: "/test/repo"),
+        path: "/test/repo",
         credentials: RepositoryCredentials(
-            repositoryId: UUID(),
-            password: "test-password",
-            repositoryPath: "/test/repo"
+            repositoryPath: "/test/repo",
+            password: "test-password"
         )
     ))
     .frame(width: 400, height: 500)

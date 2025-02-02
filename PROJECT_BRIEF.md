@@ -91,7 +91,7 @@ The app will guide users through any permission requirements and maintain secure
 
 ### Day 4-5: Testing Infrastructure and Quality Assurance
 - [x] Comprehensive test infrastructure
-  - [x] Test plan organization
+  - [x] Test plan organisation
     - [x] Main test plan configuration
     - [x] Separate plans for unit, UI, and performance tests
     - [x] Environment variable configuration
@@ -100,7 +100,7 @@ The app will guide users through any permission requirements and maintain secure
     - [x] Service tests conversion
     - [x] ViewModel tests conversion
     - [x] TestContext pattern implementation
-    - [x] Tagged tests for organized execution
+    - [x] Tagged tests for organised execution
   - [x] XCTest maintenance
     - [x] UI tests for SwiftUI components
     - [x] Performance tests for critical operations
@@ -108,7 +108,7 @@ The app will guide users through any permission requirements and maintain secure
     - [x] Coverage reporting setup
     - [x] Critical path coverage
 - [x] Code quality tools
-  - [x] Static analyzer configuration
+  - [x] Static analyser configuration
   - [x] SwiftLint integration
   - [x] Performance profiling setup
 
@@ -125,30 +125,122 @@ The app will guide users through any permission requirements and maintain secure
   - Fixed unused result warnings
   - Proper Sendable conformance
   - Improved memory management
+  - Centralised logging system implemented
 - Ready for feature development phase
 
-### Test Infrastructure Improvements
-#### TestMocksModule
-- [x] Created dedicated module for test mocks
-  - [x] MockUserDefaults implementation
-  - [x] MockFileManager implementation
-  - [x] MockNotificationCenter implementation
-  - [x] Thread-safe design with proper Sendable conformance
-  - [x] Public API for test usage
-- [x] Integrated with existing test suite
-  - [x] Updated BackupConfigurationTests
-  - [x] Prepared for wider test coverage
+### Development Timeline
 
-#### Code Quality Enhancements
-- [x] Improved command result handling
-  - [x] Explicit handling of unused results
-  - [x] Better error propagation
-- [x] Enhanced thread safety
-  - [x] Proper Sendable conformance
-  - [x] Safe state management
-- [x] Memory optimizations
-  - [x] Removed unused variables
-  - [x] Efficient resource management
+#### Completed Phases
+1. MVP Phase (5 days) 
+   - Basic structure and Restic integration
+   - Core UI framework
+   - Basic security and storage
+   - Testing infrastructure
+   - Code quality tools
+
+2. Initial Implementation 
+   - Repository management
+   - Basic security framework
+   - Service architecture
+   - ViewModels structure
+   - Testing infrastructure
+
+#### Current Phase (February 2025)
+- ResticCommandService (90% complete)
+  - Command execution framework
+  - Error handling and logging
+  - Repository management commands
+  - Backup operations
+  - Restore operations (in progress)
+  - Unit tests
+- Core UI Components (60% complete)
+  - Basic navigation
+  - Advanced features
+- Security Framework (40% complete)
+  - Basic credential management
+  - Advanced security features
+
+#### Remaining Development (11 weeks)
+
+1. Security Framework (Weeks 1-2)
+   - Passkey integration
+   - Advanced credential management
+   - Repository credentials rotation
+   - Security audit and testing
+
+2. User Interface Development (Weeks 3-6)
+   - Complete navigation structure
+   - Repository management views
+   - Backup/restore interfaces
+   - Settings panels
+   - Progress indicators
+   - Notification system
+   - Status monitoring
+   - Error reporting
+   - UI Testing
+
+3. Backup Scheduling System (Weeks 6-7)
+   - Scheduler service implementation
+   - Background task handling
+   - Power management integration
+   - Schedule conflict resolution
+   - Notification system integration
+
+4. Testing and Quality Assurance (Weeks 8-10)
+   - Comprehensive testing
+     * Unit tests (95% coverage for models)
+     * Integration tests
+     * UI tests
+     * Performance tests
+   - Bug fixes and refinements
+   - Performance optimisation
+   - Security validation
+
+5. Documentation and Polish (Weeks 10-11)
+   - User documentation
+   - API documentation
+   - Installation guide
+   - Release notes
+   - Final polish and refinements
+
+### Risk Factors and Mitigation
+1. Security Considerations
+   - Regular security audits during development
+   - Early integration of security features
+   - Comprehensive testing of credential management
+
+2. Performance
+   - Continuous performance monitoring
+   - Regular profiling of critical operations
+   - Optimisation of resource-intensive tasks
+
+3. macOS Integration
+   - Thorough sandbox compliance testing
+   - Proper entitlements management
+   - Robust error handling for system interactions
+
+### First Release Target
+- Estimated Release Date: Mid-April 2025
+- Release Type: Public Beta
+- Distribution: Mac App Store
+- Required macOS Version: 13.0 (Ventura) or later
+
+### Post-Release Plans
+1. Feedback Collection
+   - User experience monitoring
+   - Performance metrics gathering
+   - Bug reporting system
+
+2. Iterative Improvements
+   - Regular feature updates
+   - Performance optimisations
+   - Security enhancements
+
+3. Future Features
+   - Advanced scheduling options
+   - Cloud storage integration
+   - Backup analytics
+   - Network backup optimisation
 
 ## Architecture and Implementation
 
@@ -171,7 +263,7 @@ The app will guide users through any permission requirements and maintain secure
 #### Security Implementation
 - Credentials Management:
   * KeychainCredentialsManager for secure password storage
-  * Standardized format: "dev.mpy.rBUM.repository.{id}"
+  * Standardised format: "dev.mpy.rBUM.repository.{id}"
   * Repository paths as keychain account names
   * Privacy annotations in logging
 - Sandbox Compliance:
@@ -213,12 +305,12 @@ The app will guide users through any permission requirements and maintain secure
   * CredentialsError: Credential management
   * ResticError: Command execution
 - Features:
-  * Proper localization
+  * Proper localisation
   * Descriptive error messages
   * Privacy-aware logging
   * User-friendly presentation
 
-#### UI Organization
+#### UI Organisation
 - Navigation:
   * SidebarView for main navigation
   * Split view interface
@@ -351,7 +443,7 @@ The app will guide users through any permission requirements and maintain secure
 #### Testing Framework Strategy
 - Swift Testing Framework
   - Unit tests for models, services, and viewmodels
-  - Parameterized testing for multiple scenarios
+  - Parameterised testing for multiple scenarios
   - Tagged tests for organised test execution
   - Async/await support for concurrent operations
   

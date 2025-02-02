@@ -101,7 +101,7 @@ class ResticCommandService: ResticCommandServiceProtocol {
     
     init(
         fileManager: FileManager = .default,
-        logger: os.Logger = Logging.logger(for: .repository)
+        logger: os.Logger = Logging.logger(for: .restic)
     ) {
         self.fileManager = fileManager
         self.logger = logger
@@ -236,39 +236,40 @@ class ResticCommandService: ResticCommandServiceProtocol {
     }
     
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
+        guard let credentials = repository.credentials else {
+            throw RepositoryError.credentialsNotFound
+        }
+        
         let arguments = ["snapshots", "--json"]
-        
-        let output = try await executeCommand(arguments, credentials: repository.credentials)
-        
+        let output = try await executeCommand(arguments, credentials: credentials)
         return try JSONDecoder().decode([ResticSnapshot].self, from: Data(output.output.utf8))
     }
     
     func createBackup(paths: [URL], to repository: Repository, tags: [String]? = nil, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
+        guard let credentials = repository.credentials else {
+            throw RepositoryError.credentialsNotFound
+        }
+        
         guard !paths.isEmpty else {
             throw ResticError.invalidArgument("No paths specified for backup")
         }
         
         var arguments = ["backup"]
-        
-        // Add paths to backup
         arguments.append(contentsOf: paths.map { $0.path })
         
-        // Add tags if specified
         if let tags = tags {
             for tag in tags {
                 arguments.append(contentsOf: ["--tag", tag])
             }
         }
         
-        // Add JSON output flag
         arguments.append("--json")
-        
         onStatusChange?(.preparing)
         
         do {
             _ = try await executeCommand(
                 arguments,
-                credentials: repository.credentials,
+                credentials: credentials,
                 onOutput: { line in
                     if let progress = self.parseBackupProgress(line) {
                         onProgress?(progress)
@@ -297,6 +298,10 @@ class ResticCommandService: ResticCommandServiceProtocol {
     }
     
     func pruneSnapshots(in repository: Repository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
+        guard let credentials = repository.credentials else {
+            throw RepositoryError.credentialsNotFound
+        }
+        
         var arguments = ["forget", "--prune"]
         
         if let keepLast = keepLast {
@@ -324,16 +329,17 @@ class ResticCommandService: ResticCommandServiceProtocol {
             arguments.append(String(keepYearly))
         }
         
-        _ = try await executeCommand(arguments, credentials: repository.credentials)
+        _ = try await executeCommand(arguments, credentials: credentials)
     }
     
     func check(_ repository: Repository) async throws {
-        let arguments = [
-            "check",
-            "--json"
-        ]
+        guard let credentials = repository.credentials else {
+            throw RepositoryError.credentialsNotFound
+        }
         
-        let output = try await executeCommand(arguments, credentials: repository.credentials)
+        let arguments = ["check", "--json"]
+        let output = try await executeCommand(arguments, credentials: credentials)
+        
         if output.output.data(using: .utf8) == nil {
             throw ResticError.commandError("Invalid output format")
         }

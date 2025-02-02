@@ -69,7 +69,7 @@ enum ProcessError: LocalizedError, Equatable {
 /// Default implementation of ProcessExecutorProtocol
 final class ProcessExecutor: ProcessExecutorProtocol {
     private let bufferSize: Int = 4096
-    private let logger = Logging.logger(category: "Process")
+    private let logger = Logging.logger(for: .process)
     private let fileManager = FileManager.default
     
     /// Find executable in PATH or at absolute path

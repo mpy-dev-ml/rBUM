@@ -6,17 +6,22 @@
 //
 
 import Testing
+import Foundation
 @testable import rBUM
 
 /// Tests for BackupTag functionality
 struct BackupTagTests {
+    // MARK: - Test Types
+    
+    typealias TestMocks = TestMocksModule.TestMocks
+    
     // MARK: - Test Context
     
     /// Test environment with test data
     struct TestContext {
-        let notificationCenter: TestMocks.MockNotificationCenter
-        let dateProvider: TestMocks.MockDateProvider
-        let fileManager: TestMocks.MockFileManager
+        let notificationCenter: NotificationCenter
+        let dateProvider: DateProviderProtocol
+        let fileManager: FileManagerProtocol
         
         init() {
             self.notificationCenter = TestMocks.MockNotificationCenter()
@@ -26,9 +31,9 @@ struct BackupTagTests {
         
         /// Reset all mocks to initial state
         func reset() {
-            notificationCenter.reset()
-            dateProvider.reset()
-            fileManager.reset()
+            (notificationCenter as? TestMocks.MockNotificationCenter)?.reset()
+            (dateProvider as? TestMocks.MockDateProvider)?.reset()
+            (fileManager as? TestMocks.MockFileManager)?.reset()
         }
         
         /// Create test tag manager
@@ -41,35 +46,115 @@ struct BackupTagTests {
         }
     }
     
+    // MARK: - Test Data
+    
+    enum MockData {
+        struct Tag {
+            static let basicTags: [(
+                name: String,
+                description: String?,
+                shouldSucceed: Bool,
+                expectedError: BackupTagError?
+            )] = [
+                ("Test Tag", nil, true, nil),
+                ("Development", "For development backups", true, nil),
+                ("", nil, false, .invalidName),
+                ("Test Tag", nil, false, .invalidName) // Duplicate
+            ]
+            
+            static let updateTags: [(
+                name: String,
+                description: String?,
+                newName: String,
+                newDescription: String?,
+                shouldSucceed: Bool,
+                expectedError: BackupTagError?
+            )] = [
+                ("Test Tag", nil, "Updated Tag", "New description", true, nil),
+                ("Test Tag", nil, "", nil, false, .invalidName)
+            ]
+            
+            static let associationTags: [(
+                name: String,
+                backupId: String,
+                shouldSucceed: Bool,
+                expectedError: BackupTagError?
+            )] = [
+                ("Test Tag", "backup-123", true, nil),
+                ("Invalid Tag", "backup-123", false, .tagNotFound)
+            ]
+        }
+    }
+    
     // MARK: - Initialization Tests
     
-    @Test("Initialize tag manager", tags: ["init", "tag"])
+    @Test("Test tag manager initialization", ["tag", "init"] as! TestTrait)
     func testInitialization() throws {
-        // Given: Test context
+        // Given: Tag manager
         let context = TestContext()
-        
-        // When: Creating tag manager
         let manager = context.createTagManager()
         
-        // Then: Manager is properly configured
-        #expect(manager.isInitialized)
-        #expect(manager.tagCount == 0)
+        // Then: Verify initial state
+        let tags = try manager.getAllTags()
+        #expect(tags.isEmpty)
+    }
+    
+    // MARK: - Basic Tests
+    
+    @Test("Test basic tag operations", ["tag", "basic"] as! TestTrait)
+    func testBasicOperations() throws {
+        // Given: Tag manager
+        let context = TestContext()
+        let manager = context.createTagManager()
+        
+        // When/Then: Test basic tag operations
+        for testCase in MockData.Tag.basicTags {
+            do {
+                let tag = try manager.createTag(
+                    name: testCase.name,
+                    description: testCase.description
+                )
+                
+                if !testCase.shouldSucceed {
+                    throw TestFailure("Expected error for invalid tag")
+                }
+                
+                // Verify tag properties
+                #expect(tag.name == testCase.name)
+                #expect(tag.description == testCase.description)
+                
+                // Verify tag is in list
+                let tags = try manager.getAllTags()
+                #expect(tags.contains(where: { $0.id == tag.id }))
+                
+            } catch {
+                if testCase.shouldSucceed {
+                    throw TestFailure("Unexpected error: \(error)")
+                }
+                
+                if let error = error as? BackupTagError {
+                    #expect(error == testCase.expectedError)
+                }
+            }
+            
+            context.reset()
+        }
     }
     
     // MARK: - Tag Creation Tests
     
-    @Test("Test tag creation", tags: ["tag", "create"])
+    @Test("Test tag creation", ["tag", "create"] as! TestTrait)
     func testTagCreation() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let testData = MockData.Tag.creationData
+        let testData = MockData.Tag.basicTags
         
         // Test tag creation
         for data in testData {
             // Create tag
-            let tag = try manager.createTag(data)
+            let tag = try manager.createTag(name: data.name, description: data.description)
             #expect(tag.id != nil)
             #expect(context.notificationCenter.postNotificationCalled)
             
@@ -83,27 +168,27 @@ struct BackupTagTests {
     
     // MARK: - Tag Listing Tests
     
-    @Test("Test tag listing", tags: ["tag", "list"])
+    @Test("Test tag listing", ["tag", "list"] as! TestTrait)
     func testTagListing() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let testCases = MockData.Tag.listingData
+        let testCases = MockData.Tag.basicTags
         
         // Test tag listing
         for testCase in testCases {
             // Add tags
-            for tag in testCase.tags {
-                try manager.addTag(tag)
+            for _ in 0..<5 {
+                try manager.createTag(name: testCase.name, description: testCase.description)
             }
             
             // List tags
             let tags = try manager.listTags()
-            #expect(tags.count == testCase.tags.count)
+            #expect(tags.count == 5)
             
             // Filter tags
-            let filtered = try manager.filterTags(tags, by: testCase.filter)
+            let filtered = try manager.filterTags(tags, by: nil)
             #expect(filtered.count <= tags.count)
             
             context.reset()
@@ -112,27 +197,95 @@ struct BackupTagTests {
     
     // MARK: - Tag Update Tests
     
-    @Test("Test tag updates", tags: ["tag", "update"])
+    @Test("Test tag updates", ["tag", "update"] as! TestTrait)
     func testTagUpdates() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let testCases = MockData.Tag.updateData
+        // When/Then: Test tag updates
+        for testCase in MockData.Tag.updateTags {
+            do {
+                let tag = try manager.createTag(
+                    name: testCase.name,
+                    description: testCase.description
+                )
+                
+                try manager.updateTag(
+                    tag,
+                    name: testCase.newName,
+                    description: testCase.newDescription
+                )
+                
+                if !testCase.shouldSucceed {
+                    throw TestFailure("Expected error for invalid update")
+                }
+                
+                // Verify updated tag
+                let tags = try manager.getAllTags()
+                let updatedTag = tags.first { $0.id == tag.id }
+                #expect(updatedTag?.name == testCase.newName)
+                #expect(updatedTag?.description == testCase.newDescription)
+                
+                // Verify notification
+                let notifications = context.notificationCenter.postedNotifications
+                #expect(notifications.contains { notification in
+                    notification.name == .tagUpdated &&
+                    (notification.object as? BackupTag)?.id == tag.id
+                })
+                
+            } catch {
+                if testCase.shouldSucceed {
+                    throw TestFailure("Unexpected error: \(error)")
+                }
+                
+                if let error = error as? BackupTagError {
+                    #expect(error == testCase.expectedError)
+                }
+            }
+            
+            context.reset()
+        }
+    }
+    
+    // MARK: - Tag Association Tests
+    
+    @Test("Test tag associations", ["tag", "association"] as! TestTrait)
+    func testTagAssociations() throws {
+        // Given: Tag manager
+        let context = TestContext()
+        let manager = context.createTagManager()
         
-        // Test tag updates
-        for testCase in testCases {
-            // Create initial tag
-            let tag = try manager.createTag(testCase.initial)
-            
-            // Update tag
-            let updated = try manager.updateTag(tag, with: testCase.updates)
-            #expect(updated.id == tag.id)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            // Verify updates
-            for (key, value) in testCase.updates {
-                #expect(updated.getValue(for: key) == value)
+        // When/Then: Test tag associations
+        for testCase in MockData.Tag.associationTags {
+            do {
+                let tag = try manager.createTag(name: testCase.name)
+                try manager.associateTag(tag, withBackupId: testCase.backupId)
+                
+                if !testCase.shouldSucceed {
+                    throw TestFailure("Expected error for invalid association")
+                }
+                
+                // Verify association
+                let tags = try manager.getTags(forBackupId: testCase.backupId)
+                #expect(tags.contains(where: { $0.id == tag.id }))
+                
+                // Verify notification
+                let notifications = context.notificationCenter.postedNotifications
+                #expect(notifications.contains { notification in
+                    notification.name == .tagAssociated &&
+                    (notification.object as? (BackupTag, String))?.0.id == tag.id &&
+                    (notification.object as? (BackupTag, String))?.1 == testCase.backupId
+                })
+                
+            } catch {
+                if testCase.shouldSucceed {
+                    throw TestFailure("Unexpected error: \(error)")
+                }
+                
+                if let error = error as? BackupTagError {
+                    #expect(error == testCase.expectedError)
+                }
             }
             
             context.reset()
@@ -141,53 +294,40 @@ struct BackupTagTests {
     
     // MARK: - Tag Deletion Tests
     
-    @Test("Test tag deletion", tags: ["tag", "delete"])
+    @Test("Test tag deletion", ["tag", "delete"] as! TestTrait)
     func testTagDeletion() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let tags = MockData.Tag.deletionData
-        
-        // Test tag deletion
-        for tag in tags {
-            // Add tag
-            try manager.addTag(tag)
-            
-            // Delete tag
-            try manager.deleteTag(tag)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            // Verify deletion
-            let remaining = try manager.listTags()
-            #expect(!remaining.contains(tag))
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - Tag Association Tests
-    
-    @Test("Test tag associations", tags: ["tag", "associate"])
-    func testTagAssociations() throws {
-        // Given: Tag manager
-        let context = TestContext()
-        let manager = context.createTagManager()
-        
-        let testCases = MockData.Tag.associationData
-        
-        // Test tag associations
-        for testCase in testCases {
-            // Create tag and target
-            let tag = try manager.createTag(testCase.tag)
-            
-            // Associate tag
-            try manager.associateTag(tag, with: testCase.target)
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            // Verify association
-            let associated = try manager.getAssociatedTags(for: testCase.target)
-            #expect(associated.contains(tag))
+        // When/Then: Test tag deletion
+        for testCase in MockData.Tag.basicTags {
+            do {
+                // Create tag
+                let tag = try manager.createTag(
+                    name: testCase.name,
+                    description: testCase.description
+                )
+                
+                // Delete tag
+                try manager.deleteTag(tag)
+                
+                // Verify deletion
+                let remaining = try manager.getAllTags()
+                #expect(!remaining.contains(where: { $0.id == tag.id }))
+                
+                // Verify notification
+                let notifications = context.notificationCenter.postedNotifications
+                #expect(notifications.contains { notification in
+                    notification.name == .tagDeleted &&
+                    (notification.object as? BackupTag)?.id == tag.id
+                })
+                
+            } catch {
+                if testCase.shouldSucceed {
+                    throw TestFailure("Unexpected error: \(error)")
+                }
+            }
             
             context.reset()
         }
@@ -195,85 +335,192 @@ struct BackupTagTests {
     
     // MARK: - Tag Validation Tests
     
-    @Test("Test tag validation", tags: ["tag", "validate"])
-    func testTagValidation() throws {
+    @Test("Test tag validation", ["tag", "validation"] as! TestTrait)
+    func testValidation() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let testCases = MockData.Tag.validationData
-        
-        // Test tag validation
-        for testCase in testCases {
-            // Validate tag
-            let isValid = try manager.validateTag(testCase.tag)
-            #expect(isValid == testCase.expectedValid)
-            
-            if !isValid {
-                #expect(context.notificationCenter.postNotificationCalled)
-                let notification = context.notificationCenter.lastPostedNotification
-                #expect(notification?.name == .backupTagValidationError)
-            }
-            
-            context.reset()
+        // Test invalid tag name
+        do {
+            try manager.createTag(name: "", description: nil)
+            throw TestFailure("Expected error for empty tag name")
+        } catch let error as BackupTagError {
+            #expect(error == .invalidName)
         }
+        
+        // Test valid tag name
+        do {
+            let tag = try manager.createTag(name: "valid-tag")
+            #expect(tag.name == "valid-tag")
+        } catch {
+            throw TestFailure("Unexpected error: \(error)")
+        }
+        
+        // Test duplicate tag name
+        do {
+            try manager.createTag(name: "duplicate")
+            try manager.createTag(name: "duplicate")
+            throw TestFailure("Expected error for duplicate tag name")
+        } catch let error as BackupTagError {
+            #expect(error == .invalidName)
+        }
+    }
+    
+    // MARK: - Tag Listing Tests
+    
+    @Test("Test tag listing", ["tag", "list"] as! TestTrait)
+    func testTagListing() throws {
+        // Given: Tag manager
+        let context = TestContext()
+        let manager = context.createTagManager()
+        
+        // Create test tags
+        let tag1 = try manager.createTag(name: "test1", description: "First test tag")
+        let tag2 = try manager.createTag(name: "test2", description: "Second test tag")
+        
+        // Get all tags
+        let tags = try manager.getAllTags()
+        #expect(tags.count == 2)
+        #expect(tags.contains(where: { $0.id == tag1.id }))
+        #expect(tags.contains(where: { $0.id == tag2.id }))
+        
+        // Delete a tag
+        try manager.deleteTag(tag1)
+        let remainingTags = try manager.getAllTags()
+        #expect(remainingTags.count == 1)
+        #expect(remainingTags.contains(where: { $0.id == tag2.id }))
+        
+        // Verify notification
+        let notifications = (context.notificationCenter as! TestMocks.MockNotificationCenter).postedNotifications
+        #expect(notifications.contains { notification in
+            notification.name == .tagDeleted &&
+            (notification.object as? BackupTag)?.id == tag1.id
+        })
+    }
+    
+    // MARK: - Tag Update Tests
+    
+    @Test("Test tag updates", ["tag", "update"] as! TestTrait)
+    func testTagUpdates() throws {
+        // Given: Tag manager
+        let context = TestContext()
+        let manager = context.createTagManager()
+        
+        // Create and update tag
+        let tag = try manager.createTag(name: "original", description: "Original description")
+        try manager.updateTag(tag, name: "updated", description: "Updated description")
+        
+        // Verify update
+        let tags = try manager.getAllTags()
+        let updatedTag = tags.first { $0.id == tag.id }
+        #expect(updatedTag?.name == "updated")
+        #expect(updatedTag?.description == "Updated description")
+        
+        // Verify notification
+        let notifications = (context.notificationCenter as! TestMocks.MockNotificationCenter).postedNotifications
+        #expect(notifications.contains { notification in
+            notification.name == .tagUpdated &&
+            (notification.object as? BackupTag)?.id == tag.id
+        })
+    }
+    
+    // MARK: - Tag Deletion Tests
+    
+    @Test("Test tag deletion", ["tag", "delete"] as! TestTrait)
+    func testTagDeletion() throws {
+        // Given: Tag manager
+        let context = TestContext()
+        let manager = context.createTagManager()
+        
+        // Create and delete tag
+        let tag = try manager.createTag(name: "to-delete")
+        try manager.deleteTag(tag)
+        
+        // Verify deletion
+        let remaining = try manager.getAllTags()
+        #expect(!remaining.contains(where: { $0.id == tag.id }))
+        
+        // Verify notification
+        let notifications = (context.notificationCenter as! TestMocks.MockNotificationCenter).postedNotifications
+        #expect(notifications.contains { notification in
+            notification.name == .tagDeleted &&
+            (notification.object as? BackupTag)?.id == tag.id
+        })
     }
     
     // MARK: - Error Handling Tests
     
-    @Test("Test tag error handling", tags: ["tag", "error"])
+    @Test("Test tag error handling", ["tag", "error"] as! TestTrait)
     func testErrorHandling() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        let errorCases = MockData.Tag.errorCases
+        // Test invalid tag name
+        do {
+            try manager.createTag(name: "", description: nil)
+            throw TestFailure("Expected error for empty tag name")
+        } catch let error as BackupTagError {
+            #expect(error == .invalidName)
+        }
         
-        // Test error handling
-        for errorCase in errorCases {
-            do {
-                try manager.handleTagOperation(errorCase)
-                throw TestFailure("Expected error for \(errorCase)")
-            } catch {
-                // Expected error
-                #expect(context.notificationCenter.postNotificationCalled)
-                let notification = context.notificationCenter.lastPostedNotification
-                #expect(notification?.name == .backupTagError)
-            }
-            
-            context.reset()
+        // Test duplicate tag name
+        do {
+            let tag = try manager.createTag(name: "test")
+            try manager.createTag(name: "test")
+            throw TestFailure("Expected error for duplicate tag name")
+        } catch let error as BackupTagError {
+            #expect(error == .invalidName)
+        }
+        
+        // Test deleting non-existent tag
+        do {
+            let tag = BackupTag(name: "non-existent")
+            try manager.deleteTag(tag)
+            throw TestFailure("Expected error for non-existent tag")
+        } catch let error as BackupTagError {
+            #expect(error == .tagNotFound)
+        }
+        
+        // Test updating non-existent tag
+        do {
+            let tag = BackupTag(name: "non-existent")
+            try manager.updateTag(tag, name: "new-name", description: nil)
+            throw TestFailure("Expected error for non-existent tag")
+        } catch let error as BackupTagError {
+            #expect(error == .tagNotFound)
         }
     }
     
     // MARK: - Edge Cases
     
-    @Test("Handle tag edge cases", tags: ["tag", "edge"])
+    @Test("Handle tag edge cases", ["tag", "edge"] as! TestTrait)
     func testEdgeCases() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
-        // Test invalid tag
+        // Test invalid tag name
         do {
-            try manager.verifyTag(BackupTag(id: "invalid"))
-            throw TestFailure("Expected error for invalid tag")
+            try manager.createTag(name: "", description: nil)
+            throw TestFailure("Expected error for invalid tag name")
         } catch {
             // Expected error
         }
         
-        // Test duplicate tag
+        // Test duplicate tag name
         do {
             let tag = try manager.createTag(name: "test")
-            try manager.addTag(tag)
-            try manager.addTag(tag)
-            throw TestFailure("Expected error for duplicate tag")
+            try manager.createTag(name: "test")
+            throw TestFailure("Expected error for duplicate tag name")
         } catch {
             // Expected error
         }
         
         // Test empty tag list
         do {
-            let tags = try manager.listTags()
+            let tags = try manager.getAllTags()
             #expect(tags.isEmpty)
         } catch {
             throw TestFailure("Unexpected error for empty tag list")
@@ -282,36 +529,35 @@ struct BackupTagTests {
     
     // MARK: - Performance Tests
     
-    @Test("Test tag performance", tags: ["tag", "performance"])
+    @Test("Test tag performance", ["tag", "performance"] as! TestTrait)
     func testPerformance() throws {
         // Given: Tag manager
         let context = TestContext()
         let manager = context.createTagManager()
         
         // Test listing performance
-        let startTime = context.dateProvider.now()
+        let startTime = context.dateProvider.now
         
         for _ in 0..<100 {
-            _ = try manager.listTags()
+            _ = try manager.getAllTags()
         }
         
-        let endTime = context.dateProvider.now()
+        let endTime = context.dateProvider.now
         
         // Verify performance
         let timeInterval = endTime.timeIntervalSince(startTime)
         #expect(timeInterval < 1.0) // Should complete in under 1 second
         
-        // Test validation performance
-        let tag = try manager.createTag(name: "test")
-        let validationStartTime = context.dateProvider.now()
+        // Test tag creation performance
+        let creationStartTime = context.dateProvider.now
         
-        for _ in 0..<1000 {
-            _ = try manager.validateTag(tag)
+        for i in 0..<1000 {
+            _ = try manager.createTag(name: "test\(i)")
         }
         
-        let validationEndTime = context.dateProvider.now()
+        let creationEndTime = context.dateProvider.now
         
-        let validationInterval = validationEndTime.timeIntervalSince(validationStartTime)
-        #expect(validationInterval < 0.5) // Validation should be fast
+        let creationInterval = creationEndTime.timeIntervalSince(creationStartTime)
+        #expect(creationInterval < 0.5) // Creation should be fast
     }
 }

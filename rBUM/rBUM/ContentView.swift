@@ -64,31 +64,68 @@ struct SidebarView: View {
     }
 }
 
-#Preview {
-    ContentView(
-        credentialsManager: PreviewCredentialsManager()
-    )
-}
-
 // MARK: - Preview Helpers
 
 private final class PreviewRepositoryStorage: RepositoryStorageProtocol {
+    func save(_ repository: Repository) throws {
+        // No-op for preview
+    }
+    
+    func delete(_ repository: Repository) throws {
+        // No-op for preview
+    }
+    
+    func get(forId id: String) throws -> Repository? {
+        // Return nil for preview
+        return nil
+    }
+    
     func store(_ repository: Repository) throws {}
     func retrieve(forId id: UUID) throws -> Repository? { nil }
-    func list() throws -> [Repository] { [] }
+    func list() throws -> [Repository] { 
+        // Return empty list for preview
+        return [] 
+    }
+    
     func delete(forId id: UUID) throws {}
-    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool { false }
+    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool { 
+        // Always return false for preview
+        return false 
+    }
 }
 
 private final class PreviewRepositoryCreationService: RepositoryCreationServiceProtocol {
-    func createRepository(name: String, path: URL, password: String) async throws -> Repository {
-        Repository(
+    func createRepository(name: String, path: String, password: String) async throws -> Repository {
+        // Create a preview repository
+        return Repository(
             name: name,
             path: path,
             credentials: RepositoryCredentials(
-                repositoryId: UUID(),
-                password: password,
-                repositoryPath: path.path
+                repositoryPath: path,
+                password: password
+            )
+        )
+    }
+    
+    func importRepository(name: String, path: String, password: String) async throws -> Repository {
+        // Import a preview repository (same as create for preview)
+        return Repository(
+            name: name,
+            path: path,
+            credentials: RepositoryCredentials(
+                repositoryPath: path,
+                password: password
+            )
+        )
+    }
+    
+    func createRepository(name: String, path: URL, password: String) async throws -> Repository {
+        Repository(
+            name: name,
+            path: path.path,
+            credentials: RepositoryCredentials(
+                repositoryPath: path.path,
+                password: password
             )
         )
     }
@@ -96,24 +133,34 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
     func importRepository(name: String, path: URL, password: String) async throws -> Repository {
         Repository(
             name: name,
-            path: path,
+            path: path.path,
             credentials: RepositoryCredentials(
-                repositoryId: UUID(),
-                password: password,
-                repositoryPath: path.path
+                repositoryPath: path.path,
+                password: password
             )
         )
     }
 }
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
+    func initRepository(credentials: RepositoryCredentials) async throws {
+        // No-op for preview
+    }
+    
+    func checkRepository(credentials: RepositoryCredentials) async throws {
+        // No-op for preview
+    }
+    
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
+        // Return empty list for preview
         return []
     }
     
     func initializeRepository(at path: URL, password: String) async throws {}
     
-    func check(_ repository: Repository) async throws {}
+    func check(_ repository: Repository) async throws {
+        // No-op for preview
+    }
     
     func createBackup(
         paths: [URL],
@@ -201,4 +248,10 @@ class ContentViewModel: ObservableObject {
             repositoryStorage: repositoryStorage
         )
     }
+}
+
+#Preview {
+    ContentView(
+        credentialsManager: PreviewCredentialsManager()
+    )
 }

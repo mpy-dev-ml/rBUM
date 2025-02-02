@@ -62,18 +62,14 @@ final class BackupViewModel: ObservableObject {
             currentProgress = nil
             
             // Get repository credentials
-            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            let credentials = try await credentialsManager.retrieve(forId: repository.id)
             
             // Create Repository with credentials
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
-            )
-            
             let repoWithCredentials = Repository(
+                id: repository.id,
                 name: repository.name,
                 path: repository.path,
+                createdAt: repository.createdAt,
                 credentials: credentials
             )
             

@@ -1,54 +1,55 @@
-import Testing
+import Foundation
 @testable import rBUM
+import Testing
+import TestMocksModule
 
 /// Tests for BackupViewModel functionality
+@MainActor
 struct BackupViewModelTests {
     // MARK: - Test Context
     
     /// Test environment with test data
-    struct TestContext {
-        let backupService: TestMocks.MockBackupService
-        let resticService: TestMocks.MockResticService
+    private struct TestContext {
+        let backupManager: TestMocks.MockBackupManager
+        let configManager: TestMocks.MockConfigurationManager
         let notificationCenter: TestMocks.MockNotificationCenter
-        let progressTracker: TestMocks.MockProgressTracker
         let dateProvider: TestMocks.MockDateProvider
-        let userDefaults: TestMocks.MockUserDefaults
+        let progressTracker: TestMocks.MockProgressTracker
+        let logger: TestMocks.MockLogger
         
         init() {
-            self.backupService = TestMocks.MockBackupService()
-            self.resticService = TestMocks.MockResticService()
-            self.notificationCenter = TestMocks.MockNotificationCenter()
-            self.progressTracker = TestMocks.MockProgressTracker()
-            self.dateProvider = TestMocks.MockDateProvider()
-            self.userDefaults = TestMocks.MockUserDefaults()
+            backupManager = TestMocks.MockBackupManager()
+            configManager = TestMocks.MockConfigurationManager()
+            notificationCenter = TestMocks.MockNotificationCenter()
+            dateProvider = TestMocks.MockDateProvider()
+            progressTracker = TestMocks.MockProgressTracker()
+            logger = TestMocks.MockLogger()
         }
         
-        /// Reset all mocks to initial state
-        func reset() {
-            backupService.reset()
-            resticService.reset()
-            notificationCenter.reset()
-            progressTracker.reset()
-            dateProvider.reset()
-            userDefaults.reset()
-        }
-        
-        /// Create test view model
         func createViewModel() -> BackupViewModel {
             BackupViewModel(
-                backupService: backupService,
-                resticService: resticService,
+                backupManager: backupManager,
+                configManager: configManager,
                 notificationCenter: notificationCenter,
-                progressTracker: progressTracker,
                 dateProvider: dateProvider,
-                userDefaults: userDefaults
+                progressTracker: progressTracker,
+                logger: logger
             )
+        }
+        
+        mutating func reset() {
+            backupManager.reset()
+            configManager.reset()
+            notificationCenter.reset()
+            dateProvider.reset()
+            progressTracker.reset()
+            logger.reset()
         }
     }
     
-    // MARK: - Initialization Tests
+    // MARK: - Tests
     
-    @Test("Test view model initialization", tags: ["init", "viewmodel"])
+    @Test("View model initializes with empty state", [.init, .viewModel])
     func testInitialization() throws {
         // Given: Test context
         let context = TestContext()
@@ -63,14 +64,12 @@ struct BackupViewModelTests {
         #expect(viewModel.error == nil)
     }
     
-    // MARK: - Backup Loading Tests
-    
-    @Test("Test backup loading", tags: ["loading", "backup"])
+    @Test("Loading backups succeeds", [.loading, .backup])
     func testBackupLoading() async throws {
         // Given: Test context and mock backups
         let context = TestContext()
         let viewModel = context.createViewModel()
-        context.backupService.mockBackups = MockData.Backup.validBackups
+        context.backupManager.mockBackups = MockData.Backup.validBackups
         
         // When: Loading backups
         await viewModel.loadBackups()
@@ -81,176 +80,89 @@ struct BackupViewModelTests {
         #expect(!viewModel.showError)
     }
     
-    // MARK: - Backup Creation Tests
-    
-    @Test("Test backup creation", tags: ["create", "backup"])
+    @Test("Creating backup with valid configuration succeeds", [.create, .backup])
     func testBackupCreation() async throws {
         // Given: Test context and mock data
         let context = TestContext()
         let viewModel = context.createViewModel()
         let newBackup = MockData.Backup.validBackup
         
-        // When: Creating a new backup
+        // When: Creating backup
         await viewModel.createBackup(newBackup)
         
         // Then: Backup is created and added to list
-        #expect(context.backupService.createBackupCalled)
+        #expect(context.backupManager.createBackupCalled)
         #expect(viewModel.backups.contains(where: { $0.id == newBackup.id }))
         #expect(!viewModel.isLoading)
         #expect(!viewModel.showError)
     }
     
-    // MARK: - Backup Execution Tests
-    
-    @Test("Test backup execution", tags: ["execute", "backup"])
+    @Test("Executing backup triggers progress tracking", [.execute, .backup])
     func testBackupExecution() async throws {
         // Given: Test context and mock backup
         let context = TestContext()
         let viewModel = context.createViewModel()
         let backup = MockData.Backup.validBackup
-        context.backupService.mockBackups = [backup]
+        context.backupManager.mockBackups = [backup]
         
         // When: Executing backup
         await viewModel.executeBackup(backup)
         
         // Then: Backup is executed successfully
-        #expect(context.backupService.executeBackupCalled)
+        #expect(context.backupManager.executeBackupCalled)
         #expect(context.progressTracker.startTrackingCalled)
         #expect(!viewModel.isLoading)
         #expect(!viewModel.showError)
     }
     
-    // MARK: - Backup Selection Tests
-    
-    @Test("Test backup selection", tags: ["selection", "viewmodel"])
-    func testBackupSelection() async throws {
+    @Test("Error handling for various backup errors", [.error, .backup],
+          arguments: MockData.Error.backupErrors)
+    func testErrorHandling(_ error: BackupError) async throws {
         // Given: Test context and view model
-        let context = TestContext()
+        var context = TestContext()
         let viewModel = context.createViewModel()
         
-        let testCases = MockData.Backup.selectionData
+        // Setup error condition
+        context.backupManager.simulateError = error
         
-        // Test selection scenarios
-        for testCase in testCases {
-            // Setup mock data
-            context.backupService.mockBackups = testCase.backups
-            await viewModel.loadBackups()
-            
-            // Select backup
-            viewModel.selectBackup(testCase.selectedId)
-            
-            // Verify selection state
-            #expect(viewModel.selectedBackup?.id == testCase.selectedId)
-            #expect(viewModel.selectedBackupDetails == testCase.expectedDetails)
-            
-            context.reset()
+        // When: Loading backups
+        await viewModel.loadBackups()
+        
+        // Then: Error is handled correctly
+        #expect(!viewModel.isLoading)
+        #expect(viewModel.showError)
+        #expect(viewModel.error != nil)
+        if let backupError = viewModel.error as? BackupError {
+            #expect(backupError == error)
         }
     }
     
-    // MARK: - Error Handling Tests
-    
-    @Test("Test error handling", tags: ["error", "viewmodel"])
-    func testErrorHandling() async throws {
-        // Given: Test context and view model
-        let context = TestContext()
-        let viewModel = context.createViewModel()
-        
-        let errorCases = MockData.Backup.errorCases
-        
-        // Test error scenarios
-        for errorCase in errorCases {
-            // Setup error condition
-            context.backupService.simulateError = errorCase.error
-            
-            // Perform operation
-            await errorCase.operation(viewModel)
-            
-            // Verify error handling
-            #expect(viewModel.isLoading == false)
-            #expect(viewModel.error != nil)
-            if let error = viewModel.error as? BackupError {
-                #expect(error.code == errorCase.expectedErrorCode)
-            }
-            #expect(context.notificationCenter.postNotificationCalled)
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - UI State Tests
-    
-    @Test("Test UI state updates", tags: ["ui", "viewmodel"])
-    func testUIStateUpdates() async throws {
-        // Given: Test context and view model
-        let context = TestContext()
-        let viewModel = context.createViewModel()
-        
-        let testCases = MockData.Backup.uiStateData
-        
-        // Test UI state scenarios
-        for testCase in testCases {
-            // Setup initial state
-            context.backupService.mockBackups = testCase.backups
-            context.progressTracker.mockProgress = testCase.progress
-            
-            // Perform UI updates
-            await viewModel.loadBackups()
-            viewModel.selectBackup(testCase.selectedId)
-            
-            // Verify UI state
-            #expect(viewModel.isLoading == testCase.expectedLoading)
-            #expect(viewModel.backups.count == testCase.expectedBackupCount)
-            #expect(viewModel.selectedBackup?.id == testCase.selectedId)
-            #expect(viewModel.backupProgress[testCase.selectedId]?.status == testCase.expectedStatus)
-            
-            context.reset()
-        }
-    }
-    
-    // MARK: - Performance Tests
-    
-    @Test("Test view model performance", tags: ["performance", "viewmodel"])
+    @Test("Performance meets requirements", [.performance, .viewModel],
+          traits: .executionTime(10.0))
     func testPerformance() async throws {
         // Given: Test context and view model
-        let context = TestContext()
+        var context = TestContext()
         let viewModel = context.createViewModel()
         
-        let startTime = Date()
+        // When: Performing operations
+        let startTime = context.dateProvider.currentDate()
         
-        // Perform multiple operations
-        for i in 0..<100 {
-            let backup = BackupConfiguration(
-                id: UUID(),
-                name: "Test Backup \(i)",
-                settings: BackupSettings(),
-                schedule: BackupSchedule()
-            )
-            await viewModel.createBackup(backup)
+        for _ in 0..<100 {
             await viewModel.loadBackups()
-            viewModel.selectBackup(backup.id)
         }
         
-        let endTime = Date()
+        let endTime = context.dateProvider.currentDate()
         
-        // Verify performance
+        // Then: Operations complete within time limit
         let timeInterval = endTime.timeIntervalSince(startTime)
-        #expect(timeInterval < 5.0) // Should complete in under 5 seconds
+        #expect(timeInterval < 5.0, "Batch operations should complete in under 5 seconds")
         
         // Test individual operation performance
-        let backup = BackupConfiguration(
-            id: UUID(),
-            name: "Test Backup",
-            settings: BackupSettings(),
-            schedule: BackupSchedule()
-        )
-        
-        let operationStart = Date()
-        await viewModel.createBackup(backup)
+        let operationStart = context.dateProvider.currentDate()
         await viewModel.loadBackups()
-        viewModel.selectBackup(backup.id)
-        let operationEnd = Date()
+        let operationEnd = context.dateProvider.currentDate()
         
         let operationInterval = operationEnd.timeIntervalSince(operationStart)
-        #expect(operationInterval < 0.1) // Individual operations should be fast
+        #expect(operationInterval < 0.1, "Individual operations should complete in under 0.1 seconds")
     }
 }

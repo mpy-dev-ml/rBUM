@@ -81,7 +81,7 @@ private struct RepositoryRowView: View {
             Text(repository.name)
                 .font(.headline)
             
-            Text(repository.path.path())
+            Text(repository.path)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

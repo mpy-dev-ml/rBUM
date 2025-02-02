@@ -1,9 +1,12 @@
-import Testing
+import XCTest
+import Foundation
 @testable import rBUM
+import Testing
+import TestMocksModule
 
 /// Tests for RepositoryDetailViewModel functionality
 @MainActor
-struct RepositoryDetailViewModelTests {
+final class RepositoryDetailViewModelTests: XCTestCase {
     // MARK: - Test Context
     
     /// Test environment with mocked dependencies

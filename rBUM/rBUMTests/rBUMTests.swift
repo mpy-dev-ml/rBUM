@@ -12,15 +12,19 @@ import Combine
 
 /// Main test suite for rBUM application
 final class rBUMTests: XCTestCase {
+    // MARK: - Test Types
+    
+    typealias TestMocks = TestMocksModule.TestMocks
+    
     // MARK: - Test Context
     
     /// Test environment with all dependencies
     struct TestContext {
-        let backupService: TestMocks.MockBackupService
-        let repositoryService: TestMocks.MockRepositoryService
-        let credentialsManager: TestMocks.MockCredentialsManager
-        let notificationCenter: TestMocks.MockNotificationCenter
-        let fileManager: TestMocks.MockFileManager
+        let backupService: BackupServiceProtocol
+        let repositoryService: RepositoryServiceProtocol
+        let credentialsManager: CredentialsManagerProtocol
+        let notificationCenter: NotificationCenter
+        let fileManager: FileManagerProtocol
         
         init() {
             self.backupService = TestMocks.MockBackupService()
@@ -32,11 +36,11 @@ final class rBUMTests: XCTestCase {
         
         /// Reset all mocks to initial state
         func reset() {
-            backupService.reset()
-            repositoryService.reset()
-            credentialsManager.reset()
-            notificationCenter.reset()
-            fileManager.reset()
+            (backupService as? TestMocks.MockBackupService)?.reset()
+            (repositoryService as? TestMocks.MockRepositoryService)?.reset()
+            (credentialsManager as? TestMocks.MockCredentialsManager)?.reset()
+            (notificationCenter as? TestMocks.MockNotificationCenter)?.reset()
+            (fileManager as? TestMocks.MockFileManager)?.reset()
         }
     }
     

@@ -6,22 +6,108 @@
 //
 
 import Testing
+import Foundation
 @testable import rBUM
 
 /// Tests for BackupSettings functionality
 struct BackupSettingsTests {
+    // MARK: - Test Namespace
+    
+    enum BackupSettingsTestNamespace {
+        /// Protocol for mocking UserDefaults functionality
+        protocol UserDefaultsProtocol {
+            func set(_ value: Any?, forKey defaultName: String)
+            func object(forKey defaultName: String) -> Any?
+            func removeObject(forKey defaultName: String)
+        }
+
+        /// Mock implementation of UserDefaults for testing
+        final class MockUserDefaults: UserDefaultsProtocol {
+            var storage: [String: Any] = [:]
+            
+            func set(_ value: Any?, forKey defaultName: String) {
+                if let value = value {
+                    storage[defaultName] = value
+                } else {
+                    storage.removeValue(forKey: defaultName)
+                }
+            }
+            
+            func object(forKey defaultName: String) -> Any? {
+                storage[defaultName]
+            }
+            
+            func removeObject(forKey defaultName: String) {
+                storage.removeValue(forKey: defaultName)
+            }
+            
+            func reset() {
+                storage.removeAll()
+            }
+        }
+
+        /// Protocol for mocking NotificationCenter functionality
+        protocol NotificationCenterProtocol {
+            func post(_ notification: Foundation.Notification)
+        }
+
+        /// Mock implementation of NotificationCenter for testing
+        final class MockNotificationCenter: NotificationCenterProtocol {
+            var postCalled = false
+            var lastNotification: Foundation.Notification?
+            
+            func post(_ notification: Foundation.Notification) {
+                postCalled = true
+                lastNotification = notification
+            }
+            
+            func reset() {
+                postCalled = false
+                lastNotification = nil
+            }
+        }
+
+        /// Protocol for mocking FileManager functionality
+        protocol FileManagerProtocol {
+            func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<Foundation.ObjCBool>?) -> Bool
+            func isHidden(_ path: String) -> Bool
+            func isSystem(_ path: String) -> Bool
+        }
+
+        /// Mock implementation of FileManager for testing
+        final class MockFileManager: FileManagerProtocol {
+            var files: [String: (isHidden: Bool, isSystem: Bool)] = [:]
+            
+            func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<Foundation.ObjCBool>?) -> Bool {
+                files[path] != nil
+            }
+            
+            func isHidden(_ path: String) -> Bool {
+                files[path]?.isHidden ?? false
+            }
+            
+            func isSystem(_ path: String) -> Bool {
+                files[path]?.isSystem ?? false
+            }
+            
+            func reset() {
+                files.removeAll()
+            }
+        }
+    }
+    
     // MARK: - Test Context
     
     /// Test environment with test data
     struct TestContext {
-        let userDefaults: TestMocks.MockUserDefaults
-        let notificationCenter: TestMocks.MockNotificationCenter
-        let fileManager: TestMocks.MockFileManager
+        let userDefaults: BackupSettingsTestNamespace.UserDefaultsProtocol & BackupSettingsTestNamespace.MockUserDefaults
+        let notificationCenter: BackupSettingsTestNamespace.NotificationCenterProtocol & BackupSettingsTestNamespace.MockNotificationCenter
+        let fileManager: BackupSettingsTestNamespace.FileManagerProtocol & BackupSettingsTestNamespace.MockFileManager
         
         init() {
-            self.userDefaults = TestMocks.MockUserDefaults()
-            self.notificationCenter = TestMocks.MockNotificationCenter()
-            self.fileManager = TestMocks.MockFileManager()
+            self.userDefaults = BackupSettingsTestNamespace.MockUserDefaults()
+            self.notificationCenter = BackupSettingsTestNamespace.MockNotificationCenter()
+            self.fileManager = BackupSettingsTestNamespace.MockFileManager()
         }
         
         /// Reset all mocks to initial state
@@ -277,73 +363,9 @@ struct BackupSettingsTests {
         #expect(!settings.shouldExclude(""))
         
         // Test nil UserDefaults
-        let nilDefaults = TestMocks.MockUserDefaults()
+        let nilDefaults = BackupSettingsTestNamespace.MockUserDefaults()
         nilDefaults.removeObject(forKey: BackupSettings.defaultsKey)
         let loadedSettings = BackupSettings.load(from: nilDefaults)
         #expect(loadedSettings == nil)
-    }
-}
-
-// MARK: - Mock Implementations
-
-/// Mock implementation of UserDefaults for testing
-final class TestMocks.MockUserDefaults: UserDefaults {
-    var storage: [String: Any] = [:]
-    
-    override func set(_ value: Any?, forKey defaultName: String) {
-        if let value = value {
-            storage[defaultName] = value
-        } else {
-            storage.removeValue(forKey: defaultName)
-        }
-    }
-    
-    override func object(forKey defaultName: String) -> Any? {
-        storage[defaultName]
-    }
-    
-    override func removeObject(forKey defaultName: String) {
-        storage.removeValue(forKey: defaultName)
-    }
-    
-    func reset() {
-        storage.removeAll()
-    }
-}
-
-/// Mock implementation of NotificationCenter for testing
-final class TestMocks.MockNotificationCenter: NotificationCenter {
-    var postCalled = false
-    var lastNotification: Notification?
-    
-    override func post(_ notification: Notification) {
-        postCalled = true
-        lastNotification = notification
-    }
-    
-    func reset() {
-        postCalled = false
-        lastNotification = nil
-    }
-}
-
-/// Mock implementation of FileManager for testing
-final class TestMocks.MockFileManager: FileManager {
-    var files: [String: (isHidden: Bool, isSystem: Bool)] = [:]
-    
-    override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
-        files[path] != nil
-    }
-    
-    func isHidden(_ path: String) -> Bool {
-        files[path]?.isHidden ?? false
-    }
-    
-    func isSystem(_ path: String) -> Bool {
-        files[path]?.isSystem ?? false
-    }
-    
-    func reset() {
-        files.removeAll()
     }
 }

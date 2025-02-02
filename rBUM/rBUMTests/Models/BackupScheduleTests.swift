@@ -7,6 +7,7 @@
 
 import Testing
 @testable import rBUM
+import TestMocksModule
 
 /// Tests for BackupSchedule functionality
 struct BackupScheduleTests {
@@ -14,14 +15,14 @@ struct BackupScheduleTests {
     
     /// Test environment with test data
     struct TestContext {
-        let dateProvider: MockDateProvider
-        let notificationCenter: MockNotificationCenter
-        let userDefaults: MockUserDefaults
+        let dateProvider: TestMocksModule.TestMocks.MockDateProvider
+        let notificationCenter: TestMocksModule.TestMocks.MockNotificationCenter
+        let userDefaults: TestMocksModule.TestMocks.MockUserDefaults
         
         init() {
-            self.dateProvider = MockDateProvider()
-            self.notificationCenter = MockNotificationCenter()
-            self.userDefaults = MockUserDefaults()
+            self.dateProvider = TestMocksModule.TestMocks.MockDateProvider()
+            self.notificationCenter = TestMocksModule.TestMocks.MockNotificationCenter()
+            self.userDefaults = TestMocksModule.TestMocks.MockUserDefaults()
         }
         
         /// Reset all mocks to initial state

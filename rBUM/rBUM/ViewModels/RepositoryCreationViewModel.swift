@@ -6,32 +6,34 @@
 //
 
 import Foundation
-import SwiftUI
+import AppKit
 import os
 
 @MainActor
 final class RepositoryCreationViewModel: ObservableObject {
-    enum Mode {
+    enum Mode: CaseIterable, Identifiable {
         case create
         case `import`
+        
+        var id: Self { self }
     }
     
-    enum CreationState: Equatable {
+    enum State: Equatable {
         case idle
         case creating
         case success(Repository)
-        case error(Error)
+        case error(RepositoryCreationError)
         
-        static func == (lhs: CreationState, rhs: CreationState) -> Bool {
+        static func == (lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
             case (.idle, .idle):
                 return true
             case (.creating, .creating):
                 return true
             case (.success(let lhsRepo), .success(let rhsRepo)):
-                return lhsRepo.id == rhsRepo.id
-            case (.error(let lhsError as NSError), .error(let rhsError as NSError)):
-                return lhsError.domain == rhsError.domain && lhsError.code == rhsError.code
+                return lhsRepo == rhsRepo
+            case (.error(let lhsError), .error(let rhsError)):
+                return lhsError.localizedDescription == rhsError.localizedDescription
             default:
                 return false
             }
@@ -43,7 +45,7 @@ final class RepositoryCreationViewModel: ObservableObject {
     @Published var path: String = ""
     @Published var password: String = ""
     @Published var confirmPassword: String = ""
-    @Published var state: CreationState = .idle
+    @Published var state: State = .idle
     @Published var showError = false
     @Published var showSuccess = false
     @Published var createdRepository: Repository?
@@ -106,7 +108,7 @@ final class RepositoryCreationViewModel: ObservableObject {
                         self.logger.infoMessage("Selected path: \(url.path)")
                     } catch {
                         self.logger.errorMessage("Failed to create bookmark: \(error.localizedDescription)")
-                        self.state = .error(error)
+                        self.state = .error(RepositoryCreationError.invalidPath("Failed to create bookmark"))
                         self.showError = true
                     }
                 }
@@ -152,7 +154,7 @@ final class RepositoryCreationViewModel: ObservableObject {
             case .create:
                 repository = try await creationService.createRepository(
                     name: name,
-                    path: repositoryURL,
+                    path: repositoryURL.path,
                     password: password
                 )
                 self.logger.infoMessage("Created repository: \(repository.id) at \(repositoryURL.path)")
@@ -160,7 +162,7 @@ final class RepositoryCreationViewModel: ObservableObject {
             case .import:
                 repository = try await creationService.importRepository(
                     name: name,
-                    path: repositoryURL,
+                    path: repositoryURL.path,
                     password: password
                 )
                 self.logger.infoMessage("Imported repository: \(repository.id) from \(repositoryURL.path)")
@@ -182,11 +184,15 @@ final class RepositoryCreationViewModel: ObservableObject {
             password = ""
             confirmPassword = ""
             
-            logger.info("Repository \(mode == .create ? "created" : "imported") successfully: \(repository.id, privacy: .public)")
+            logger.info("Repository \(self.mode == .create ? "created" : "imported") successfully: \(repository.id, privacy: .public)")
         } catch {
+            if let creationError = error as? RepositoryCreationError {
+                self.state = .error(creationError)
+            } else {
+                self.state = .error(RepositoryCreationError.unknown(error.localizedDescription))
+            }
             self.logger.errorMessage("Failed to \(mode == .create ? "create" : "import") repository: \(error.localizedDescription)")
-            state = .error(error)
-            showError = true
+            self.showError = true
         }
     }
     

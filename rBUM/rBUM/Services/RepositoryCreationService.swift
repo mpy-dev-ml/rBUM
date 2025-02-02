@@ -36,8 +36,7 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
     init(resticService: ResticCommandServiceProtocol, repositoryStorage: RepositoryStorageProtocol) {
         self.resticService = resticService
         self.repositoryStorage = repositoryStorage
-        self.logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "dev.mpy.rBUM", 
-                           category: "Creation")
+        self.logger = Logging.logger(for: .creation)
     }
     
     func createRepository(name: String, path: String, password: String) async throws -> Repository {

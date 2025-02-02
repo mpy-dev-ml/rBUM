@@ -38,7 +38,8 @@ enum ConfigurationStorageError: LocalizedError, Equatable {
 
 /// Manages the storage of application configuration using FileManager
 final class ConfigurationStorage: ConfigurationStorageProtocol {
-    private let fileManager: FileManager
+    private let fileManager: FileManagerProtocol
+    private let notificationCenter: NotificationCenter
     private let logger = Logging.logger(for: .configuration)
     private let customStorageURL: URL?
     
@@ -59,15 +60,26 @@ final class ConfigurationStorage: ConfigurationStorageProtocol {
             .appendingPathComponent("config.json")
     }
     
-    init(fileManager: FileManager = .default, storageURL: URL? = nil) {
+    /// Initialize configuration storage
+    /// - Parameters:
+    ///   - fileManager: File manager to use for storage
+    ///   - notificationCenter: Notification center for change notifications
+    ///   - customStorageURL: Optional custom URL for storage location
+    init(
+        fileManager: FileManagerProtocol = FileManager.default,
+        notificationCenter: NotificationCenter = .default,
+        customStorageURL: URL? = nil
+    ) {
         self.fileManager = fileManager
-        self.customStorageURL = storageURL
+        self.notificationCenter = notificationCenter
+        self.customStorageURL = customStorageURL
         try? createStorageDirectoryIfNeeded()
     }
     
     private func createStorageDirectoryIfNeeded() throws {
         let directory = storageURL.deletingLastPathComponent()
-        if !fileManager.fileExists(atPath: directory.path) {
+        var isDirectory = ObjCBool(false)
+        if !fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
             try fileManager.createDirectory(
                 at: directory,
                 withIntermediateDirectories: true,
@@ -77,39 +89,19 @@ final class ConfigurationStorage: ConfigurationStorageProtocol {
     }
     
     func load() throws -> Configuration {
-        guard fileManager.fileExists(atPath: storageURL.path) else {
-            // If no configuration exists, create default
-            let config = Configuration.default
-            try save(config)
-            return config
+        guard let data = fileManager.contents(atPath: storageURL.path) else {
+            return Configuration.default
         }
-        
-        do {
-            let data = try Data(contentsOf: storageURL)
-            let decoder = JSONDecoder()
-            return try decoder.decode(Configuration.self, from: data)
-        } catch {
-            logger.errorMessage("Failed to load configuration: \(error.localizedDescription)")
-            throw ConfigurationStorageError.fileOperationFailed("read")
-        }
+        return try JSONDecoder().decode(Configuration.self, from: data)
     }
     
     func save(_ configuration: Configuration) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        
-        do {
-            let data = try encoder.encode(configuration)
-            try data.write(to: storageURL, options: .atomic)
-            logger.infoMessage("Saved configuration")
-        } catch {
-            logger.errorMessage("Failed to save configuration: \(error.localizedDescription)")
-            throw ConfigurationStorageError.fileOperationFailed("write")
-        }
+        let data = try JSONEncoder().encode(configuration)
+        try fileManager.write(data, to: storageURL)
+        notificationCenter.post(name: .configurationDidChange, object: self)
     }
     
     func reset() throws {
         try save(Configuration.default)
-        logger.infoMessage("Reset configuration to defaults")
     }
 }

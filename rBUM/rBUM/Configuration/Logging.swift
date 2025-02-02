@@ -24,6 +24,12 @@ enum Logging {
         case settings = "Settings"
         case configuration = "Configuration"
         case storage = "Storage"
+        case security = "Security"
+        case bookmarkService = "BookmarkService"
+        case creation = "Creation"
+        case restic = "Restic"
+        case snapshots = "Snapshots"
+        case process = "Process"
         
         /// Get a logger configured for this category
         var logger: os.Logger {

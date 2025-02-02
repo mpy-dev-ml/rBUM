@@ -36,16 +36,13 @@ final class RepositoryDetailViewModel: ObservableObject {
     @Published private(set) var repositoryStatus: RepositoryStatus?
     
     private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: CredentialsManagerProtocol
+    private let credentialsManager: KeychainCredentialsManagerProtocol
     private let logger = Logging.logger(for: .repository)
     
     init(
         repository: Repository,
-        resticService: ResticCommandServiceProtocol = ResticCommandService(
-            fileManager: .default,
-            logger: Logging.logger(for: .repository)
-        ),
-        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+        resticService: ResticCommandServiceProtocol = ResticCommandService(),
+        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
         self.repository = repository
         self.resticService = resticService
@@ -59,48 +56,44 @@ final class RepositoryDetailViewModel: ObservableObject {
         defer { isChecking = false }
         
         do {
-            // Get repository password
-            let password = try await credentialsManager.getPassword(forRepositoryId: repository.id)
+            // Get repository credentials
+            let credentials = try await credentialsManager.retrieve(forId: repository.id)
             
             // Create Repository with credentials
-            let credentials = RepositoryCredentials(
-                repositoryId: repository.id,
-                password: password,
-                repositoryPath: repository.path.path
-            )
-            
             let repoWithCredentials = Repository(
+                id: repository.id,
                 name: repository.name,
                 path: repository.path,
+                createdAt: repository.createdAt,
                 credentials: credentials
             )
             
-            // Check repository
-            try await resticService.check(repoWithCredentials)
-            
-            // Update last check time
+            // List snapshots to verify repository access
+            _ = try await resticService.listSnapshots(in: repoWithCredentials)
             lastCheck = Date()
-            logger.infoMessage("Repository check successful: \(repository.id)")
+            
+            logger.info("Repository check completed successfully: \(self.repository.id, privacy: .public)")
         } catch {
             self.error = error
-            self.showError = true
-            logger.errorMessage("Repository check failed: \(error.localizedDescription)")
+            showError = true
+            logger.error("Repository check failed: \(error.localizedDescription)")
         }
     }
     
-    func updatePassword(_ newPassword: String) async throws {
+    func updateRepositoryPassword(_ newPassword: String) async throws {
         guard !newPassword.isEmpty else {
             throw ResticError.invalidPassword
         }
         
+        // Create new credentials with updated password
         let credentials = RepositoryCredentials(
-            repositoryId: repository.id,
-            password: newPassword,
-            repositoryPath: repository.path.path
+            repositoryPath: self.repository.path,
+            password: newPassword
         )
         
-        try await credentialsManager.store(credentials)
-        logger.infoMessage("Updated password for repository: \(repository.id)")
+        // Store updated credentials
+        try await self.credentialsManager.store(credentials, forRepositoryId: self.repository.id)
+        self.logger.info("Updated password for repository: \(self.repository.id, privacy: .public)")
     }
     
     var formattedLastCheck: String {

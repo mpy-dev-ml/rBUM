@@ -7,6 +7,7 @@
 
 import Testing
 @testable import rBUM
+import TestMocksModule
 
 /// Tests for BackupRestic functionality
 struct BackupResticTests {
@@ -14,18 +15,18 @@ struct BackupResticTests {
     
     /// Test environment with test data
     struct TestContext {
-        let fileManager: MockFileManager
-        let processManager: MockProcessManager
-        let keychain: MockKeychain
-        let notificationCenter: MockNotificationCenter
-        let dateProvider: MockDateProvider
+        let fileManager: TestMocksModule.TestMocks.MockFileManager
+        let processManager: TestMocksModule.TestMocks.MockProcessManager
+        let keychain: TestMocksModule.TestMocks.MockKeychain
+        let notificationCenter: TestMocksModule.TestMocks.MockNotificationCenter
+        let dateProvider: TestMocksModule.TestMocks.MockDateProvider
         
         init() {
-            self.fileManager = MockFileManager()
-            self.processManager = MockProcessManager()
-            self.keychain = MockKeychain()
-            self.notificationCenter = MockNotificationCenter()
-            self.dateProvider = MockDateProvider()
+            self.fileManager = TestMocksModule.TestMocks.MockFileManager()
+            self.processManager = TestMocksModule.TestMocks.MockProcessManager()
+            self.keychain = TestMocksModule.TestMocks.MockKeychain()
+            self.notificationCenter = TestMocksModule.TestMocks.MockNotificationCenter()
+            self.dateProvider = TestMocksModule.TestMocks.MockDateProvider()
         }
         
         /// Reset all mocks to initial state

@@ -17,7 +17,7 @@ struct RepositoryDetailView: View {
     init(
         repository: Repository,
         resticService: ResticCommandServiceProtocol = ResticCommandService(),
-        credentialsManager: CredentialsManagerProtocol = KeychainCredentialsManager()
+        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
         _viewModel = StateObject(wrappedValue: RepositoryDetailViewModel(
             repository: repository,
@@ -143,30 +143,16 @@ private struct RepositoryDetailsSection: View {
             .accessibilityLabel("Repository name: \(viewModel.repository.name)")
             
             LabeledContent<Text, Text>(
-                content: { Text(viewModel.repository.path.path) },
+                content: { Text(viewModel.repository.path) },
                 label: { Text("Path") }
             )
-            .accessibilityLabel("Repository path: \(viewModel.repository.path.path)")
-            
-            if let lastBackup = viewModel.repository.lastBackup {
-                LabeledContent<Text, Text>(
-                    content: { Text(lastBackup.formatted(date: .abbreviated, time: .shortened)) },
-                    label: { Text("Last Backup") }
-                )
-                .accessibilityLabel("Last backup on \(lastBackup.formatted(date: .abbreviated, time: .shortened))")
-            }
+            .accessibilityLabel("Repository path: \(viewModel.repository.path)")
             
             LabeledContent<Text, Text>(
-                content: { Text("\(viewModel.repository.backupCount)") },
-                label: { Text("Backups") }
+                content: { Text(viewModel.repository.createdAt.formatted(date: .abbreviated, time: .shortened)) },
+                label: { Text("Created") }
             )
-            .accessibilityLabel("Number of backups: \(viewModel.repository.backupCount)")
-            
-            LabeledContent<Text, Text>(
-                content: { Text(ByteCountFormatter.string(fromByteCount: Int64(viewModel.repository.totalSize), countStyle: .file)) },
-                label: { Text("Total Size") }
-            )
-            .accessibilityLabel("Total size: \(ByteCountFormatter.string(fromByteCount: Int64(viewModel.repository.totalSize), countStyle: .file))")
+            .accessibilityLabel("Created on \(viewModel.repository.createdAt.formatted(date: .abbreviated, time: .shortened))")
         }
     }
     
@@ -206,11 +192,10 @@ struct RepositoryDetailView_Previews: PreviewProvider {
         RepositoryDetailView(
             repository: Repository(
                 name: "Test Repository",
-                path: URL(fileURLWithPath: "/tmp/test"),
+                path: "/tmp/test",
                 credentials: RepositoryCredentials(
-                    repositoryId: UUID(),
-                    password: "test-password",
-                    repositoryPath: "/tmp/test"
+                    repositoryPath: "/tmp/test",
+                    password: "test-password"
                 )
             )
         )

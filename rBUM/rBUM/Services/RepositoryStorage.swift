@@ -12,6 +12,7 @@ protocol RepositoryStorageProtocol {
 final class RepositoryStorage: RepositoryStorageProtocol {
     private let fileManager: FileManager
     private let logger: Logger
+    private let bookmarkService: BookmarkServiceProtocol
     private let appFolderName = "dev.mpy.rBUM"
     
     private var storageURL: URL {
@@ -26,10 +27,11 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         return appFolder.appendingPathComponent("bookmarks.plist")
     }
     
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, 
+         bookmarkService: BookmarkServiceProtocol = BookmarkService()) {
         self.fileManager = fileManager
-        self.logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "dev.mpy.rBUM", 
-                           category: "Storage")
+        self.bookmarkService = bookmarkService
+        self.logger = Logging.logger(for: .storage)
         
         // Create application support directory if needed
         if let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
@@ -41,29 +43,29 @@ final class RepositoryStorage: RepositoryStorageProtocol {
     func save(_ repository: Repository) throws {
         var repositories = try list()
         
-        // Update or add repository
+        // Create security-scoped bookmark for the repository
+        if let url = URL(string: repository.path) {
+            do {
+                let bookmarkData = try bookmarkService.createBookmark(for: url)
+                var bookmarks = try loadBookmarks()
+                bookmarks[repository.id] = bookmarkData
+                try saveBookmarks(bookmarks)
+            } catch {
+                logger.error("Failed to create bookmark for repository: \(repository.id, privacy: .public)")
+                throw RepositoryStorageError.bookmarkCreationFailed(error.localizedDescription)
+            }
+        }
+        
+        // Update repositories list
         if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
             repositories[index] = repository
         } else {
             repositories.append(repository)
         }
         
-        // Save repository data
+        // Save updated repository list
         let data = try JSONEncoder().encode(repositories)
         try data.write(to: storageURL)
-        
-        // Create and save security-scoped bookmark
-        if let url = URL(string: repository.path) {
-            let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            
-            var bookmarks = try loadBookmarks()
-            bookmarks[repository.id] = bookmark
-            try saveBookmarks(bookmarks)
-        }
         
         logger.info("\(repository.id, privacy: .public)")
     }
@@ -78,12 +80,25 @@ final class RepositoryStorage: RepositoryStorageProtocol {
         
         // Start accessing security-scoped resources
         for repository in repositories {
-            if let bookmark = try loadBookmarks()[repository.id],
-               let url = try? URL(resolvingBookmarkData: bookmark,
-                                options: .withSecurityScope,
-                                relativeTo: nil,
-                                bookmarkDataIsStale: nil) {
-                url.startAccessingSecurityScopedResource()
+            if let bookmark = try loadBookmarks()[repository.id] {
+                do {
+                    let (url, isStale) = try bookmarkService.resolveBookmark(bookmark)
+                    let hasAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                    
+                    if !hasAccess {
+                        logger.error("Sandbox access denied for repository: \(repository.id, privacy: .public). User may need to re-authorize access.")
+                        continue
+                    }
+                    
+                    if isStale {
+                        try refreshBookmark(for: repository, url: url)
+                    }
+                } catch {
+                    logger.error("Failed to resolve bookmark for repository: \(repository.id, privacy: .public)")
+                }
             }
         }
         
@@ -125,5 +140,41 @@ final class RepositoryStorage: RepositoryStorageProtocol {
     private func saveBookmarks(_ bookmarks: [String: Data]) throws {
         let data = try PropertyListEncoder().encode(bookmarks)
         try data.write(to: bookmarksURL)
+    }
+    
+    private func refreshBookmark(for repository: Repository, url: URL) throws {
+        logger.info("Refreshing stale bookmark for repository: \(repository.id, privacy: .public)")
+        
+        do {
+            // Create new bookmark data with security scope
+            let newBookmarkData = try bookmarkService.refreshBookmark(for: url)
+            
+            // Update bookmarks dictionary
+            var bookmarks = try loadBookmarks()
+            bookmarks[repository.id] = newBookmarkData
+            
+            // Save updated bookmarks
+            try saveBookmarks(bookmarks)
+            
+            logger.info("Successfully refreshed bookmark for repository: \(repository.id, privacy: .public)")
+        } catch {
+            logger.error("Failed to refresh bookmark: \(error.localizedDescription, privacy: .public)")
+            throw RepositoryStorageError.bookmarkUpdateFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Error types specific to repository storage operations
+    enum RepositoryStorageError: LocalizedError {
+        case bookmarkCreationFailed(String)
+        case bookmarkUpdateFailed(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .bookmarkCreationFailed(let reason):
+                return "Failed to create bookmark: \(reason)"
+            case .bookmarkUpdateFailed(let reason):
+                return "Failed to update bookmark: \(reason)"
+            }
+        }
     }
 }
