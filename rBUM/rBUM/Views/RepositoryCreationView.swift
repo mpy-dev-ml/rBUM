@@ -12,13 +12,11 @@ struct RepositoryCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showSuccess = false
     
-    init(creationService: RepositoryCreationServiceProtocol) {
+    init(creationService: RepositoryCreationServiceProtocol, credentialsManager: KeychainCredentialsManagerProtocol) {
         // Create the view model with dependencies
-        let credentialsManager = KeychainCredentialsManager()
-        let credentialsStorage = credentialsManager as! any CredentialsStorageProtocol as CredentialsStorageProtocol
         let viewModel = RepositoryCreationViewModel(
             creationService: creationService,
-            credentialsStorage: credentialsStorage
+            credentialsManager: credentialsManager
         )
         
         // Initialize the state object

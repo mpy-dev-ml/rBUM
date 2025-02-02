@@ -494,6 +494,161 @@ The app will guide users through any permission requirements and maintain secure
 - [ ] Troubleshooting guide
 - [ ] Release notes
 
+## Core Module Implementation Plan
+
+### Overview
+The Core module will serve as the foundation of rBUM, providing essential functionality, models, and services that can be shared across the application. This modularization will improve code organization, maintainability, and testability.
+
+### Implementation Phases
+
+#### Phase 1: Foundation Setup (3-4 hours)
+- **Objectives**:
+  - Create Core module structure
+  - Set up basic build system
+  - Migrate essential models
+  - Establish module boundaries
+
+- **Tasks**:
+  1. Create Core module directory structure
+  2. Configure Package.swift
+  3. Migrate core models:
+     - ProcessResult
+     - Repository
+     - RepositoryCredentials
+     - ResticSnapshot
+  4. Set up basic test infrastructure
+  5. Update main app to reference Core module
+
+- **Success Criteria**:
+  - Core module builds successfully
+  - Basic models are accessible from main app
+  - Initial test suite passes
+  - No regression in existing functionality
+
+#### Phase 2: Services and Protocols (3-4 hours)
+- **Objectives**:
+  - Implement core services
+  - Define protocol interfaces
+  - Establish service boundaries
+  - Set up logging infrastructure
+
+- **Tasks**:
+  1. Create and implement base protocols:
+     - FileManagerProtocol
+     - DateProviderProtocol
+     - NotificationCenterProtocol
+  2. Migrate common services:
+     - DateProvider
+     - LoggingService
+  3. Set up utilities and extensions
+  4. Implement error handling infrastructure
+
+- **Success Criteria**:
+  - All core services operational
+  - Clean protocol interfaces
+  - Comprehensive error handling
+  - Service tests passing
+
+#### Phase 3: Testing and Documentation (3-6 hours)
+- **Objectives**:
+  - Ensure comprehensive test coverage
+  - Complete documentation
+  - Optimize performance
+  - Polish public interfaces
+
+- **Tasks**:
+  1. Write comprehensive unit tests
+  2. Add integration tests
+  3. Document public interfaces
+  4. Create module-level documentation
+  5. Performance testing and optimization
+  6. Update project README
+
+- **Success Criteria**:
+  - 80%+ test coverage
+  - All public interfaces documented
+  - Performance metrics within targets
+  - Updated technical documentation
+
+### Core Module Structure
+```
+Core/
+├── Sources/
+│   ├── Models/
+│   │   ├── ProcessResult.swift
+│   │   ├── Repository.swift
+│   │   ├── RepositoryCredentials.swift
+│   │   └── ResticSnapshot.swift
+│   ├── Protocols/
+│   │   ├── FileManagerProtocol.swift
+│   │   ├── DateProviderProtocol.swift
+│   │   └── NotificationCenterProtocol.swift
+│   ├── Services/
+│   │   ├── Base/
+│   │   │   └── ServiceProtocols.swift
+│   │   └── Common/
+│   │       └── DateProvider.swift
+│   └── Utils/
+│       ├── Logging.swift
+│       └── Extensions/
+│           └── Foundation+Extensions.swift
+├── Tests/
+│   └── CoreTests/
+└── Package.swift
+```
+
+### Risk Management
+1. **Technical Risks**:
+   - Circular dependencies
+   - Build system configuration issues
+   - Performance impacts
+   - Integration challenges
+
+2. **Mitigation Strategies**:
+   - Phased implementation approach
+   - Regular integration testing
+   - Performance benchmarking
+   - Clear module boundaries
+   - Comprehensive documentation
+
+3. **Rollback Plan**:
+   - Git branches for each phase
+   - Feature flags for gradual rollout
+   - Backup of critical configurations
+   - Version tagging for stable releases
+
+### Success Metrics
+1. **Code Quality**:
+   - Reduced coupling between components
+   - Improved test coverage
+   - Fewer dependencies in main app
+   - Cleaner public interfaces
+
+2. **Performance**:
+   - No degradation in app startup time
+   - Maintained memory footprint
+   - Quick build times
+   - Efficient test execution
+
+3. **Maintainability**:
+   - Clear module boundaries
+   - Well-documented interfaces
+   - Consistent coding patterns
+   - Easy to add new features
+
+### Timeline
+- **Total Duration**: 9-14 hours
+- **Phase 1**: 3-4 hours
+- **Phase 2**: 3-4 hours
+- **Phase 3**: 3-6 hours
+
+### Next Steps
+1. Review and approve implementation plan
+2. Set up development branch for Core module
+3. Begin Phase 1 implementation
+4. Schedule regular progress reviews
+5. Plan for gradual feature integration
+
 ## Development Phases
 
 ### MVP Phase

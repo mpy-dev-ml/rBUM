@@ -30,11 +30,14 @@ public struct Repository: Identifiable, Codable, Equatable {
     // MARK: - Security-Scoped Resource Handling
     
     private var url: URL? {
-        URL(string: path)
+        URL(fileURLWithPath: path)  // Use fileURLWithPath instead of string URL
     }
     
     public func startAccessing() -> Bool {
         guard let url = self.url else {
+            Logging.logger(for: .repository).error(
+                "Invalid URL for repository path: \(path, privacy: .public)"
+            )
             return false
         }
         let hasAccess = url.startAccessingSecurityScopedResource()

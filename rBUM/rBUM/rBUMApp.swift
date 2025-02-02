@@ -23,7 +23,8 @@ struct rBUMApp: App {
         // Initialize services
         let keychainService = KeychainService()
         self.credentialsManager = KeychainCredentialsManager(keychainService: keychainService)
-        let storage = RepositoryStorage()
+        let bookmarkService = BookmarkService()
+        let storage = RepositoryStorage(bookmarkService: bookmarkService)
         self.repositoryStorage = storage
         self.resticService = ResticCommandService(
             fileManager: .default,
@@ -37,7 +38,10 @@ struct rBUMApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView(credentialsManager: credentialsManager)
+            ContentView(
+                credentialsManager: credentialsManager,
+                creationService: repositoryCreationService
+            )
             .onAppear {
                 logger.info("ContentView appeared")
             }

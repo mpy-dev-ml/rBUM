@@ -48,7 +48,7 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         
         // Create and save repository
         let repository = Repository(name: name, path: path)
-        try repositoryStorage.save(repository)
+        try await repositoryStorage.save(repository)
         
         logger.info("\(repository.id, privacy: .public)")
         return repository
@@ -63,7 +63,7 @@ final class RepositoryCreationService: RepositoryCreationServiceProtocol {
         
         // Create and save repository
         let repository = Repository(name: name, path: path)
-        try repositoryStorage.save(repository)
+        try await repositoryStorage.save(repository)
         
         logger.info("\(repository.id, privacy: .public)")
         return repository

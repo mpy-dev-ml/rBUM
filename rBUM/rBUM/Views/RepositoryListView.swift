@@ -12,8 +12,13 @@ struct RepositoryListView: View {
     @State private var showAddSheet = false
     @State private var showingDeleteAlert = false
     @State private var repositoryToDelete: Repository?
+    private let credentialsManager: KeychainCredentialsManagerProtocol
+    private let creationService: RepositoryCreationServiceProtocol
     
-    init() {
+    init(credentialsManager: KeychainCredentialsManagerProtocol,
+         creationService: RepositoryCreationServiceProtocol) {
+        self.credentialsManager = credentialsManager
+        self.creationService = creationService
         _viewModel = StateObject(wrappedValue: RepositoryListViewModel())
     }
     
@@ -49,7 +54,10 @@ struct RepositoryListView: View {
                 }
             } content: {
                 NavigationStack {
-                    RepositoryCreationView(creationService: viewModel.repositoryCreationService)
+                    RepositoryCreationView(
+                        creationService: creationService,
+                        credentialsManager: credentialsManager
+                    )
                 }
             }
             .alert("Delete Repository", isPresented: $showingDeleteAlert) {
@@ -92,6 +100,47 @@ private struct RepositoryRowView: View {
 
 struct RepositoryListView_Previews: PreviewProvider {
     static var previews: some View {
-        RepositoryListView()
+        RepositoryListView(
+            credentialsManager: PreviewCredentialsManager(),
+            creationService: PreviewRepositoryCreationService()
+        )
+    }
+}
+
+// MARK: - Preview Helpers
+private class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
+    func retrieve(forId id: String) async throws -> RepositoryCredentials {
+        return RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password")
+    }
+    
+    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
+        return [
+            ("mock-id", RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password"))
+        ]
+    }
+    
+    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) throws {
+        // No-op for preview
+    }
+    
+    func retrieve(forRepositoryId id: String) throws -> RepositoryCredentials? {
+        // Return mock credentials for preview
+        return RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password")
+    }
+    
+    func delete(forId id: String) throws {
+        // No-op for preview
+    }
+}
+
+private class PreviewRepositoryCreationService: RepositoryCreationServiceProtocol {
+    func createRepository(name: String, path: String, password: String) async throws -> Repository {
+        // Return mock repository for preview
+        return Repository(name: name, path: path)
+    }
+    
+    func importRepository(name: String, path: String, password: String) async throws -> Repository {
+        // Return mock repository for preview
+        return Repository(name: name, path: path)
     }
 }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSFileProviderDomainUsageDescription</key>
+    <string>rBUM needs access to your files to perform backups and restores.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>rBUM needs access to your Desktop folder if you choose to back it up.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>rBUM needs access to your Documents folder if you choose to back it up.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>rBUM needs access to your Downloads folder if you choose to back it up.</string>
+    <key>NSHomeDirectoryUsageDescription</key>
+    <string>rBUM needs access to your home directory for backup and restore operations.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>rBUM needs access to external drives if you choose to back them up or store backups on them.</string>
+</dict>
+</plist>

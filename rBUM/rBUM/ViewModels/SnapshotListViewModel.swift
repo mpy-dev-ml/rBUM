@@ -50,9 +50,11 @@ final class SnapshotListViewModel: ObservableObject {
         repository: Repository,
         resticService: ResticCommandServiceProtocol = ResticCommandService(
             fileManager: .default,
-            logger: Logging.logger(for: .repository)
+            logger: Logging.logger(for: .snapshots)
         ),
-        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
+        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager(
+            keychainService: KeychainService()
+        )
     ) {
         self.repository = repository
         self.resticService = resticService

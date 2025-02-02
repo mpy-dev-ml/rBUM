@@ -47,36 +47,56 @@ final class RepositoryListViewModel: ObservableObject {
     
     func loadRepositories() async {
         do {
-            var storedRepos = try repositoryStorage.list()
+            var storedRepos = try await repositoryStorage.list()
             
-            // Verify each repository still exists
-            storedRepos = storedRepos.filter { repository in
-                let exists = FileManager.default.fileExists(atPath: repository.path)
-                if !exists {
-                    logger.warning("Repository at \(repository.path) no longer exists, removing from storage")
-                    try? repositoryStorage.delete(repository)
+            // Verify each repository still exists and filter asynchronously
+            storedRepos = await withTaskGroup(of: (Repository, Bool).self) { group in
+                for repository in storedRepos {
+                    group.addTask {
+                        let exists = FileManager.default.fileExists(atPath: repository.path)
+                        if !exists {
+                            self.logger.warning("Repository at \(repository.path) no longer exists, removing from storage")
+                            try? await self.repositoryStorage.delete(repository)
+                        }
+                        return (repository, exists)
+                    }
                 }
-                return exists
+                
+                var validRepos: [Repository] = []
+                for await (repository, exists) in group {
+                    if exists {
+                        validRepos.append(repository)
+                    }
+                }
+                return validRepos
             }
             
-            repositories = storedRepos
-            logger.infoMessage("Loaded \(repositories.count) valid repositories")
+            await MainActor.run {
+                self.repositories = storedRepos
+                self.logger.infoMessage("Loaded \(repositories.count) valid repositories")
+            }
         } catch {
-            logger.error("Failed to load repositories: \(error.localizedDescription)")
-            self.error = error
-            showError = true
+            await MainActor.run {
+                self.logger.error("Failed to load repositories: \(error.localizedDescription)")
+                self.error = error
+                self.showError = true
+            }
         }
     }
     
     func deleteRepository(_ repository: Repository) async {
         do {
-            try repositoryStorage.delete(repository)
+            try await repositoryStorage.delete(repository)
             await loadRepositories()  // Refresh list after deletion
-            logger.infoMessage("Deleted repository: \(repository.id)")
+            await MainActor.run {
+                self.logger.infoMessage("Deleted repository: \(repository.id)")
+            }
         } catch {
-            logger.error("Failed to delete repository: \(error.localizedDescription)")
-            self.error = error
-            showError = true
+            await MainActor.run {
+                self.logger.error("Failed to delete repository: \(error.localizedDescription)")
+                self.error = error
+                self.showError = true
+            }
         }
     }
 }

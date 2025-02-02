@@ -27,8 +27,6 @@
   },
   "testTargets" : [
     {
-      "enabled" : false,
-      "parallelizable" : true,
       "target" : {
         "containerPath" : "container:rBUM.xcodeproj",
         "identifier" : "8D4680AA2D4B73A100A3EE30",

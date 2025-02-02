@@ -9,8 +9,13 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel: ContentViewModel
+    private let credentialsManager: KeychainCredentialsManagerProtocol
+    private let creationService: RepositoryCreationServiceProtocol
     
-    init(credentialsManager: KeychainCredentialsManagerProtocol) {
+    init(credentialsManager: KeychainCredentialsManagerProtocol,
+         creationService: RepositoryCreationServiceProtocol) {
+        self.credentialsManager = credentialsManager
+        self.creationService = creationService
         _viewModel = StateObject(wrappedValue: ContentViewModel(credentialsManager: credentialsManager))
     }
     
@@ -20,7 +25,10 @@ struct ContentView: View {
         } detail: {
             switch viewModel.selectedSidebarItem {
             case .repositories:
-                RepositoryListView()
+                RepositoryListView(
+                    credentialsManager: credentialsManager,
+                    creationService: creationService
+                )
             case .backups:
                 Text("Backup List")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -252,6 +260,7 @@ class ContentViewModel: ObservableObject {
 
 #Preview {
     ContentView(
-        credentialsManager: PreviewCredentialsManager()
+        credentialsManager: PreviewCredentialsManager(),
+        creationService: PreviewRepositoryCreationService()
     )
 }

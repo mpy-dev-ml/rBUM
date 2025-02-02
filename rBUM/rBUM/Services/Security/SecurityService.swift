@@ -7,6 +7,10 @@
 
 import Foundation
 import os
+import AppKit
+import SystemConfiguration
+import Security
+import ApplicationServices
 
 /// Protocol defining security-related operations for the application
 public protocol SecurityServiceProtocol {
@@ -33,75 +37,216 @@ public protocol SecurityServiceProtocol {
     
     /// Resolve a security-scoped bookmark to a URL
     func resolveBookmark(_ data: Data) async throws -> URL
+    
+    /// Check if we have access to a specific path
+    func checkAccess(to url: URL) -> Bool
 }
 
 /// Implementation of SecurityService
 public final class SecurityService: SecurityServiceProtocol {
     private let logger: Logger
+    private let fileManager: FileManager
+    private let workspace: NSWorkspace
     
-    public init() {
+    public init(
+        fileManager: FileManager = .default,
+        workspace: NSWorkspace = .shared
+    ) {
         self.logger = Logging.logger(for: .security)
+        self.fileManager = fileManager
+        self.workspace = workspace
     }
     
     public func requestPermission(for url: URL) async throws -> Bool {
-        // TODO: Implement permission request using NSOpenPanel or similar
         logger.debug("Requesting permission for: \(url.path, privacy: .public)")
-        return false
+        
+        return await MainActor.run { @MainActor in
+            let openPanel = NSOpenPanel()
+            openPanel.canChooseFiles = url.hasDirectoryPath ? false : true
+            openPanel.canChooseDirectories = url.hasDirectoryPath
+            openPanel.allowsMultipleSelection = false
+            openPanel.canCreateDirectories = false
+            openPanel.directoryURL = url.deletingLastPathComponent()
+            openPanel.message = "Grant access to \(url.lastPathComponent)"
+            openPanel.prompt = "Grant Access"
+            
+            let response = openPanel.runModal()
+            guard response == .OK else {
+                logger.warning("Permission request cancelled by user")
+                return false
+            }
+            
+            guard let selectedURL = openPanel.url, selectedURL == url else {
+                logger.warning("Selected URL does not match requested URL")
+                return false
+            }
+            
+            // Start accessing the security-scoped resource
+            let hasAccess = selectedURL.startAccessingSecurityScopedResource()
+            if !hasAccess {
+                logger.error("Failed to access security-scoped resource")
+            }
+            return hasAccess
+        }
     }
     
     public func revokePermission(for url: URL) async throws {
-        // TODO: Implement permission revocation
         logger.debug("Revoking permission for: \(url.path, privacy: .public)")
+        url.stopAccessingSecurityScopedResource()
     }
     
     public func requestFullDiskAccess() async throws -> Bool {
-        // TODO: Implement Full Disk Access request
         logger.debug("Requesting Full Disk Access")
-        return false
+        
+        guard !(await checkFullDiskAccess()) else {
+            return true
+        }
+        
+        // Open System Settings to Security & Privacy
+        let prefpaneURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+        let opened = await MainActor.run {
+            workspace.open(prefpaneURL)
+        }
+        
+        if !opened {
+            logger.error("Failed to open System Settings")
+        }
+        
+        // Show instructions to the user
+        throw SecurityError.needsFullDiskAccess(
+            "Full Disk Access is required for backup operations.\n" +
+            "Please grant access in System Settings > Privacy & Security > Full Disk Access"
+        )
     }
     
     public func checkFullDiskAccess() async -> Bool {
-        // TODO: Implement Full Disk Access check
         logger.debug("Checking Full Disk Access")
-        return false
+        
+        // Test by attempting to read a protected directory
+        let homeDir = fileManager.homeDirectoryForCurrentUser
+        let testPath = homeDir.appendingPathComponent("Library/Application Support")
+        
+        do {
+            _ = try fileManager.contentsOfDirectory(atPath: testPath.path)
+            return true
+        } catch {
+            logger.error("Full Disk Access check failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
     }
     
     public func requestAutomation() async throws -> Bool {
-        // TODO: Implement Automation permission request
         logger.debug("Requesting Automation permission")
-        return false
+        
+        guard !(await checkAutomation()) else {
+            return true
+        }
+        
+        // Open System Settings to Security & Privacy > Automation
+        let prefpaneURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
+        let opened = await MainActor.run {
+            workspace.open(prefpaneURL)
+        }
+        
+        if !opened {
+            logger.error("Failed to open System Settings")
+        }
+        
+        throw SecurityError.needsAutomation(
+            "Automation access is required for some backup operations.\n" +
+            "Please grant access in System Settings > Privacy & Security > Automation"
+        )
     }
     
     public func checkAutomation() async -> Bool {
-        // TODO: Implement Automation permission check
         logger.debug("Checking Automation permission")
-        return false
+        
+        return await Task {
+            // Use AXIsProcessTrusted() to check if we have automation access
+            let isTrusted = AXIsProcessTrusted()
+            
+            if !isTrusted {
+                logger.warning("Automation access not granted")
+                return false
+            }
+            
+            logger.info("Automation access granted")
+            return true
+        }.value
     }
     
     public func createBookmark(for url: URL) async throws -> Data {
         logger.debug("Creating bookmark for: \(url.path, privacy: .public)")
-        return try url.bookmarkData(
-            options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        )
+        
+        do {
+            return try url.bookmarkData(
+                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+        } catch {
+            logger.error("Failed to create bookmark: \(error.localizedDescription, privacy: .public)")
+            throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
+        }
     }
     
     public func resolveBookmark(_ data: Data) async throws -> URL {
         logger.debug("Resolving bookmark")
-        var isStale = false
-        let url = try URL(
-            resolvingBookmarkData: data,
-            options: .withSecurityScope,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        )
         
-        if isStale {
-            logger.error("Bookmark is stale for URL: \(url.path, privacy: .public)")
-            // TODO: Handle stale bookmark
+        do {
+            var isStale = false
+            let url = try URL(
+                resolvingBookmarkData: data,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            
+            if isStale {
+                logger.error("Bookmark is stale for URL: \(url.path, privacy: .public)")
+                throw SecurityError.staleBookmark(url.path)
+            }
+            
+            return url
+        } catch {
+            logger.error("Failed to resolve bookmark: \(error.localizedDescription, privacy: .public)")
+            throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
         }
+    }
+    
+    public func checkAccess(to url: URL) -> Bool {
+        logger.debug("Checking access to: \(url.path, privacy: .public)")
         
-        return url
+        do {
+            let resourceValues = try url.resourceValues(forKeys: [.isReadableKey, .isWritableKey])
+            return resourceValues.isReadable == true
+        } catch {
+            logger.error("Failed to check access: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+}
+
+/// Errors that can occur during security operations
+public enum SecurityError: LocalizedError {
+    case needsFullDiskAccess(String)
+    case needsAutomation(String)
+    case bookmarkCreationFailed(String)
+    case bookmarkResolutionFailed(String)
+    case staleBookmark(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .needsFullDiskAccess(let message):
+            return "Full Disk Access Required: \(message)"
+        case .needsAutomation(let message):
+            return "Automation Access Required: \(message)"
+        case .bookmarkCreationFailed(let message):
+            return "Failed to create security bookmark: \(message)"
+        case .bookmarkResolutionFailed(let message):
+            return "Failed to resolve security bookmark: \(message)"
+        case .staleBookmark(let path):
+            return "Security bookmark is stale for path: \(path)"
+        }
     }
 }

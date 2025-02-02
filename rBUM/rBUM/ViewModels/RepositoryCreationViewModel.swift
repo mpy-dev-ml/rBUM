@@ -50,12 +50,6 @@ final class RepositoryCreationViewModel: ObservableObject {
     @Published var showSuccess = false
     @Published var createdRepository: Repository?
     
-    private let creationService: RepositoryCreationServiceProtocol
-    private let credentialsStorage: CredentialsStorageProtocol
-    private let logger = Logging.logger(for: .repository)
-    private var directoryBookmark: Data?
-    private var selectedDirectoryURL: URL?
-    
     var errorMessage: String {
         if case .error(let error) = state {
             return error.localizedDescription
@@ -63,14 +57,22 @@ final class RepositoryCreationViewModel: ObservableObject {
         return ""
     }
     
+    private let creationService: RepositoryCreationServiceProtocol
+    private let credentialsManager: KeychainCredentialsManagerProtocol
+    private let logger: Logger
+    private var directoryBookmark: Data?
+    private var selectedDirectoryURL: URL?
+    
+    init(creationService: RepositoryCreationServiceProtocol,
+         credentialsManager: KeychainCredentialsManagerProtocol) {
+        self.creationService = creationService
+        self.credentialsManager = credentialsManager
+        self.logger = Logging.logger(for: .creation)
+    }
+    
     var isValid: Bool {
         !name.isEmpty && !path.isEmpty && !password.isEmpty && 
         (mode == .import || password == confirmPassword)
-    }
-    
-    init(creationService: RepositoryCreationServiceProtocol, credentialsStorage: CredentialsStorageProtocol) {
-        self.creationService = creationService
-        self.credentialsStorage = credentialsStorage
     }
     
     func selectPath() {
@@ -169,7 +171,7 @@ final class RepositoryCreationViewModel: ObservableObject {
             }
             
             // Store credentials
-            try credentialsStorage.store(
+            try await credentialsManager.store(
                 RepositoryCredentials(repositoryPath: repositoryURL.path, password: password),
                 forRepositoryId: repository.id
             )
