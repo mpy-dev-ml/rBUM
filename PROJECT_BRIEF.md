@@ -167,6 +167,22 @@ The app will guide users through any permission requirements and maintain secure
    - Advanced credential management
    - Repository credentials rotation
    - Security audit and testing
+   - Two-Factor Authentication
+     * TOTP Implementation (Week 1)
+       - Standard authenticator app support
+       - QR code generation
+       - Backup codes system
+       - Secret management
+     * YubiKey Integration (Week 2)
+       - FIDO2/WebAuthn support
+       - Hardware key registration
+       - Cross-platform compatibility
+       - Recovery mechanisms
+     * Security Features
+       - Rate limiting
+       - Brute force protection
+       - Audit logging
+       - Device management
 
 2. User Interface Development (Weeks 3-6)
    - Complete navigation structure
@@ -342,6 +358,123 @@ The app will guide users through any permission requirements and maintain secure
   * UI testing
   * Mock services
 
+### Modular Development and Feature Availability
+
+#### Module Organisation
+The application is structured into distinct modules to ensure maintainability, testability, and future cross-platform compatibility:
+
+1. **Core Module**
+   - Essential functionality and interfaces
+   - Platform-agnostic models and protocols
+   - Shared utilities and services
+   - Base error handling
+
+2. **Platform Module**
+   - macOS-specific implementations
+   - Platform service adapters
+   - OS integration points
+   - Native API wrappers
+
+3. **UI Module**
+   - User interface components
+   - ViewModels and Views
+   - Navigation structure
+   - UI-specific utilities
+
+4. **Features Module**
+   - Individual backup features
+   - Feature-specific services
+   - Feature coordination
+   - Feature-specific models
+
+#### Feature Availability States
+To ensure transparency and manage user expectations, features are clearly marked with their current state:
+
+1. **Available Features**
+   - Fully implemented and tested
+   - Production-ready
+   - Documented and supported
+   - Available in current release
+
+2. **In Development**
+   - Partially implemented
+   - May have limitations
+   - Under active development
+   - Available but marked as beta
+
+3. **Planned Features**
+   - Defined but not implemented
+   - On the development roadmap
+   - Timeframe communicated
+   - Not available in current release
+
+4. **Experimental Features**
+   - Available for testing
+   - May be unstable
+   - Limited support
+   - Marked as beta/testing
+
+#### User Communication
+The application provides clear indicators of feature availability:
+
+1. **UI Indicators**
+   - Status badges on features
+   - Clear state communication
+   - Progress indicators
+   - Feature availability tooltips
+
+2. **Documentation**
+   - Feature status page
+   - Implementation progress
+   - Known limitations
+   - Upcoming features
+
+3. **Error Handling**
+   - Clear unavailability messages
+   - Alternative suggestions
+   - Help documentation links
+   - Status explanations
+
+#### Development Phases
+
+1. **Phase 1: Core Infrastructure**
+   - Essential models and protocols
+   - Basic platform implementations
+   - Minimal viable UI
+   - Core security features
+
+2. **Phase 2: Basic Functionality**
+   - Repository management
+   - Basic backup operations
+   - Essential security features
+   - Core UI components
+
+3. **Phase 3: Advanced Features**
+   - Scheduled backups
+   - Advanced filtering
+   - Detailed reporting
+   - Enhanced UI features
+
+#### Testing Strategy
+
+1. **Core Functionality**
+   - Comprehensive unit tests
+   - Integration tests
+   - Performance benchmarks
+   - Security validation
+
+2. **Feature Testing**
+   - Feature-specific test suites
+   - UI/UX testing
+   - Cross-module integration
+   - Edge case validation
+
+3. **Release Testing**
+   - Beta testing programme
+   - Performance validation
+   - Security audits
+   - User acceptance testing
+
 ### Current Implementation Status
 
 #### Completed Features
@@ -429,7 +562,7 @@ The app will guide users through any permission requirements and maintain secure
   - [ ] Notification system
   - [ ] Status monitoring
   - [ ] Error reporting
-- [ ] UI Testing
+  - [ ] UI Testing
 
 ### 5. Backup Scheduling System (1-2 weeks)
 - [ ] Scheduler service
