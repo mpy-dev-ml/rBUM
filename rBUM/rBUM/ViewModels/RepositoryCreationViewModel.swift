@@ -7,203 +7,201 @@
 
 import Foundation
 import AppKit
-import os
+import Logging
+import Core
 
+/// macOS implementation of repository creation view model
 @MainActor
-final class RepositoryCreationViewModel: ObservableObject {
-    enum Mode: CaseIterable, Identifiable {
-        case create
-        case `import`
-        
-        var id: Self { self }
-    }
+final class RepositoryCreationViewModel: ObservableObject, RepositoryCreationViewModelProtocol {
+    // MARK: - Published Properties
     
-    enum State: Equatable {
-        case idle
-        case creating
-        case success(Repository)
-        case error(RepositoryCreationError)
-        
-        static func == (lhs: State, rhs: State) -> Bool {
-            switch (lhs, rhs) {
-            case (.idle, .idle):
-                return true
-            case (.creating, .creating):
-                return true
-            case (.success(let lhsRepo), .success(let rhsRepo)):
-                return lhsRepo == rhsRepo
-            case (.error(let lhsError), .error(let rhsError)):
-                return lhsError.localizedDescription == rhsError.localizedDescription
-            default:
-                return false
-            }
-        }
-    }
-    
-    @Published var mode: Mode = .create
     @Published var name: String = ""
-    @Published var path: String = ""
     @Published var password: String = ""
-    @Published var confirmPassword: String = ""
-    @Published var state: State = .idle
-    @Published var showError = false
-    @Published var showSuccess = false
-    @Published var createdRepository: Repository?
+    @Published private(set) var directoryURL: URL?
+    @Published private(set) var directoryBookmark: Data?
+    @Published var mode: RepositoryCreationMode = .create
+    @Published private(set) var state: RepositoryCreationState = .idle
+    @Published var showError: Bool = false
     
-    var errorMessage: String {
-        if case .error(let error) = state {
-            return error.localizedDescription
-        }
-        return ""
-    }
+    // MARK: - Private Properties
     
     private let creationService: RepositoryCreationServiceProtocol
-    private let credentialsManager: KeychainCredentialsManagerProtocol
+    private let securityService: SecurityService
     private let logger: Logger
-    private var directoryBookmark: Data?
-    private var selectedDirectoryURL: URL?
+    private var resourceAccessToken: ResourceAccessToken?
     
-    init(creationService: RepositoryCreationServiceProtocol,
-         credentialsManager: KeychainCredentialsManagerProtocol) {
+    // MARK: - Initialization
+    
+    init(
+        creationService: RepositoryCreationServiceProtocol = DefaultRepositoryCreationService(),
+        securityService: SecurityService = SecurityService(platformService: DefaultSecurityService()),
+        logger: Logger = Logger(label: "dev.mpy.rbum.viewmodel.creation")
+    ) {
         self.creationService = creationService
-        self.credentialsManager = credentialsManager
-        self.logger = Logging.logger(for: .creation)
+        self.securityService = securityService
+        self.logger = logger
+        
+        logger.debug("ViewModel initialised", metadata: [
+            "mode": .string(mode.rawValue)
+        ])
     }
+    
+    deinit {
+        cleanupSecurityScopedAccess()
+    }
+    
+    // MARK: - Validation
     
     var isValid: Bool {
-        !name.isEmpty && !path.isEmpty && !password.isEmpty && 
-        (mode == .import || password == confirmPassword)
+        guard !name.isEmpty, !password.isEmpty else { return false }
+        return directoryBookmark != nil
     }
     
-    func selectPath() {
-        let openPanel = NSOpenPanel()
-        openPanel.title = mode == .create ? "Choose Repository Location" : "Select Repository"
-        openPanel.showsResizeIndicator = true
-        openPanel.showsHiddenFiles = false
-        openPanel.canChooseFiles = mode == .import
-        openPanel.canChooseDirectories = mode == .create
-        openPanel.canCreateDirectories = true
-        openPanel.allowsMultipleSelection = false
+    // MARK: - Directory Selection
+    
+    func selectDirectory() async {
+        logger.debug("Opening directory selection panel", metadata: [
+            "mode": .string(mode.rawValue)
+        ])
         
-        openPanel.begin { [weak self] response in
-            guard let self = self else { return }
+        // Clean up any existing security-scoped access
+        cleanupSecurityScopedAccess()
+        
+        let panel = NSOpenPanel()
+        panel.title = mode == .create ? "Choose Repository Location" : "Select Repository"
+        panel.canChooseFiles = mode == .import
+        panel.canChooseDirectories = mode == .create
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = mode == .create
+        
+        guard await panel.beginSheetModal(for: NSApp.keyWindow!) == .OK,
+              let url = panel.url else {
+            logger.debug("Directory selection cancelled")
+            return
+        }
+        
+        do {
+            // Create and validate security-scoped bookmark
+            let bookmark = try await securityService.createSecurityScopedBookmark(
+                for: url,
+                readOnly: mode == .import,
+                requiredKeys: [.isDirectoryKey]
+            )
             
-            if response == .OK, let url = openPanel.url {
-                Task { @MainActor in
-                    do {
-                        // Create security-scoped bookmark
-                        let bookmark = try url.bookmarkData(
-                            options: .withSecurityScope,
-                            includingResourceValuesForKeys: nil,
-                            relativeTo: nil
-                        )
-                        
-                        self.directoryBookmark = bookmark
-                        self.selectedDirectoryURL = url
-                        self.path = url.path
-                        
-                        // If creating new repository, use the last path component as default name
-                        if self.mode == .create && self.name.isEmpty {
-                            self.name = url.lastPathComponent
-                        }
-                        
-                        self.logger.infoMessage("Selected path: \(url.path)")
-                    } catch {
-                        self.logger.errorMessage("Failed to create bookmark: \(error.localizedDescription)")
-                        self.state = .error(RepositoryCreationError.invalidPath("Failed to create bookmark"))
-                        self.showError = true
-                    }
-                }
+            // Start security-scoped access and get cleanup token
+            let (resolvedURL, cleanup) = try await securityService.accessSecurityScopedResource(bookmark)
+            
+            // Store cleanup token
+            resourceAccessToken = ResourceAccessToken(url: resolvedURL, cleanup: cleanup)
+            
+            // Verify directory type
+            let isDirectory = try resolvedURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory ?? false
+            if mode == .create && !isDirectory {
+                throw RepositoryError.invalidPath
             }
+            
+            directoryURL = resolvedURL
+            directoryBookmark = bookmark
+            
+            logger.info("Directory selected successfully", metadata: [
+                "path": .string(resolvedURL.path),
+                "mode": .string(mode.rawValue),
+                "isDirectory": .string("\(isDirectory)"),
+                "readOnly": .string("\(mode == .import)")
+            ])
+            
+        } catch {
+            logger.error("Failed to create bookmark", metadata: [
+                "error": .string(error.localizedDescription),
+                "path": .string(url.path),
+                "mode": .string(mode.rawValue)
+            ])
+            state = .error(error)
+            showError = true
+            cleanupSecurityScopedAccess()
         }
     }
     
+    // MARK: - Repository Creation/Import
+    
     func createOrImport() async {
-        guard isValid else { return }
+        guard isValid else {
+            logger.warning("Invalid form state", metadata: [
+                "name": .string(name.isEmpty ? "empty" : "valid"),
+                "password": .string(password.isEmpty ? "empty" : "valid"),
+                "bookmark": .string(directoryBookmark == nil ? "missing" : "present"),
+                "mode": .string(mode.rawValue)
+            ])
+            return
+        }
+        
         guard let bookmark = directoryBookmark else {
-            state = .error(RepositoryCreationError.invalidPath("No directory access granted"))
+            logger.error("Missing directory bookmark", metadata: [
+                "mode": .string(mode.rawValue)
+            ])
+            state = .error(RepositoryError.invalidPath)
             showError = true
             return
         }
         
-        state = .creating
-        
         do {
-            var isStale = false
-            let baseURL = try URL(resolvingBookmarkData: bookmark,
-                            options: .withSecurityScope,
-                            relativeTo: nil,
-                            bookmarkDataIsStale: &isStale)
+            // Access security-scoped resource
+            let (url, cleanup) = try await securityService.accessSecurityScopedResource(bookmark)
+            defer { cleanup() }
             
-            guard baseURL.startAccessingSecurityScopedResource() else {
-                throw RepositoryCreationError.invalidPath("Failed to access directory")
-            }
+            // Create or import repository
+            logger.info("Starting repository operation", metadata: [
+                "mode": .string(mode.rawValue),
+                "path": .string(url.path)
+            ])
             
-            defer { baseURL.stopAccessingSecurityScopedResource() }
+            state = mode == .create ? .creating : .importing
+            let repository = try await mode == .create
+                ? creationService.createRepository(name: name, at: url, password: password)
+                : creationService.importRepository(name: name, at: url, password: password)
             
-            let repository: Repository
-            let repositoryURL: URL
+            logger.info("Repository operation successful", metadata: [
+                "mode": .string(mode.rawValue),
+                "id": .string(repository.id),
+                "path": .string(repository.path)
+            ])
             
-            if mode == .create {
-                // For new repositories, append the repository name to the selected directory
-                repositoryURL = baseURL.appendingPathComponent(name)
-            } else {
-                // For imports, use the selected path directly
-                repositoryURL = baseURL
-            }
-            
-            switch mode {
-            case .create:
-                repository = try await creationService.createRepository(
-                    name: name,
-                    path: repositoryURL.path,
-                    password: password
-                )
-                self.logger.infoMessage("Created repository: \(repository.id) at \(repositoryURL.path)")
-                
-            case .import:
-                repository = try await creationService.importRepository(
-                    name: name,
-                    path: repositoryURL.path,
-                    password: password
-                )
-                self.logger.infoMessage("Imported repository: \(repository.id) from \(repositoryURL.path)")
-            }
-            
-            // Store credentials
-            try await credentialsManager.store(
-                RepositoryCredentials(repositoryPath: repositoryURL.path, password: password),
-                forRepositoryId: repository.id
+            // Store repository credentials securely
+            try securityService.storeCredentials(
+                password.data(using: .utf8)!,
+                identifier: repository.id
             )
             
-            state = .success(repository)
-            createdRepository = repository
-            showSuccess = true
+            state = .idle
             
-            // Clear form
-            name = ""
-            path = ""
-            password = ""
-            confirmPassword = ""
-            
-            logger.info("Repository \(self.mode == .create ? "created" : "imported") successfully: \(repository.id, privacy: .public)")
         } catch {
-            if let creationError = error as? RepositoryCreationError {
-                self.state = .error(creationError)
-            } else {
-                self.state = .error(RepositoryCreationError.unknown(error.localizedDescription))
-            }
-            self.logger.errorMessage("Failed to \(mode == .create ? "create" : "import") repository: \(error.localizedDescription)")
-            self.showError = true
+            logger.error("Repository operation failed", metadata: [
+                "mode": .string(mode.rawValue),
+                "error": .string(error.localizedDescription)
+            ])
+            state = .error(error)
+            showError = true
+            cleanupSecurityScopedAccess()
         }
     }
     
-    func reset() {
-        name = ""
-        path = ""
-        password = ""
-        confirmPassword = ""
-        state = .idle
-        showError = false
+    // MARK: - Private Methods
+    
+    private func cleanupSecurityScopedAccess() {
+        if let token = resourceAccessToken {
+            token.cleanup()
+            logger.debug("Cleaned up security-scoped access", metadata: [
+                "path": .string(token.url.path)
+            ])
+            resourceAccessToken = nil
+        }
+        directoryURL = nil
+        directoryBookmark = nil
     }
+}
+
+/// Token for managing security-scoped resource access
+private struct ResourceAccessToken {
+    let url: URL
+    let cleanup: () -> Void
 }

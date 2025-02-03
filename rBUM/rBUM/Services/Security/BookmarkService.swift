@@ -11,22 +11,29 @@ import os
 /// Protocol for managing security-scoped bookmarks
 protocol BookmarkServiceProtocol {
     /// Create a security-scoped bookmark for a URL
-    /// - Parameter url: The URL to create a bookmark for
+    /// - Parameters:
+    ///   - url: The URL to create a bookmark for
+    ///   - timeout: Optional timeout for the operation
     /// - Returns: The bookmark data
-    func createBookmark(for url: URL) async throws -> Data
+    func createBookmark(for url: URL, timeout: TimeInterval) async throws -> Data
     
     /// Resolve a security-scoped bookmark
-    /// - Parameter bookmarkData: The bookmark data to resolve
+    /// - Parameters:
+    ///   - bookmarkData: The bookmark data to resolve
+    ///   - timeout: Optional timeout for the operation
     /// - Returns: Tuple containing the resolved URL and whether the bookmark is stale
-    func resolveBookmark(_ bookmarkData: Data) async throws -> (url: URL, isStale: Bool)
+    func resolveBookmark(_ bookmarkData: Data, timeout: TimeInterval) async throws -> (url: URL, isStale: Bool)
     
     /// Refresh a stale bookmark
-    /// - Parameter url: The URL to refresh the bookmark for
+    /// - Parameters:
+    ///   - url: The URL to refresh the bookmark for
+    ///   - timeout: Optional timeout for the operation
     /// - Returns: The new bookmark data
-    func refreshBookmark(for url: URL) async throws -> Data
+    func refreshBookmark(for url: URL, timeout: TimeInterval) async throws -> Data
     
     /// Restore persisted bookmarks
-    func restoreBookmarks() async throws
+    /// - Parameter timeout: Optional timeout for the operation
+    func restoreBookmarks(timeout: TimeInterval) async throws
     
     /// Stop accessing a security-scoped resource
     /// - Parameter url: The URL of the resource to stop accessing
@@ -37,51 +44,44 @@ protocol BookmarkServiceProtocol {
 final class BookmarkService: BookmarkServiceProtocol {
     private let logger: Logger
     private let persistenceService: BookmarkPersistenceServiceProtocol
+    private let fileManager: FileManager
     
-    init(persistenceService: BookmarkPersistenceServiceProtocol = BookmarkPersistenceService()) {
+    init(persistenceService: BookmarkPersistenceServiceProtocol = BookmarkPersistenceService(),
+         fileManager: FileManager = .default) {
         self.persistenceService = persistenceService
+        self.fileManager = fileManager
         self.logger = Logging.logger(for: .bookmarkService)
     }
     
-    func createBookmark(for url: URL) async throws -> Data {
+    func createBookmark(for url: URL, timeout: TimeInterval = 30) async throws -> Data {
         logger.info("Creating bookmark for URL: \(url.path, privacy: .public)")
-        return try await Task {
+        return try await withTimeout(timeout) {
             do {
                 let bookmarkData = try url.bookmarkData(
                     options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
-                try await persistenceService.persistBookmark(bookmarkData, forURL: url)
+                try await self.persistenceService.persistBookmark(bookmarkData, forURL: url)
                 return bookmarkData
             } catch {
                 logger.error("Failed to create bookmark: \(error.localizedDescription, privacy: .public)")
                 throw BookmarkError.creationFailed(error.localizedDescription)
             }
-        }.value
+        }
     }
     
-    func resolveBookmark(_ bookmarkData: Data) async throws -> (url: URL, isStale: Bool) {
-        return try await Task {
+    func resolveBookmark(_ bookmarkData: Data, timeout: TimeInterval = 30) async throws -> (url: URL, isStale: Bool) {
+        return try await withTimeout(timeout) {
             var isStale = false
             do {
-                let url = try URL(
-                    resolvingBookmarkData: bookmarkData,
-                    options: .withSecurityScope,
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &isStale
-                )
-                
-                if isStale {
-                    logger.warning("Bookmark is stale for URL: \(url.path, privacy: .public)")
-                    if let refreshedData = try? await refreshBookmark(for: url) {
-                        try await persistenceService.persistBookmark(refreshedData, forURL: url)
-                    }
-                }
+                let url = try URL(resolvingBookmarkData: bookmarkData,
+                                options: .withSecurityScope,
+                                relativeTo: nil,
+                                bookmarkDataIsStale: &isStale)
                 
                 if !url.startAccessingSecurityScopedResource() {
-                    logger.error("Failed to access security-scoped resource: \(url.path, privacy: .public)")
-                    throw BookmarkError.accessDenied
+                    throw BookmarkError.resolutionFailed("Failed to start accessing resource")
                 }
                 
                 return (url, isStale)
@@ -89,12 +89,11 @@ final class BookmarkService: BookmarkServiceProtocol {
                 logger.error("Failed to resolve bookmark: \(error.localizedDescription, privacy: .public)")
                 throw BookmarkError.resolutionFailed(error.localizedDescription)
             }
-        }.value
+        }
     }
     
-    func refreshBookmark(for url: URL) async throws -> Data {
-        logger.info("Refreshing bookmark for URL: \(url.path, privacy: .public)")
-        return try await Task {
+    func refreshBookmark(for url: URL, timeout: TimeInterval = 30) async throws -> Data {
+        return try await withTimeout(timeout) {
             do {
                 let newBookmarkData = try url.bookmarkData(
                     options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
@@ -107,23 +106,21 @@ final class BookmarkService: BookmarkServiceProtocol {
                 logger.error("Failed to refresh bookmark: \(error.localizedDescription, privacy: .public)")
                 throw BookmarkError.refreshFailed(error.localizedDescription)
             }
-        }.value
+        }
     }
     
-    func restoreBookmarks() async throws {
-        logger.info("Restoring persisted bookmarks")
-        try await Task {
+    func restoreBookmarks(timeout: TimeInterval = 30) async throws {
+        try await withTimeout(timeout) {
             do {
                 let bookmarks = try await persistenceService.listBookmarks()
-                for (url, data) in bookmarks {
+                for (url, bookmarkData) in bookmarks {
                     do {
-                        let (resolvedURL, isStale) = try await resolveBookmark(data)
+                        let (resolvedURL, isStale) = try await resolveBookmark(bookmarkData)
                         if isStale {
-                            try await refreshBookmark(for: resolvedURL)
+                            _ = try await refreshBookmark(for: resolvedURL)
                         }
                     } catch {
                         logger.warning("Failed to restore bookmark for URL: \(url.path, privacy: .public)")
-                        // Continue with other bookmarks even if one fails
                         continue
                     }
                 }
@@ -131,12 +128,35 @@ final class BookmarkService: BookmarkServiceProtocol {
                 logger.error("Failed to restore bookmarks: \(error.localizedDescription, privacy: .public)")
                 throw BookmarkError.restorationFailed(error.localizedDescription)
             }
-        }.value
+        }
     }
     
     func stopAccessingResource(_ url: URL) {
+        if fileManager.isUbiquitousItem(at: url) {
+            logger.debug("Skipping stop access for iCloud item: \(url.path, privacy: .public)")
+            return
+        }
         url.stopAccessingSecurityScopedResource()
         logger.debug("Stopped accessing resource: \(url.path, privacy: .public)")
+    }
+    
+    private func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                throw BookmarkError.operationTimeout
+            }
+            
+            let result = try await group.next()
+            group.cancelAll()
+            return result ?? {
+                throw BookmarkError.operationTimeout
+            }()
+        }
     }
 }
 
@@ -146,7 +166,7 @@ enum BookmarkError: LocalizedError {
     case resolutionFailed(String)
     case refreshFailed(String)
     case restorationFailed(String)
-    case accessDenied
+    case operationTimeout
     
     var errorDescription: String? {
         switch self {
@@ -158,8 +178,8 @@ enum BookmarkError: LocalizedError {
             return "Failed to refresh bookmark: \(reason)"
         case .restorationFailed(let reason):
             return "Failed to restore bookmarks: \(reason)"
-        case .accessDenied:
-            return "Access denied to security-scoped resource"
+        case .operationTimeout:
+            return "Operation timed out"
         }
     }
 }

@@ -1,0 +1,12 @@
+feat: Clean project structure with modular architecture
+
+- Core Module: Essential functionality and protocols
+  - LoggerProtocol and LoggerFactory
+  - Core models and services
+  - Platform-agnostic interfaces
+- Platform Module: macOS implementations
+  - OSLogger using os.Logger
+  - Platform-specific services
+- Tests: Comprehensive test coverage
+  - Mock implementations
+  - Core and platform-specific tests
