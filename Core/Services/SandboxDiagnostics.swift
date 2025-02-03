@@ -1,13 +1,16 @@
 import Foundation
 import os.log
+import os.signpost
 
 /// Service for monitoring and diagnosing sandbox-related issues
 public class SandboxDiagnostics {
     private let logger: LoggerProtocol
     private let subsystem = "dev.mpy.rBUM"
+    private let signpostLog: OSLog
     
-    public init(logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxDiagnostics")) {
+    public init(logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxDiagnostics") as! LoggerProtocol) {
         self.logger = logger
+        self.signpostLog = OSLog(subsystem: subsystem, category: "Sandbox")
         setupSignposts()
     }
     
@@ -15,8 +18,8 @@ public class SandboxDiagnostics {
     
     private func setupSignposts() {
         if #available(macOS 10.14, *) {
-            let log = OSLog(subsystem: subsystem, category: "Sandbox")
-            os_signpost_interval_begin(log, "FileAccess")
+            let signpostID = OSSignpostID(log: signpostLog)
+            os_signpost(.begin, log: signpostLog, name: "FileAccess", signpostID: signpostID)
         }
     }
     
@@ -24,34 +27,64 @@ public class SandboxDiagnostics {
     
     /// Monitor file system access
     public func monitorFileAccess(url: URL, operation: String) {
-        logger.debug("File access attempt: \(url.path, privacy: .private) - Operation: \(operation, privacy: .public)")
+        logger.debug(
+            "File access attempt: \(url.path) - Operation: \(operation)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Check if path is within sandbox
         if !url.path.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.path) &&
            !url.path.hasPrefix("/private/tmp") {
-            logger.error("Potential sandbox violation: Accessing path outside sandbox", privacy: .public)
+            logger.error(
+                "Potential sandbox violation: Accessing path outside sandbox",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             logViolation(type: .fileAccess, path: url.path)
         }
     }
     
     /// Monitor network access
     public func monitorNetworkAccess(host: String, port: Int) {
-        logger.debug("Network access attempt: \(host, privacy: .private):\(port, privacy: .public)")
+        logger.debug(
+            "Network access attempt: \(host):\(port)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Check for restricted ports
         if port < 1024 && port != 80 && port != 443 {
-            logger.error("Potential sandbox violation: Accessing restricted port", privacy: .public)
+            logger.error(
+                "Potential sandbox violation: Accessing restricted port",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             logViolation(type: .network, path: "\(host):\(port)")
         }
     }
     
     /// Monitor IPC operations
     public func monitorIPCAccess(service: String) {
-        logger.debug("IPC access attempt: \(service, privacy: .public)")
+        logger.debug(
+            "IPC access attempt: \(service)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Check for allowed XPC services
         if !service.hasPrefix("dev.mpy.rBUM") {
-            logger.error("Potential sandbox violation: Accessing unauthorized XPC service", privacy: .public)
+            logger.error(
+                "Potential sandbox violation: Accessing unauthorized XPC service",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             logViolation(type: .ipc, path: service)
         }
     }
@@ -75,9 +108,14 @@ public class SandboxDiagnostics {
     private func logViolation(type: ViolationType, path: String) {
         // Log to system log
         if #available(macOS 10.14, *) {
-            let log = OSLog(subsystem: subsystem, category: "SandboxViolation")
-            os_log(.fault, log: log, "Sandbox Violation - Type: %{public}@ Path: %{private}@",
-                   type.description, path)
+            let violationLog = OSLog(subsystem: subsystem, category: "SandboxViolation")
+            os_log(
+                .fault,
+                log: violationLog,
+                "Sandbox Violation - Type: %{public}s Path: %{private}s",
+                type.description,
+                path
+            )
         }
         
         // Store violation for analysis
@@ -92,30 +130,41 @@ public class SandboxDiagnostics {
             "process": ProcessInfo.processInfo.processName
         ]
         
-        // Store in app's container
-        if let violationsURL = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ).appendingPathComponent("SandboxViolations.json") {
+        do {
+            // Get violations file URL
+            let violationsURL = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            ).appendingPathComponent("SandboxViolations.json")
             
+            // Read existing violations or create new array
             var violations: [[String: String]] = []
             if let data = try? Data(contentsOf: violationsURL),
-               let existing = try? JSONDecoder().decode([[String: String]].self, from: data) {
-                violations = existing
+               let existingViolations = try? JSONDecoder().decode([[String: String]].self, from: data) {
+                violations = existingViolations
             }
             
+            // Add new violation and write back
             violations.append(violation)
+            let data = try JSONEncoder().encode(violations)
+            try data.write(to: violationsURL, options: .atomicWrite)
             
-            // Keep only last 100 violations
-            if violations.count > 100 {
-                violations.removeFirst(violations.count - 100)
-            }
+            logger.info(
+                "Stored sandbox violation record",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             
-            if let data = try? JSONEncoder().encode(violations) {
-                try? data.write(to: violationsURL)
-            }
+        } catch {
+            logger.error(
+                "Failed to store violation record: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -132,5 +181,14 @@ public class SandboxDiagnostics {
             return violations
         }
         return []
+    }
+    
+    // MARK: - Cleanup
+    
+    deinit {
+        if #available(macOS 10.14, *) {
+            let signpostID = OSSignpostID(log: signpostLog)
+            os_signpost(.end, log: signpostLog, name: "FileAccess", signpostID: signpostID)
+        }
     }
 }

@@ -1,5 +1,7 @@
+import Foundation
 import XCTest
 @testable import Core
+@testable import rBUM
 
 class SandboxComplianceTests: XCTestCase {
     var securityService: SecurityService!

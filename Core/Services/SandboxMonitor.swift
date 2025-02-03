@@ -16,7 +16,7 @@ public class SandboxMonitor {
     private let maxAccessDuration: TimeInterval = 300 // 5 minutes
     
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxMonitor"),
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxMonitor") as! LoggerProtocol,
         fileManager: FileManager = .default,
         permissionManager: PermissionManager = PermissionManager()
     ) {
@@ -33,7 +33,12 @@ public class SandboxMonitor {
     public func trackAccess(to url: URL) {
         queue.async {
             self.activeAccess[url] = Date()
-            self.logger.debug("Started tracking access to: \(url.path, privacy: .private)")
+            self.logger.debug(
+                "Started tracking access to: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -42,7 +47,12 @@ public class SandboxMonitor {
     public func stopTracking(_ url: URL) {
         queue.async {
             self.activeAccess[url] = nil
-            self.logger.debug("Stopped tracking access to: \(url.path, privacy: .private)")
+            self.logger.debug(
+                "Stopped tracking access to: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -110,8 +120,11 @@ public class SandboxMonitor {
             Task {
                 let violations = await self.detectViolations()
                 for violation in violations {
-                    self.logger.warning(
-                        "Sandbox violation detected: \(violation.description, privacy: .private)"
+                    self.logger.error(
+                        "Sandbox violation detected: \(violation.description)",
+                        file: #file,
+                        function: #function,
+                        line: #line
                     )
                 }
             }

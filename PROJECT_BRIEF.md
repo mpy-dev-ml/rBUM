@@ -80,6 +80,60 @@ rBUM is a macOS application for managing Restic backups with a focus on user-fri
    - Advanced filtering
    - Statistics and reporting
 
+## Progress Update (2025-02-03)
+
+### Completed Tasks
+
+1. Enhanced Sandbox Compliance:
+   - Implemented proper security-scoped bookmark handling
+   - Added stale bookmark detection and recovery
+   - Enhanced error handling for sandbox violations
+   - Improved logging with privacy attributes
+
+2. XPC Service Integration:
+   - Created robust ResticXPCService with proper security measures
+   - Implemented secure communication between app and helper
+   - Added audit token support for session tracking
+   - Configured proper security attributes and class allowlists
+
+3. Security Enhancements:
+   - Enhanced SecurityService with proper XPC validation
+   - Added comprehensive error handling
+   - Improved KeychainService integration
+   - Added sandbox violation tracking
+
+4. Logging Improvements:
+   - Enhanced SandboxDiagnostics with proper signpost usage
+   - Added privacy-aware logging
+   - Implemented violation tracking and analysis
+   - Added structured logging format
+
+### Next Steps
+
+1. Testing:
+   - Create comprehensive test suite for XPC communication
+   - Add sandbox compliance tests
+   - Implement security validation tests
+   - Add performance benchmarks
+
+2. Documentation:
+   - Document security model and compliance requirements
+   - Create troubleshooting guide
+   - Add API documentation
+   - Document sandbox restrictions and workarounds
+
+3. Performance:
+   - Optimize XPC communication
+   - Enhance bookmark management
+   - Improve resource cleanup
+   - Add performance monitoring
+
+4. User Experience:
+   - Add user-friendly error messages
+   - Improve permission request flows
+   - Add progress indicators
+   - Enhance status reporting
+
 ## Development Guidelines
 
 ### Code Style

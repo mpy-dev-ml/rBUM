@@ -1,5 +1,7 @@
+import Foundation
 import XCTest
 @testable import Core
+@testable import rBUM
 
 class ResticXPCServiceTests: XCTestCase {
     var commandService: ResticCommandService!

@@ -9,9 +9,15 @@ public class PermissionManager {
     /// Prefix for keychain permission entries
     private let keychainPrefix = "dev.mpy.rBUM.permission."
     
+    /// Access group for sharing permissions with XPC service
+    private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
+    
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "PermissionManager"),
-        securityService: SecurityServiceProtocol = SecurityService(),
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "PermissionManager") as! any LoggerProtocol as LoggerProtocol,
+        securityService: SecurityServiceProtocol = SecurityService(
+            logger: LoggerFactory.createLogger(category: "SecurityService") as! LoggerProtocol,
+            xpcService: ResticXPCService.shared
+        ),
         keychain: KeychainServiceProtocol = KeychainService()
     ) {
         self.logger = logger
@@ -23,12 +29,18 @@ public class PermissionManager {
     /// - Parameter url: The URL to request permission for
     /// - Returns: true if permission was granted and persisted
     public func requestAndPersistPermission(for url: URL) async throws -> Bool {
-        logger.debug("Requesting permission for: \(url.path, privacy: .private)")
+        logger.debug("Requesting permission for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         
         do {
             // Request permission
             guard try await securityService.requestPermission(for: url) else {
-                logger.error("Permission denied for: \(url.path, privacy: .private)")
+                logger.error("Permission denied for: \(url.path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
             
@@ -36,11 +48,17 @@ public class PermissionManager {
             let bookmark = try await securityService.createBookmark(for: url)
             try persistBookmark(bookmark, for: url)
             
-            logger.info("Permission granted and persisted for: \(url.path, privacy: .private)")
+            logger.info("Permission granted and persisted for: \(url.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
             return true
             
         } catch {
-            logger.error("Failed to request/persist permission: \(error.localizedDescription, privacy: .private)")
+            logger.error("Failed to request/persist permission: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
             throw PermissionError.persistenceFailed(error.localizedDescription)
         }
     }
@@ -49,12 +67,18 @@ public class PermissionManager {
     /// - Parameter url: The URL to recover permission for
     /// - Returns: true if permission was recovered
     public func recoverPermission(for url: URL) async throws -> Bool {
-        logger.debug("Attempting to recover permission for: \(url.path, privacy: .private)")
+        logger.debug("Attempting to recover permission for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         
         do {
             // Check for existing bookmark
             guard let bookmark = try retrieveBookmark(for: url) else {
-                logger.debug("No stored bookmark found for: \(url.path, privacy: .private)")
+                logger.debug("No stored bookmark found for: \(url.path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
             
@@ -63,24 +87,36 @@ public class PermissionManager {
             
             // Verify resolved URL matches original
             guard resolvedURL.path == url.path else {
-                logger.error("Bookmark resolved to different path: \(resolvedURL.path, privacy: .private)")
+                logger.error("Bookmark resolved to different path: \(resolvedURL.path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 try removeBookmark(for: url)
                 return false
             }
             
             // Test access
             guard securityService.startAccessing(resolvedURL) else {
-                logger.error("Failed to access resolved URL: \(resolvedURL.path, privacy: .private)")
+                logger.error("Failed to access resolved URL: \(resolvedURL.path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 try removeBookmark(for: url)
                 return false
             }
             securityService.stopAccessing(resolvedURL)
             
-            logger.info("Successfully recovered permission for: \(url.path, privacy: .private)")
+            logger.info("Successfully recovered permission for: \(url.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
             return true
             
         } catch {
-            logger.error("Failed to recover permission: \(error.localizedDescription, privacy: .private)")
+            logger.error("Failed to recover permission: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
             
             // Clean up failed bookmark
             try? removeBookmark(for: url)
@@ -102,7 +138,10 @@ public class PermissionManager {
             return resolvedURL.path == url.path
             
         } catch {
-            logger.debug("Permission check failed: \(error.localizedDescription, privacy: .private)")
+            logger.debug("Permission check failed: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
             return false
         }
     }
@@ -110,14 +149,23 @@ public class PermissionManager {
     /// Revoke permission for a URL
     /// - Parameter url: The URL to revoke permission for
     public func revokePermission(for url: URL) async throws {
-        logger.debug("Revoking permission for: \(url.path, privacy: .private)")
+        logger.debug("Revoking permission for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         
         do {
             try removeBookmark(for: url)
-            logger.info("Permission revoked for: \(url.path, privacy: .private)")
+            logger.info("Permission revoked for: \(url.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
             
         } catch {
-            logger.error("Failed to revoke permission: \(error.localizedDescription, privacy: .private)")
+            logger.error("Failed to revoke permission: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
             throw PermissionError.revocationFailed(error.localizedDescription)
         }
     }
@@ -126,17 +174,17 @@ public class PermissionManager {
     
     private func persistBookmark(_ bookmark: Data, for url: URL) throws {
         let key = keychainKey(for: url)
-        try keychain.save(bookmark, for: key)
+        try keychain.save(bookmark, for: key, accessGroup: permissionAccessGroup)
     }
     
     private func retrieveBookmark(for url: URL) throws -> Data? {
         let key = keychainKey(for: url)
-        return try keychain.retrieve(for: key)
+        return try keychain.retrieve(for: key, accessGroup: permissionAccessGroup)
     }
     
     private func removeBookmark(for url: URL) throws {
         let key = keychainKey(for: url)
-        try keychain.delete(for: key)
+        try keychain.delete(for: key, accessGroup: permissionAccessGroup)
     }
     
     private func keychainKey(for url: URL) -> String {
