@@ -7,9 +7,13 @@
 
 import Foundation
 import SwiftUI
+import Core
 
+/// Manages the list of snapshots for a repository
 @MainActor
 final class SnapshotListViewModel: ObservableObject {
+    // MARK: - Types
+    
     enum Filter: String, CaseIterable {
         case all = "All"
         case today = "Today"
@@ -19,148 +23,168 @@ final class SnapshotListViewModel: ObservableObject {
         case tagged = "Tagged"
     }
     
-    struct PruneOptions {
-        var keepLast: Int?
-        var keepDaily: Int?
-        var keepWeekly: Int?
-        var keepMonthly: Int?
-        var keepYearly: Int?
-        var tags: [String]?
-    }
+    // MARK: - Published Properties
     
     @Published private(set) var repository: Repository
-    @Published private(set) var snapshots: [Snapshot] = []
-    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var snapshots: [ResticSnapshot] = []
+    @Published private(set) var progress: ProgressTracker?
     @Published var error: Error?
-    @Published var showError: Bool = false
-    @Published var selectedSnapshot: Snapshot?
+    @Published var showError = false
+    @Published var selectedSnapshot: ResticSnapshot?
     @Published var showRestoreSheet = false
     @Published var restorePath: URL?
-    @Published var searchText: String = ""
+    @Published var searchText = ""
     @Published var selectedFilter: Filter = .all
-    @Published var showPruneSheet = false
-    @Published var pruneOptions = PruneOptions()
     
-    private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: KeychainCredentialsManagerProtocol
-    private let logger = Logging.logger(for: .snapshots)
+    // MARK: - Private Properties
+    
+    private let repositoryService: RepositoryServiceProtocol
+    private let credentialsService: CredentialsServiceProtocol
+    private let securityService: SecurityServiceProtocol
+    private let bookmarkService: BookmarkServiceProtocol
+    private let logger: LoggerProtocol
     private let calendar = Calendar.current
+    
+    // MARK: - Initialization
     
     init(
         repository: Repository,
-        resticService: ResticCommandServiceProtocol = ResticCommandService(
-            fileManager: .default,
-            logger: Logging.logger(for: .snapshots)
-        ),
-        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager(
-            keychainService: KeychainService()
-        )
+        repositoryService: RepositoryServiceProtocol = RepositoryService(),
+        credentialsService: CredentialsServiceProtocol = CredentialsService(),
+        securityService: SecurityServiceProtocol = SecurityService(),
+        bookmarkService: BookmarkServiceProtocol = BookmarkService(),
+        logger: LoggerProtocol = Logging.logger(for: .snapshots)
     ) {
         self.repository = repository
-        self.resticService = resticService
-        self.credentialsManager = credentialsManager
+        self.repositoryService = repositoryService
+        self.credentialsService = credentialsService
+        self.securityService = securityService
+        self.bookmarkService = bookmarkService
+        self.logger = logger
+        
+        logger.debug("Initialized SnapshotListViewModel for repository: \(repository.id)", privacy: .public, file: #file, function: #function, line: #line)
     }
     
-    @MainActor
+    // MARK: - Public Methods
+    
+    /// Load snapshots from the repository
     func loadSnapshots() async {
-        isLoading = true
-        defer { isLoading = false }
+        logger.debug("Loading snapshots for repository: \(repository.id)", privacy: .public, file: #file, function: #function, line: #line)
         
         do {
-            // Get repository credentials
-            let credentials = try await credentialsManager.retrieve(forId: repository.id)
+            // Create progress tracker
+            let tracker = ProgressTracker(total: 1)
+            self.progress = tracker
             
-            // Create Repository with credentials
-            let repoWithCredentials = Repository(
-                id: repository.id,
-                name: repository.name,
-                path: repository.path,
-                createdAt: repository.createdAt,
-                credentials: credentials
-            )
+            // Get repository credentials
+            let credentials = try await credentialsService.retrieveCredentials(for: repository)
             
             // List snapshots
-            let resticSnapshots = try await resticService.listSnapshots(in: repoWithCredentials)
+            let status = try await repositoryService.listSnapshots(repository, credentials: credentials)
             
-            // Convert ResticSnapshot to Snapshot
-            snapshots = resticSnapshots.map { resticSnapshot in
-                Snapshot(
-                    id: resticSnapshot.id,
-                    time: resticSnapshot.time,
-                    hostname: resticSnapshot.hostname,
-                    username: ProcessInfo.processInfo.userName,
-                    paths: resticSnapshot.paths,
-                    tags: resticSnapshot.tags ?? [],
-                    sizeInBytes: 0  // Size will be fetched separately if needed
-                )
-            }
+            // Update snapshots
+            snapshots = status.snapshots.sorted { $0.time > $1.time }
             
-            snapshots.sort { $0.time > $1.time } // Sort by newest first
-            logger.infoMessage("Loaded \(snapshots.count) snapshots")
+            // Complete progress
+            progress?.complete()
+            
+            logger.info("Loaded \(snapshots.count) snapshots from repository: \(repository.id)", privacy: .public, file: #file, function: #function, line: #line)
         } catch {
-            logger.errorMessage("Failed to load snapshots: \(error.localizedDescription)")
+            progress?.fail(error)
             self.error = error
             showError = true
+            logger.error("Failed to load snapshots: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
         }
     }
     
-    // Note: Snapshot deletion is not currently supported by ResticCommandService
-    // This functionality will need to be added when required
-    func deleteSnapshot(_ snapshot: Snapshot) async {
-        self.error = ResticError.commandError("Snapshot deletion is not currently supported")
-        showError = true
-    }
-    
-    // Note: Snapshot restoration is not currently supported by ResticCommandService
-    // This functionality will need to be added when required
-    func restoreSnapshot(_ snapshot: Snapshot, to path: URL) async {
-        self.error = ResticError.commandError("Snapshot restoration is not currently supported")
-        showError = true
-    }
-    
-    func pruneSnapshots() async {
+    /// Delete a snapshot
+    /// - Parameter snapshot: The snapshot to delete
+    func deleteSnapshot(_ snapshot: ResticSnapshot) async {
+        logger.debug("Deleting snapshot: \(snapshot.id)", privacy: .public, file: #file, function: #function, line: #line)
+        
         do {
-            // Get credentials for repository
-            let credentials = try await credentialsManager.retrieve(forId: repository.id)
+            // Create progress tracker
+            let tracker = ProgressTracker(total: 1)
+            self.progress = tracker
             
-            // Create Repository with credentials
-            let repoWithCredentials = Repository(
-                name: repository.name,
-                path: repository.path,
-                credentials: credentials
-            )
+            // Get repository credentials
+            let credentials = try await credentialsService.retrieveCredentials(for: repository)
             
-            // Prune snapshots
-            try await resticService.pruneSnapshots(
-                in: repoWithCredentials,
-                keepLast: pruneOptions.keepLast,
-                keepDaily: pruneOptions.keepDaily,
-                keepWeekly: pruneOptions.keepWeekly,
-                keepMonthly: pruneOptions.keepMonthly,
-                keepYearly: pruneOptions.keepYearly
-            )
+            // Delete snapshot
+            try await repositoryService.deleteSnapshot(snapshot, from: repository, credentials: credentials)
             
-            // Reload snapshots after pruning
+            // Complete progress
+            progress?.complete()
+            
+            // Refresh snapshots
             await loadSnapshots()
-            logger.infoMessage("Successfully pruned snapshots")
+            
+            logger.info("Successfully deleted snapshot: \(snapshot.id)", privacy: .public, file: #file, function: #function, line: #line)
         } catch {
-            logger.errorMessage("Failed to prune snapshots: \(error.localizedDescription)")
+            progress?.fail(error)
             self.error = error
             showError = true
+            logger.error("Failed to delete snapshot: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
         }
     }
     
-    var filteredSnapshots: [Snapshot] {
-        let filtered = snapshots.filter { snapshot in
+    /// Restore a snapshot
+    /// - Parameters:
+    ///   - snapshot: The snapshot to restore
+    ///   - path: The path to restore to
+    func restoreSnapshot(_ snapshot: ResticSnapshot, to path: URL) async {
+        logger.debug("Restoring snapshot \(snapshot.id) to \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+        
+        do {
+            // Create progress tracker
+            let tracker = ProgressTracker(total: Int64(snapshot.paths.count))
+            self.progress = tracker
+            
+            // Validate restore path access
+            try securityService.validateAccess(to: path)
+            
+            // Get repository credentials
+            let credentials = try await credentialsService.retrieveCredentials(for: repository)
+            
+            // Create bookmark for restore path
+            try bookmarkService.createBookmark(for: path)
+            
+            // Start restore
+            try await repositoryService.restoreSnapshot(
+                snapshot,
+                to: path,
+                from: repository,
+                credentials: credentials,
+                onProgress: { [weak self] processed in
+                    self?.progress?.update(processed: Int64(processed))
+                }
+            )
+            
+            // Complete progress
+            progress?.complete()
+            
+            logger.info("Successfully restored snapshot \(snapshot.id) to \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+        } catch {
+            progress?.fail(error)
+            self.error = error
+            showError = true
+            logger.error("Failed to restore snapshot: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    /// Filtered snapshots based on search text and selected filter
+    var filteredSnapshots: [ResticSnapshot] {
+        snapshots.filter { snapshot in
             // Apply search filter
             if !searchText.isEmpty {
                 let searchLower = searchText.lowercased()
-                let matchesPath = snapshot.paths.contains { $0.lowercased().contains(searchLower) }
-                let matchesTag = snapshot.tags.contains { $0.lowercased().contains(searchLower) }
-                let matchesHostname = snapshot.hostname.lowercased().contains(searchLower)
-                let matchesUsername = snapshot.username.lowercased().contains(searchLower)
+                let nameMatch = snapshot.hostname.lowercased().contains(searchLower)
+                let pathMatch = snapshot.paths.contains { $0.lowercased().contains(searchLower) }
+                let tagMatch = snapshot.tags?.contains { $0.lowercased().contains(searchLower) } ?? false
                 
-                if !matchesPath && !matchesTag && !matchesHostname && !matchesUsername {
+                guard nameMatch || pathMatch || tagMatch else {
                     return false
                 }
             }
@@ -178,14 +202,12 @@ final class SnapshotListViewModel: ObservableObject {
             case .thisYear:
                 return calendar.isDate(snapshot.time, equalTo: Date(), toGranularity: .year)
             case .tagged:
-                return !snapshot.tags.isEmpty
+                return !(snapshot.tags?.isEmpty ?? true)
             }
         }
-        
-        return filtered
     }
     
-    var groupedSnapshots: [(String, [Snapshot])] {
+    var groupedSnapshots: [(String, [ResticSnapshot])] {
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: filteredSnapshots) { snapshot in
             calendar.startOfDay(for: snapshot.time)
@@ -200,5 +222,16 @@ final class SnapshotListViewModel: ObservableObject {
     
     var uniqueTags: [String] {
         Array(Set(snapshots.flatMap(\.tags))).sorted()
+    }
+}
+
+// Add sandbox-specific error types
+extension RepositoryError {
+    static func sandboxViolation(_ message: String) -> RepositoryError {
+        .operationFailed("Sandbox violation: \(message)")
+    }
+    
+    static func bookmarkError(_ message: String) -> RepositoryError {
+        .operationFailed("Bookmark error: \(message)")
     }
 }

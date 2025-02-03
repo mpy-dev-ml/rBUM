@@ -1,0 +1,1 @@
+[Previous LoggerProtocol.swift content]

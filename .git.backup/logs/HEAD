@@ -1,0 +1,3 @@
+0000000000000000000000000000000000000000 3900f9d1d24e1bf3487c8a0cfee355c83bf87c7f MP Yeager <mpy@mpy.dev> 1738590431 +0000	commit (initial): chore: Initial commit with .gitignore
+3900f9d1d24e1bf3487c8a0cfee355c83bf87c7f 7498390389586ac28225eb3e83d9470d34b44f52 MP Yeager <mpy@mpy.dev> 1738590431 +0000	commit: feat: Clean project structure with modular architecture
+7498390389586ac28225eb3e83d9470d34b44f52 7498390389586ac28225eb3e83d9470d34b44f52 MP Yeager <mpy@mpy.dev> 1738590431 +0000	checkout: moving from main to feature/clean-architecture

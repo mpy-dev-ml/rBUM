@@ -6,17 +6,18 @@
 //
 
 import Foundation
-import OSLog
+import os
 
 /// Protocol for executing system processes
 protocol ProcessExecutorProtocol {
-    /// Execute a command with arguments and environment variables
+    /// Execute a command with the given arguments and environment
     /// - Parameters:
     ///   - command: The command to execute
-    ///   - arguments: Array of command arguments
-    ///   - environment: Optional dictionary of environment variables
-    ///   - onOutput: Optional callback for streaming output line by line
-    /// - Returns: Process execution result containing output, error, and exit code
+    ///   - arguments: Command arguments
+    ///   - environment: Optional environment variables
+    ///   - onOutput: Optional callback for process output
+    /// - Returns: Process execution result
+    /// - Throws: Error if execution fails
     func execute(
         command: String,
         arguments: [String],
@@ -25,98 +26,57 @@ protocol ProcessExecutorProtocol {
     ) async throws -> ProcessResult
 }
 
-/// Result of a process execution
-struct ProcessResult {
-    /// Standard output from the process
+/// Result of process execution
+struct ProcessResult: Equatable {
     let output: String
-    /// Standard error from the process
     let error: String
-    /// Process exit code
-    let exitCode: Int32
+    let exitCode: Int
+    
+    var succeeded: Bool { exitCode == 0 }
 }
 
 /// Errors that can occur during process execution
-enum ProcessError: LocalizedError, Equatable {
+enum ProcessError: LocalizedError {
     case executionFailed(String)
-    case invalidData
-    case commandNotFound(String)
+    case invalidExecutable(String)
+    case sandboxViolation(String)
+    case timeout(String)
+    case environmentError(String)
     
     var errorDescription: String? {
         switch self {
         case .executionFailed(let message):
             return "Process execution failed: \(message)"
-        case .invalidData:
-            return "Invalid data received from process"
-        case .commandNotFound(let command):
-            return "Command not found: \(command)"
-        }
-    }
-    
-    static func == (lhs: ProcessError, rhs: ProcessError) -> Bool {
-        switch (lhs, rhs) {
-        case (.executionFailed(let lhsMessage), .executionFailed(let rhsMessage)):
-            return lhsMessage == rhsMessage
-        case (.invalidData, .invalidData):
-            return true
-        case (.commandNotFound(let lhsCommand), .commandNotFound(let rhsCommand)):
-            return lhsCommand == rhsCommand
-        default:
-            return false
+        case .invalidExecutable(let path):
+            return "Invalid executable at path: \(path)"
+        case .sandboxViolation(let message):
+            return "Sandbox violation: \(message)"
+        case .timeout(let message):
+            return "Process timed out: \(message)"
+        case .environmentError(let message):
+            return "Environment error: \(message)"
         }
     }
 }
 
-/// Default implementation of ProcessExecutorProtocol
+/// Service for executing system processes with sandbox compliance
 final class ProcessExecutor: ProcessExecutorProtocol {
-    private let bufferSize: Int = 4096
-    private let logger = Logging.logger(for: .process)
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
+    private let logger: Logger
+    private let defaultTimeout: TimeInterval
+    private let allowedPaths: Set<String>
     
-    /// Find executable in PATH or at absolute path
-    private func findExecutable(_ command: String) -> String? {
-        // Common paths for Homebrew executables
-        let commonPaths = [
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin"
-        ]
+    init(
+        fileManager: FileManager = .default,
+        defaultTimeout: TimeInterval = 300,
+        allowedPaths: Set<String> = ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]
+    ) {
+        self.fileManager = fileManager
+        self.logger = Logging.logger(for: .process)
+        self.defaultTimeout = defaultTimeout
+        self.allowedPaths = allowedPaths
         
-        logger.debug("Searching for executable: \(command)")
-        
-        // If it's an absolute path or exists in current directory
-        if fileManager.fileExists(atPath: command) {
-            logger.debug("Found executable at absolute path: \(command)")
-            return command
-        }
-        
-        // Build search paths from PATH environment and common paths
-        var searchPaths = Set<String>()
-        
-        // Add paths from PATH environment
-        if let pathEnv = ProcessInfo.processInfo.environment["PATH"] {
-            let envPaths = pathEnv.split(separator: ":").map(String.init)
-            searchPaths.formUnion(envPaths)
-            logger.debug("Added PATH environment paths: \(envPaths.joined(separator: ":"))")
-        }
-        
-        // Add common paths
-        searchPaths.formUnion(commonPaths)
-        logger.debug("Added common paths: \(commonPaths.joined(separator: ":"))")
-        
-        // Search for executable
-        for path in searchPaths {
-            let fullPath = (path as NSString).appendingPathComponent(command)
-            logger.debug("Checking path: \(fullPath)")
-            if fileManager.fileExists(atPath: fullPath) {
-                logger.debug("Found executable at: \(fullPath)")
-                return fullPath
-            }
-        }
-        
-        logger.error("Could not find executable: \(command)")
-        logger.error("Searched paths: \(searchPaths.joined(separator: ":"))")
-        return nil
+        logger.info("Initialized ProcessExecutor with allowed paths: \(allowedPaths, privacy: .public)")
     }
     
     func execute(
@@ -125,96 +85,143 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         environment: [String: String]?,
         onOutput: ((String) -> Void)?
     ) async throws -> ProcessResult {
-        logger.debug("Executing command: \(command)")
-        logger.debug("Arguments: \(arguments.joined(separator: " "))")
-        logger.debug("Environment: \(environment?.description ?? "none")")
+        // Validate executable path
+        guard let executableURL = validateExecutablePath(command) else {
+            throw ProcessError.invalidExecutable(command)
+        }
         
+        // Create and configure process
         let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        
+        // Set up environment with sanitization
+        if let environment = environment {
+            process.environment = try sanitizeEnvironment(environment)
+        }
+        
+        // Set up pipes for output capture
         let outputPipe = Pipe()
         let errorPipe = Pipe()
-        
-        // Use shell to execute the command
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", ([command] + arguments).joined(separator: " ")]
         process.standardOutput = outputPipe
         process.standardError = errorPipe
         
-        // Ensure PATH is included in environment
-        var finalEnvironment = environment ?? ProcessInfo.processInfo.environment
-        if finalEnvironment["PATH"] == nil {
-            finalEnvironment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-        }
-        process.environment = finalEnvironment
-        
-        logger.debug("Starting process with shell command: \(process.arguments?.joined(separator: " ") ?? "")")
-        
-        do {
-            try process.run()
-        } catch {
-            logger.error("Failed to start process: \(error.localizedDescription)")
-            throw ProcessError.executionFailed("Failed to start process: \(error.localizedDescription)")
-        }
-        
-        // Use actors to handle concurrent access to buffers
-        actor OutputBuffer {
-            private var data = Data()
-            
-            func append(_ newData: Data) {
-                data.append(newData)
+        // Start process with timeout
+        return try await withThrowingTaskGroup(of: ProcessResult.self) { group in
+            group.addTask {
+                return try await self.runProcess(
+                    process,
+                    outputPipe: outputPipe,
+                    errorPipe: errorPipe,
+                    onOutput: onOutput
+                )
             }
             
-            func getData() -> Data {
-                data
+            group.addTask {
+                try await self.enforceTimeout(process)
+                throw ProcessError.timeout("Process exceeded timeout of \(self.defaultTimeout) seconds")
             }
+            
+            // Return first completed result (success or error)
+            return try await group.next() ?? ProcessResult(output: "", error: "", exitCode: -1)
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func validateExecutablePath(_ path: String) -> URL? {
+        let url = URL(fileURLWithPath: path)
+        
+        // Check if path is in allowed directories
+        guard allowedPaths.contains(where: { url.path.hasPrefix($0) }) else {
+            logger.error("Executable path not in allowed directories: \(path, privacy: .public)")
+            return nil
         }
         
-        let outputBuffer = OutputBuffer()
-        let errorBuffer = OutputBuffer()
+        // Validate executable exists and is executable
+        guard fileManager.fileExists(atPath: url.path),
+              fileManager.isExecutableFile(atPath: url.path) else {
+            logger.error("Executable not found or not executable: \(path, privacy: .public)")
+            return nil
+        }
         
-        // Set up output handling
-        let outputHandle = outputPipe.fileHandleForReading
-        outputHandle.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty {
-                Task {
-                    await outputBuffer.append(data)
-                    if let onOutput = onOutput,
-                       let str = String(data: data, encoding: .utf8) {
-                        // Split by newlines and process each line
-                        str.split(separator: "\n").forEach { line in
-                            onOutput(String(line))
+        return url
+    }
+    
+    private func sanitizeEnvironment(_ environment: [String: String]) throws -> [String: String] {
+        var sanitized = ProcessInfo.processInfo.environment
+        
+        // Remove sensitive environment variables
+        let sensitiveKeys = ["SUDO_", "PASSWORD", "TOKEN", "KEY", "SECRET"]
+        sanitized = sanitized.filter { key, _ in
+            !sensitiveKeys.contains { key.uppercased().contains($0) }
+        }
+        
+        // Add provided environment variables after validation
+        for (key, value) in environment {
+            guard !key.isEmpty else { continue }
+            guard !sensitiveKeys.contains(where: { key.uppercased().contains($0) }) else {
+                throw ProcessError.environmentError("Attempted to set sensitive environment variable: \(key)")
+            }
+            sanitized[key] = value
+        }
+        
+        return sanitized
+    }
+    
+    private func runProcess(
+        _ process: Process,
+        outputPipe: Pipe,
+        errorPipe: Pipe,
+        onOutput: ((String) -> Void)?
+    ) async throws -> ProcessResult {
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                process.terminationHandler = { process in
+                    Task {
+                        do {
+                            let output = try outputPipe.fileHandleForReading.readToEnd() ?? Data()
+                            let error = try errorPipe.fileHandleForReading.readToEnd() ?? Data()
+                            
+                            let outputString = String(data: output, encoding: .utf8) ?? ""
+                            let errorString = String(data: error, encoding: .utf8) ?? ""
+                            
+                            if process.terminationStatus != 0 {
+                                self.logger.error("Process failed with status \(process.terminationStatus): \(errorString, privacy: .public)")
+                            }
+                            
+                            continuation.resume(returning: ProcessResult(
+                                output: outputString,
+                                error: errorString,
+                                exitCode: Int(process.terminationStatus)
+                            ))
+                        } catch {
+                            continuation.resume(throwing: ProcessError.executionFailed(error.localizedDescription))
                         }
                     }
                 }
-            }
-        }
-        
-        // Set up error handling
-        let errorHandle = errorPipe.fileHandleForReading
-        errorHandle.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty {
-                Task {
-                    await errorBuffer.append(data)
+                
+                try process.run()
+                
+                // Handle real-time output if callback provided
+                if let onOutput = onOutput {
+                    outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                        let data = handle.availableData
+                        if let output = String(data: data, encoding: .utf8) {
+                            onOutput(output)
+                        }
+                    }
                 }
+            } catch {
+                continuation.resume(throwing: ProcessError.executionFailed(error.localizedDescription))
             }
         }
-        
-        process.waitUntilExit()
-        
-        // Clean up handlers
-        outputHandle.readabilityHandler = nil
-        errorHandle.readabilityHandler = nil
-        
-        // Convert buffers to strings
-        let outputData = await outputBuffer.getData()
-        let errorData = await errorBuffer.getData()
-        
-        guard let output = String(data: outputData, encoding: .utf8),
-              let error = String(data: errorData, encoding: .utf8) else {
-            throw ProcessError.invalidData
+    }
+    
+    private func enforceTimeout(_ process: Process) async throws {
+        try await Task.sleep(nanoseconds: UInt64(defaultTimeout * 1_000_000_000))
+        if process.isRunning {
+            process.terminate()
         }
-        
-        return ProcessResult(output: output, error: error, exitCode: process.terminationStatus)
     }
 }

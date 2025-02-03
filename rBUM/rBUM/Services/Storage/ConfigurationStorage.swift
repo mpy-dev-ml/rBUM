@@ -6,18 +6,22 @@
 //
 
 import Foundation
+import Core
 
 /// Protocol for managing configuration storage
-protocol ConfigurationStorageProtocol {
+public protocol ConfigurationStorageProtocol {
     /// Load the current configuration
     /// - Returns: The current configuration
+    /// - Throws: ConfigurationError if loading fails
     func load() throws -> Configuration
     
     /// Save the configuration
     /// - Parameter configuration: The configuration to save
+    /// - Throws: ConfigurationError if saving fails
     func save(_ configuration: Configuration) throws
     
     /// Reset configuration to default values
+    /// - Throws: ConfigurationError if reset fails
     func reset() throws
 }
 
@@ -36,72 +40,102 @@ enum ConfigurationStorageError: LocalizedError, Equatable {
     }
 }
 
-/// Manages the storage of application configuration using FileManager
-final class ConfigurationStorage: ConfigurationStorageProtocol {
-    private let fileManager: FileManagerProtocol
-    private let notificationCenter: NotificationCenter
-    private let logger = Logging.logger(for: .configuration)
-    private let customStorageURL: URL?
+/// FileSystem-based implementation of ConfigurationStorageProtocol
+public final class ConfigurationStorage: ConfigurationStorageProtocol {
+    // MARK: - Properties
     
-    /// URL where configuration is stored
-    private var storageURL: URL {
-        if let customURL = customStorageURL {
-            return customURL
+    private let fileManager: FileManagerProtocol
+    private let logger: LoggerProtocol
+    private let configURL: URL
+    
+    // MARK: - Initialization
+    
+    /// Initialises a new ConfigurationStorage instance
+    /// - Parameters:
+    ///   - fileManager: FileManager to use for file operations
+    ///   - logger: Logger for recording operations
+    /// - Throws: ConfigurationError if setup fails
+    public init(
+        fileManager: FileManagerProtocol = DefaultFileManager(),
+        logger: LoggerProtocol = Logging.logger(for: .configuration)
+    ) throws {
+        self.fileManager = fileManager
+        self.logger = logger
+        
+        // Get application support directory
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logger.error("Could not access application support directory", privacy: .public, file: #file, function: #function, line: #line)
+            throw ConfigurationError.accessDenied
         }
         
-        let appSupport = try! fileManager.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        return appSupport
-            .appendingPathComponent("dev.mpy.rBUM", isDirectory: true)
-            .appendingPathComponent("config.json")
+        // Create config directory if needed
+        let configDir = appSupport.appendingPathComponent("Configuration", isDirectory: true)
+        if !fileManager.directoryExists(atPath: configDir.path) {
+            do {
+                try fileManager.createDirectory(
+                    atPath: configDir.path,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                logger.error("Failed to create configuration directory: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+                throw ConfigurationError.saveFailed("Could not create configuration directory")
+            }
+        }
+        
+        self.configURL = configDir.appendingPathComponent("config.json")
+        logger.debug("Configuration file path: \(configURL.path)", privacy: .public, file: #file, function: #function, line: #line)
     }
     
-    /// Initialize configuration storage
-    /// - Parameters:
-    ///   - fileManager: File manager to use for storage
-    ///   - notificationCenter: Notification center for change notifications
-    ///   - customStorageURL: Optional custom URL for storage location
-    init(
-        fileManager: FileManagerProtocol = FileManager.default,
-        notificationCenter: NotificationCenter = .default,
-        customStorageURL: URL? = nil
-    ) {
-        self.fileManager = fileManager
-        self.notificationCenter = notificationCenter
-        self.customStorageURL = customStorageURL
-        try? createStorageDirectoryIfNeeded()
-    }
+    // MARK: - ConfigurationStorageProtocol Implementation
     
-    private func createStorageDirectoryIfNeeded() throws {
-        let directory = storageURL.deletingLastPathComponent()
-        var isDirectory = ObjCBool(false)
-        if !fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
+    public func load() throws -> Configuration {
+        logger.debug("Loading configuration", privacy: .public, file: #file, function: #function, line: #line)
+        
+        if !fileManager.fileExists(atPath: configURL.path) {
+            logger.info("Configuration file not found, using defaults", privacy: .public, file: #file, function: #function, line: #line)
+            return .default
+        }
+        
+        do {
+            let data = try Data(contentsOf: configURL)
+            let decoder = JSONDecoder()
+            let config = try decoder.decode(Configuration.self, from: data)
+            logger.info("Successfully loaded configuration", privacy: .public, file: #file, function: #function, line: #line)
+            return config
+        } catch {
+            logger.error("Failed to load configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            throw ConfigurationError.loadFailed(error.localizedDescription)
         }
     }
     
-    func load() throws -> Configuration {
-        guard let data = fileManager.contents(atPath: storageURL.path) else {
-            return Configuration.default
+    public func save(_ configuration: Configuration) throws {
+        logger.debug("Saving configuration", privacy: .public, file: #file, function: #function, line: #line)
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(configuration)
+            try data.write(to: configURL, options: .atomic)
+            logger.info("Successfully saved configuration", privacy: .public, file: #file, function: #function, line: #line)
+        } catch {
+            logger.error("Failed to save configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            throw ConfigurationError.saveFailed(error.localizedDescription)
         }
-        return try JSONDecoder().decode(Configuration.self, from: data)
     }
     
-    func save(_ configuration: Configuration) throws {
-        let data = try JSONEncoder().encode(configuration)
-        try fileManager.write(data, to: storageURL)
-        notificationCenter.post(name: .configurationDidChange, object: self)
-    }
-    
-    func reset() throws {
-        try save(Configuration.default)
+    public func reset() throws {
+        logger.debug("Resetting configuration", privacy: .public, file: #file, function: #function, line: #line)
+        
+        do {
+            if fileManager.fileExists(atPath: configURL.path) {
+                try fileManager.removeItem(atPath: configURL.path)
+            }
+            try save(.default)
+            logger.info("Successfully reset configuration", privacy: .public, file: #file, function: #function, line: #line)
+        } catch {
+            logger.error("Failed to reset configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            throw ConfigurationError.resetFailed(error.localizedDescription)
+        }
     }
 }

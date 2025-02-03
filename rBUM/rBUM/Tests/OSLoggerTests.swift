@@ -1,0 +1,1 @@
+[Previous OSLoggerTests.swift content]

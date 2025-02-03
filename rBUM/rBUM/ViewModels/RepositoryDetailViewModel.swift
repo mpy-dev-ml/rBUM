@@ -7,6 +7,8 @@
 
 import Foundation
 import SwiftUI
+import Logging
+import Core
 
 @MainActor
 final class RepositoryDetailViewModel: ObservableObject {
@@ -27,101 +29,158 @@ final class RepositoryDetailViewModel: ObservableObject {
         }
     }
     
-    @Published var selectedTab: Tab = .overview
-    @Published private(set) var repository: Repository
-    @Published private(set) var lastCheck: Date?
-    @Published private(set) var isChecking: Bool = false
-    @Published var error: Error?
-    @Published var showError: Bool = false
-    @Published private(set) var repositoryStatus: RepositoryStatus?
+    // MARK: - Properties
     
-    private let resticService: ResticCommandServiceProtocol
-    private let credentialsManager: KeychainCredentialsManagerProtocol
-    private let logger = Logging.logger(for: .repository)
+    @Published var selectedTab: Tab = .overview
+    @Published var repository: Repository
+    @Published var snapshots: [ResticSnapshot] = []
+    @Published var isLoading = false
+    @Published var error: Error?
+    @Published var showError = false
+    
+    private let repositoryService: RepositoryServiceProtocol
+    private let logger: Logger
+    
+    // MARK: - Initialization
     
     init(
         repository: Repository,
-        resticService: ResticCommandServiceProtocol = ResticCommandService(),
-        credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
+        repositoryService: RepositoryServiceProtocol = DefaultRepositoryService(),
+        logger: Logger = Logger(label: "dev.mpy.rbum.viewmodel.detail")
     ) {
         self.repository = repository
-        self.resticService = resticService
-        self.credentialsManager = credentialsManager
+        self.repositoryService = repositoryService
+        self.logger = logger
     }
     
-    func checkRepository() async {
-        guard !isChecking else { return }
-        
-        isChecking = true
-        defer { isChecking = false }
+    // MARK: - Repository Operations
+    
+    func refresh() async {
+        guard !isLoading else { return }
+        isLoading = true
         
         do {
-            // Get repository credentials
-            let credentials = try await credentialsManager.retrieve(forId: repository.id)
+            logger.debug("Refreshing repository", metadata: [
+                "id": .string(repository.id)
+            ])
             
-            // Create Repository with credentials
-            let repoWithCredentials = Repository(
-                id: repository.id,
-                name: repository.name,
-                path: repository.path,
-                createdAt: repository.createdAt,
-                credentials: credentials
-            )
+            // Check repository status
+            let status = try await repositoryService.checkRepository(repository, credentials: repository.credentials)
+            repository.status = status
             
-            // List snapshots to verify repository access
-            _ = try await resticService.listSnapshots(in: repoWithCredentials)
-            lastCheck = Date()
+            // Load snapshots if repository is ready
+            if status == .ready {
+                snapshots = try await repositoryService.listSnapshots(in: repository, credentials: repository.credentials)
+            }
             
-            logger.info("Repository check completed successfully: \(self.repository.id, privacy: .public)")
+            logger.info("Refresh successful", metadata: [
+                "id": .string(repository.id),
+                "status": .string("\(status)"),
+                "snapshots": .string("\(snapshots.count)")
+            ])
+            
         } catch {
+            logger.error("Refresh failed", metadata: [
+                "error": .string(error.localizedDescription)
+            ])
             self.error = error
             showError = true
-            logger.error("Repository check failed: \(error.localizedDescription)")
         }
+        
+        isLoading = false
     }
     
-    func updateRepositoryPassword(_ newPassword: String) async throws {
-        guard !newPassword.isEmpty else {
-            throw ResticError.invalidPassword
+    func createSnapshot(paths: [URL], tags: [String]) async {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        do {
+            logger.debug("Creating snapshot", metadata: [
+                "id": .string(repository.id),
+                "paths": .string("\(paths.count) paths"),
+                "tags": .string("\(tags.count) tags")
+            ])
+            
+            let snapshot = try await repositoryService.createSnapshot(
+                in: repository,
+                credentials: repository.credentials,
+                paths: paths,
+                tags: tags
+            )
+            
+            snapshots.append(snapshot)
+            
+            logger.info("Snapshot created", metadata: [
+                "id": .string(repository.id),
+                "snapshot": .string(snapshot.id)
+            ])
+            
+        } catch {
+            logger.error("Failed to create snapshot", metadata: [
+                "error": .string(error.localizedDescription)
+            ])
+            self.error = error
+            showError = true
         }
         
-        // Create new credentials with updated password
-        let credentials = RepositoryCredentials(
-            repositoryPath: self.repository.path,
-            password: newPassword
-        )
-        
-        // Store updated credentials
-        try await self.credentialsManager.store(credentials, forRepositoryId: self.repository.id)
-        self.logger.info("Updated password for repository: \(self.repository.id, privacy: .public)")
+        isLoading = false
     }
     
-    var formattedLastCheck: String {
-        guard let lastCheck else {
-            return "Never"
+    func deleteSnapshot(_ snapshot: ResticSnapshot) async {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        do {
+            logger.debug("Deleting snapshot", metadata: [
+                "id": .string(repository.id),
+                "snapshot": .string(snapshot.id)
+            ])
+            
+            try await repositoryService.deleteSnapshot(snapshot, from: repository, credentials: repository.credentials)
+            snapshots.removeAll { $0.id == snapshot.id }
+            
+            logger.info("Snapshot deleted", metadata: [
+                "id": .string(repository.id),
+                "snapshot": .string(snapshot.id)
+            ])
+            
+        } catch {
+            logger.error("Failed to delete snapshot", metadata: [
+                "error": .string(error.localizedDescription)
+            ])
+            self.error = error
+            showError = true
         }
         
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: lastCheck, relativeTo: Date())
+        isLoading = false
     }
     
-    var statusColor: Color {
-        guard let lastCheck else {
-            return .secondary
+    func restoreSnapshot(_ snapshot: ResticSnapshot, to path: URL) async {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        do {
+            logger.debug("Restoring snapshot", metadata: [
+                "id": .string(repository.id),
+                "snapshot": .string(snapshot.id),
+                "path": .string(path.path)
+            ])
+            
+            try await repositoryService.restoreSnapshot(snapshot, from: repository, credentials: repository.credentials, to: path)
+            
+            logger.info("Snapshot restored", metadata: [
+                "id": .string(repository.id),
+                "snapshot": .string(snapshot.id)
+            ])
+            
+        } catch {
+            logger.error("Failed to restore snapshot", metadata: [
+                "error": .string(error.localizedDescription)
+            ])
+            self.error = error
+            showError = true
         }
         
-        // If checked in last hour and no error, show green
-        if Date().timeIntervalSince(lastCheck) < 3600 && error == nil {
-            return .green
-        }
-        
-        // If error or not checked in last day, show red
-        if error != nil || Date().timeIntervalSince(lastCheck) > 86400 {
-            return .red
-        }
-        
-        // Otherwise show yellow
-        return .yellow
+        isLoading = false
     }
 }
