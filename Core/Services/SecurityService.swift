@@ -81,7 +81,23 @@ public final class SecurityService {
 
 extension SecurityService: SecurityServiceProtocol {
     public func validateXPCService() async throws -> Bool {
-        <#code#>
+        logger.debug("Validating XPC service", file: #file, function: #function, line: #line)
+        
+        do {
+            try await xpcService.connect()
+            let isValid = try await xpcService.validatePermissions()
+            
+            if isValid {
+                logger.info("XPC service validated successfully", file: #file, function: #function, line: #line)
+            } else {
+                logger.error("XPC service validation failed: invalid permissions", file: #file, function: #function, line: #line)
+            }
+            
+            return isValid
+        } catch {
+            logger.error("XPC service validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw SecurityError.xpcValidationFailed("XPC service validation failed: \(error.localizedDescription)")
+        }
     }
     
     public func requestPermission(for url: URL) async throws -> Bool {

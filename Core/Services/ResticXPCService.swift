@@ -1,6 +1,5 @@
 import Foundation
 import Security
-import Audit
 
 /// XPC service for executing Restic commands outside the sandbox
 public final class ResticXPCService {
@@ -18,30 +17,13 @@ public final class ResticXPCService {
         self.logger = logger
     }
     
-    /// Convert audit token to session ID
-    private func audit_token_to_au32(_ token: audit_token_t) -> (asid: au_asid_t, auid: au_id_t, euid: uid_t, egid: gid_t, ruid: uid_t, rgid: gid_t, pid: pid_t, tid: pid_t, tid_ex: u_int32_t) {
-        var au_asid: au_asid_t = 0
-        var au_auid: au_id_t = 0
-        var au_euid: uid_t = 0
-        var au_egid: gid_t = 0
-        var au_ruid: uid_t = 0
-        var au_rgid: gid_t = 0
-        var au_pid: pid_t = 0
-        var au_tid: pid_t = 0
-        var au_tid_ex: u_int32_t = 0
-        
-        audit_token_to_au32(token,
-                           &au_asid,
-                           &au_auid,
-                           &au_euid,
-                           &au_egid,
-                           &au_ruid,
-                           &au_rgid,
-                           &au_pid,
-                           &au_tid,
-                           &au_tid_ex)
-        
-        return (au_asid, au_auid, au_euid, au_egid, au_ruid, au_rgid, au_pid, au_tid, au_tid_ex)
+    /// Get audit session ID from process info
+    private func getAuditSessionID() -> au_asid_t {
+        var asid: au_asid_t = AU_DEFAUDITSID
+        if #available(macOS 11.0, *) {
+            asid = audit_token_to_asid(ProcessInfo.processInfo.auditToken)
+        }
+        return asid
     }
     
     /// Ensure connection is established
@@ -71,7 +53,7 @@ public final class ResticXPCService {
         ]
         connection.remoteObjectInterface = interface
         connection.exportedInterface = interface
-        connection.auditSessionIdentifier = audit_token_to_au32(ProcessInfo.processInfo.auditToken).asid
+        connection.auditSessionIdentifier = getAuditSessionID()
         
         for (key, value) in securityAttributes {
             connection.setValue(value, forKeyPath: key)
@@ -112,55 +94,56 @@ public final class ResticXPCService {
 
 extension ResticXPCService: ResticXPCServiceProtocol {
     public func isEqual(_ object: Any?) -> Bool {
-        <#code#>
+        guard let other = object as? ResticXPCService else { return false }
+        return serviceName == other.serviceName
     }
     
     public var hash: Int {
-        <#code#>
+        return serviceName.hash
     }
     
     public var superclass: AnyClass? {
-        <#code#>
+        return NSObject.self
     }
     
     public func `self`() -> Self {
-        <#code#>
+        return self
     }
     
     public func perform(_ aSelector: Selector!) -> Unmanaged<AnyObject>! {
-        <#code#>
+        return nil
     }
     
     public func perform(_ aSelector: Selector!, with object: Any!) -> Unmanaged<AnyObject>! {
-        <#code#>
+        return nil
     }
     
     public func perform(_ aSelector: Selector!, with object1: Any!, with object2: Any!) -> Unmanaged<AnyObject>! {
-        <#code#>
+        return nil
     }
     
     public func isProxy() -> Bool {
-        <#code#>
+        return false
     }
     
     public func isKind(of aClass: AnyClass) -> Bool {
-        <#code#>
+        return self.isKind(of: aClass)
     }
     
     public func isMember(of aClass: AnyClass) -> Bool {
-        <#code#>
+        return type(of: self) == aClass
     }
     
     public func conforms(to aProtocol: Protocol) -> Bool {
-        <#code#>
+        return self.conforms(to: aProtocol)
     }
     
     public func responds(to aSelector: Selector!) -> Bool {
-        <#code#>
+        return self.responds(to: aSelector)
     }
     
     public var description: String {
-        <#code#>
+        return "ResticXPCService(serviceName: \(serviceName))"
     }
     
     public func connect() async throws {
