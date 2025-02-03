@@ -6,41 +6,36 @@
 //
 
 import Foundation
-
-/// Privacy level for logged messages
-public enum LogPrivacy {
-    /// Public information that can be freely logged
-    case `public`
-    /// Private information that should be redacted in logs
-    case `private`
-    /// Sensitive information that should be carefully handled
-    case sensitive
-}
+import os.log
 
 /// Protocol for logging messages with different privacy levels
 public protocol LoggerProtocol {
     /// Log a debug message
     /// - Parameters:
     ///   - message: The message to log
-    ///   - privacy: Privacy level for the message
-    func debug(_ message: String, privacy: LogPrivacy)
+    ///   - file: The file where the log was called
+    ///   - function: The function where the log was called
+    ///   - line: The line where the log was called
+    func debug(_ message: String, file: String, function: String, line: Int)
     
     /// Log an info message
     /// - Parameters:
     ///   - message: The message to log
-    ///   - privacy: Privacy level for the message
-    func info(_ message: String, privacy: LogPrivacy)
+    ///   - file: The file where the log was called
+    ///   - function: The function where the log was called
+    ///   - line: The line where the log was called
+    func info(_ message: String, file: String, function: String, line: Int)
     
     /// Log an error message
     /// - Parameters:
     ///   - message: The message to log
-    ///   - privacy: Privacy level for the message
-    func error(_ message: String, privacy: LogPrivacy)
+    ///   - file: The file where the log was called
+    ///   - function: The function where the log was called
+    ///   - line: The line where the log was called
+    func error(_ message: String, file: String, function: String, line: Int)
 }
 
 #if os(macOS)
-import os
-
 /// macOS-specific logger implementation using os.Logger
 public struct OSLogger: LoggerProtocol {
     private let logger: Logger
@@ -49,32 +44,22 @@ public struct OSLogger: LoggerProtocol {
         self.logger = Logger(subsystem: subsystem, category: category)
     }
     
-    public func debug(_ message: String, privacy: LogPrivacy) {
-        logger.debug("\(message, privacy: privacy.toOSLogPrivacy)")
+    public func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        // Debug messages are always private by default as they may contain sensitive information
+        logger.debug("[\(file.split(separator: "/").last ?? "", privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
     }
     
-    public func info(_ message: String, privacy: LogPrivacy) {
-        logger.info("\(message, privacy: privacy.toOSLogPrivacy)")
+    public func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        // Info messages can be public but should be marked private if they contain sensitive data
+        logger.info("[\(file.split(separator: "/").last ?? "", privacy: .public):\(line, privacy: .public)] \(message, privacy: .auto)")
     }
     
-    public func error(_ message: String, privacy: LogPrivacy) {
-        logger.error("\(message, privacy: privacy.toOSLogPrivacy)")
+    public func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        // Error messages often contain sensitive information and should be private
+        logger.error("[\(file.split(separator: "/").last ?? "", privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
     }
 }
-
-private extension LogPrivacy {
-    var toOSLogPrivacy: OSLogPrivacy {
-        switch self {
-        case .public:
-            return .public
-        case .private:
-            return .private
-        case .sensitive:
-            return .private // os.Logger doesn't have a 'sensitive' level
-        }
-    }
-}
-#endif
 
 /// Default logger implementation for the current platform
 public typealias DefaultLogger = OSLogger
+#endif

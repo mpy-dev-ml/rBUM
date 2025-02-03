@@ -51,6 +51,7 @@ enum BookmarkPersistenceError: LocalizedError {
 final class BookmarkPersistenceService: BookmarkPersistenceServiceProtocol {
     private let fileManager: FileManager
     private let logger: LoggerProtocol
+    private let keychain: Keychain
     
     /// URL where bookmarks are stored
     private var bookmarksDirectory: URL {
@@ -58,60 +59,58 @@ final class BookmarkPersistenceService: BookmarkPersistenceServiceProtocol {
         return appSupport.appendingPathComponent("rBUM/Bookmarks", isDirectory: true)
     }
     
-    init(fileManager: FileManager = .default, logger: LoggerProtocol = LoggerFactory.createLogger(category: "BookmarkPersistence")) {
+    init(fileManager: FileManager = .default, logger: LoggerProtocol = LoggerFactory.createLogger(category: "BookmarkPersistence"), keychain: Keychain = Keychain()) {
         self.fileManager = fileManager
         self.logger = logger
+        self.keychain = keychain
         Task {
             try? await createBookmarksDirectory()
         }
     }
     
     func persistBookmark(_ data: Data, forURL url: URL) async throws {
-        let bookmarkFile = bookmarkFileURL(for: url)
+        logger.debug("Saving bookmark for URL: \(url.path, privacy: .private)")
         
-        try await Task {
-            do {
-                try await createBookmarksDirectory()
-                try data.write(to: bookmarkFile, options: .atomicWrite)
-                logger.debug("Persisted bookmark for URL: \(url.path, privacy: .public)")
-            } catch {
-                logger.error("Failed to persist bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkPersistenceError.persistenceFailed(error.localizedDescription)
-            }
-        }.value
+        do {
+            let key = url.path
+            try await keychain.set(data, for: key)
+            logger.info("Successfully saved bookmark for: \(url.path, privacy: .private)")
+        } catch {
+            logger.error("Failed to save bookmark: \(error.localizedDescription, privacy: .private)")
+            throw error
+        }
     }
     
     func retrieveBookmark(forURL url: URL) async throws -> Data? {
-        let bookmarkFile = bookmarkFileURL(for: url)
+        logger.debug("Loading bookmark for URL: \(url.path, privacy: .private)")
         
-        return try await Task {
-            guard fileManager.fileExists(atPath: bookmarkFile.path) else {
-                return nil
+        do {
+            let key = url.path
+            guard let data = try await keychain.get(key) else {
+                logger.error("No bookmark found for URL: \(url.path, privacy: .private)")
+                throw BookmarkPersistenceError.bookmarkNotFound
             }
             
-            do {
-                let data = try Data(contentsOf: bookmarkFile)
-                logger.debug("Retrieved bookmark for URL: \(url.path, privacy: .public)")
-                return data
-            } catch {
-                logger.error("Failed to retrieve bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkPersistenceError.retrievalFailed(error.localizedDescription)
-            }
-        }.value
+            logger.info("Successfully loaded bookmark for: \(url.path, privacy: .private)")
+            return data
+            
+        } catch {
+            logger.error("Failed to load bookmark: \(error.localizedDescription, privacy: .private)")
+            throw error
+        }
     }
     
     func removeBookmark(forURL url: URL) async throws {
-        let bookmarkFile = bookmarkFileURL(for: url)
+        logger.debug("Deleting bookmark for URL: \(url.path, privacy: .private)")
         
-        try await Task {
-            do {
-                try fileManager.removeItem(at: bookmarkFile)
-                logger.info("Removed bookmark for URL: \(url.path, privacy: .public)")
-            } catch {
-                logger.error("Failed to remove bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkPersistenceError.deletionFailed(error.localizedDescription)
-            }
-        }.value
+        do {
+            let key = url.path
+            try await keychain.delete(key)
+            logger.info("Successfully deleted bookmark for: \(url.path, privacy: .private)")
+        } catch {
+            logger.error("Failed to delete bookmark: \(error.localizedDescription, privacy: .private)")
+            throw error
+        }
     }
     
     func listBookmarks() async throws -> [URL: Data] {

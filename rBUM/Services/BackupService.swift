@@ -7,6 +7,7 @@
 
 import Foundation
 import Core
+import OSLog
 
 /// Protocol defining backup service operations
 protocol BackupServiceProtocol {
@@ -36,6 +37,13 @@ protocol BackupServiceProtocol {
     /// - Returns: Array of snapshots
     /// - Throws: BackupError if listing fails
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot]
+    
+    /// Backup items to a repository
+    /// - Parameters:
+    ///   - repository: Repository to backup to
+    ///   - items: Items to backup
+    /// - Throws: BackupError if backup fails
+    func backup(repository: Repository, items: [URL]) async throws
 }
 
 /// Service responsible for managing backup operations
@@ -78,7 +86,7 @@ final class BackupService: BackupServiceProtocol {
     // MARK: - Public Methods
     
     func createRepository(at path: URL, password: String) async throws -> Repository {
-        logger.info("Creating new repository at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Creating new repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
         
         do {
             // Validate path access
@@ -103,7 +111,7 @@ final class BackupService: BackupServiceProtocol {
             )
             
             try await resticService.initializeRepository(repository)
-            logger.info("Successfully created repository at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.info("Successfully created repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
             return repository
             
         } catch {
@@ -113,44 +121,43 @@ final class BackupService: BackupServiceProtocol {
     }
     
     func initializeRepository(at path: URL, password: String) async throws -> Repository {
-        logger.info("Initializing existing repository at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Initializing repository at: \(path.path, privacy: .private)")
         
         do {
             // Validate path access
-            logger.debug("Validating access to path: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-            guard try bookmarkService.validateBookmark(for: path) else {
-                logger.error("Cannot access repository location: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                throw BackupError.accessDenied("Cannot access repository location")
+            guard await securityService.checkAccess(to: path) else {
+                logger.error("Access denied to path: \(path.path, privacy: .private)")
+                throw RepositoryError.accessDenied(path.path)
             }
             
-            // Verify repository exists
-            guard fileManager.fileExists(atPath: path.path) else {
-                logger.error("Repository directory not found at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                throw BackupError.notFound("Repository directory not found")
+            // Create repository directory if it doesn't exist
+            if !fileManager.fileExists(atPath: path.path) {
+                logger.debug("Creating repository directory at: \(path.path, privacy: .private)")
+                try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
             }
             
             // Initialize repository
-            let repository = Repository(
-                name: path.lastPathComponent,
-                path: path.path,
-                credentials: RepositoryCredentials(password: password)
-            )
+            let repository = Repository(path: path, password: password)
             
-            // Verify repository is valid
-            logger.debug("Verifying repository integrity", privacy: .public, file: #file, function: #function, line: #line)
+            // Initialize restic repository
+            logger.debug("Initializing restic repository", privacy: .public)
+            try await resticService.initializeRepository(repository)
+            
+            // Verify repository
+            logger.debug("Verifying repository integrity", privacy: .public)
             try await resticService.verifyRepository(repository)
             
-            logger.info("Successfully initialized repository at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.info("Successfully initialized repository at: \(path.path, privacy: .private)")
             return repository
             
         } catch {
-            logger.error("Failed to initialize repository: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw BackupError.initializationFailed(error.localizedDescription)
+            logger.error("Failed to initialize repository: \(error.localizedDescription, privacy: .private)")
+            throw error
         }
     }
     
     func deleteRepository(_ repository: Repository) async throws {
-        logger.info("Deleting repository at: \(repository.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Deleting repository at: \(repository.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
         
         do {
             let path = URL(fileURLWithPath: repository.path)
@@ -172,7 +179,7 @@ final class BackupService: BackupServiceProtocol {
             logger.debug("Removing repository directory", privacy: .public, file: #file, function: #function, line: #line)
             try fileManager.removeItem(at: path)
             
-            logger.info("Successfully deleted repository at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.info("Successfully deleted repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
             
         } catch {
             logger.error("Failed to delete repository: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
@@ -190,6 +197,46 @@ final class BackupService: BackupServiceProtocol {
         } catch {
             logger.error("Failed to list snapshots: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
             throw BackupError.listingFailed(error.localizedDescription)
+        }
+    }
+    
+    func backup(repository: Repository, items: [URL]) async throws {
+        logger.info("Starting backup of \(items.count, privacy: .public) items")
+        
+        // Start accessing all resources
+        var accessedItems: [URL] = []
+        defer {
+            // Ensure we stop accessing all resources
+            for item in accessedItems {
+                securityService.stopAccessing(item)
+            }
+        }
+        
+        do {
+            // Start accessing repository
+            guard securityService.startAccessing(repository.path) else {
+                logger.error("Failed to access repository: \(repository.path.path, privacy: .private)")
+                throw BackupError.accessDenied("Cannot access repository")
+            }
+            accessedItems.append(repository.path)
+            
+            // Start accessing each backup item
+            for item in items {
+                guard securityService.startAccessing(item) else {
+                    logger.error("Failed to access backup item: \(item.path, privacy: .private)")
+                    throw BackupError.accessDenied("Cannot access backup item")
+                }
+                accessedItems.append(item)
+            }
+            
+            // Perform backup
+            try await resticService.backup(items, to: repository)
+            
+            logger.info("Successfully backed up \(items.count, privacy: .public) items")
+            
+        } catch {
+            logger.error("Backup failed: \(error.localizedDescription, privacy: .private)")
+            throw error
         }
     }
     

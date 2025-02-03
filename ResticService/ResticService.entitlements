@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Enable App Sandbox -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    
+    <!-- Temporary exceptions for Restic -->
+    <key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+    <array>
+        <string>/usr/local/bin/restic</string>
+        <string>/private/tmp/</string>
+    </array>
+    
+    <!-- Network access configuration -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <false/>
+    
+    <!-- File access permissions -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <key>com.apple.security.files.bookmarks.app-scope</key>
+    <true/>
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+    
+    <!-- Shared access with main app -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>dev.mpy.rBUM</string>
+    </array>
+    
+    <!-- Keychain access -->
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)dev.mpy.rBUM</string>
+    </array>
+    
+    <!-- Additional security configurations -->
+    <key>com.apple.security.files.user-selected.executable</key>
+    <true/>
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>dev.mpy.rBUM.ResticService</string>
+    </array>
+</dict>
+</plist>

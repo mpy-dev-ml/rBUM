@@ -59,41 +59,50 @@ final class BookmarkService: BookmarkServiceProtocol {
     }
     
     func createBookmark(for url: URL, timeout: TimeInterval = 30) async throws -> Data {
-        logger.info("Creating bookmark for URL: \(url.path, privacy: .public)")
-        return try await withTimeout(timeout) {
-            do {
-                let bookmarkData = try url.bookmarkData(
-                    options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-                    includingResourceValuesForKeys: nil,
-                    relativeTo: nil
-                )
-                try await self.persistenceService.persistBookmark(bookmarkData, forURL: url)
-                return bookmarkData
-            } catch {
-                logger.error("Failed to create bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkError.creationFailed(error.localizedDescription)
-            }
+        logger.debug("Creating bookmark for URL: \(url.path, privacy: .private)")
+        
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            
+            try await persistenceService.saveBookmark(bookmarkData, for: url)
+            logger.info("Successfully created bookmark for: \(url.path, privacy: .private)")
+            
+            return bookmarkData
+            
+        } catch {
+            logger.error("Failed to create bookmark: \(error.localizedDescription, privacy: .private)")
+            throw error
         }
     }
     
     func resolveBookmark(_ bookmarkData: Data, timeout: TimeInterval = 30) async throws -> (url: URL, isStale: Bool) {
-        return try await withTimeout(timeout) {
+        logger.debug("Resolving bookmark for URL: \(bookmarkData, privacy: .private)")
+        
+        do {
             var isStale = false
-            do {
-                let url = try URL(resolvingBookmarkData: bookmarkData,
-                                options: .withSecurityScope,
-                                relativeTo: nil,
-                                bookmarkDataIsStale: &isStale)
-                
-                if !url.startAccessingSecurityScopedResource() {
-                    throw BookmarkError.resolutionFailed("Failed to start accessing resource")
-                }
-                
-                return (url, isStale)
-            } catch {
-                logger.error("Failed to resolve bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkError.resolutionFailed(error.localizedDescription)
+            
+            let url = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [.withSecurityScope],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            
+            if isStale {
+                logger.warning("Bookmark is stale for URL: \(url.path, privacy: .private)")
+                throw BookmarkError.staleBookmark(url.path)
             }
+            
+            logger.info("Successfully resolved bookmark for: \(url.path, privacy: .private)")
+            return (url, isStale)
+            
+        } catch {
+            logger.error("Failed to resolve bookmark: \(error.localizedDescription, privacy: .private)")
+            throw error
         }
     }
     
@@ -171,6 +180,7 @@ enum BookmarkError: LocalizedError {
     case resolutionFailed(String)
     case refreshFailed(String)
     case restorationFailed(String)
+    case staleBookmark(String)
     case operationTimeout
     
     var errorDescription: String? {
@@ -183,6 +193,8 @@ enum BookmarkError: LocalizedError {
             return "Failed to refresh bookmark: \(reason)"
         case .restorationFailed(let reason):
             return "Failed to restore bookmarks: \(reason)"
+        case .staleBookmark(let url):
+            return "Bookmark is stale for URL: \(url)"
         case .operationTimeout:
             return "Operation timed out"
         }

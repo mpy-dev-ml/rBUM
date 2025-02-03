@@ -50,17 +50,20 @@ final class RestoreService: RestoreServiceProtocol {
         onProgress: ((RestoreProgress) -> Void)?,
         onStatusChange: ((RestoreStatus) -> Void)?
     ) async throws {
-        logger.info("Starting restore from snapshot: \(snapshot.id)", privacy: .public, file: #file, function: #function, line: #line)
-        logger.debug("Target directory: \(targetDirectory.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Starting restore of snapshot \(snapshot.id, privacy: .public) to: \(targetDirectory.path, privacy: .private)")
         
         onStatusChange?(.preparing)
         
         do {
             // Validate target directory access
-            try securityService.validateAccess(to: targetDirectory)
+            guard await securityService.checkAccess(to: targetDirectory) else {
+                logger.error("Access denied to restore path: \(targetDirectory.path, privacy: .private)")
+                throw RestoreError.accessDenied(targetDirectory.path)
+            }
             
             // Create target directory if needed
             if !fileManager.fileExists(atPath: targetDirectory.path) {
+                logger.debug("Creating restore directory at: \(targetDirectory.path, privacy: .private)")
                 try fileManager.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
             }
             
@@ -77,6 +80,7 @@ final class RestoreService: RestoreServiceProtocol {
                 credentials: credentials
             ) { progress in
                 tracker.update(processed: Int64(progress))
+                logger.info("Restore progress: \(progress, privacy: .public)%", privacy: .public)
                 onProgress?(RestoreProgress(
                     processedFiles: progress,
                     totalFiles: snapshot.stats.totalFiles,
@@ -98,9 +102,10 @@ final class RestoreService: RestoreServiceProtocol {
                 ]
             )
             
-            logger.info("Successfully restored snapshot: \(snapshot.id)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.info("Successfully restored snapshot to: \(targetDirectory.path, privacy: .private)")
+            
         } catch {
-            logger.error("Restore failed: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.error("Failed to restore snapshot: \(error.localizedDescription, privacy: .private)")
             onStatusChange?(.failed(error))
             throw error
         }

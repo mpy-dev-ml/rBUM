@@ -6,23 +6,31 @@
 //
 
 import Foundation
+import os.log
 @testable import Core
 
 /// Mock logger for testing
 class MockLogger: LoggerProtocol {
-    var debugMessages: [(message: String, privacy: LogPrivacy)] = []
-    var infoMessages: [(message: String, privacy: LogPrivacy)] = []
-    var errorMessages: [(message: String, privacy: LogPrivacy)] = []
-    
-    func debug(_ message: String, privacy: LogPrivacy) {
-        debugMessages.append((message, privacy))
+    struct LogMessage {
+        let message: String
+        let file: String
+        let function: String
+        let line: Int
     }
     
-    func info(_ message: String, privacy: LogPrivacy) {
-        infoMessages.append((message, privacy))
+    var debugMessages: [LogMessage] = []
+    var infoMessages: [LogMessage] = []
+    var errorMessages: [LogMessage] = []
+    
+    func debug(_ message: String, file: String, function: String, line: Int) {
+        debugMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }
     
-    func error(_ message: String, privacy: LogPrivacy) {
-        errorMessages.append((message, privacy))
+    func info(_ message: String, file: String, function: String, line: Int) {
+        infoMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+    }
+    
+    func error(_ message: String, file: String, function: String, line: Int) {
+        errorMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }
 }
