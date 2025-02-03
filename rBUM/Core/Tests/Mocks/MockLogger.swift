@@ -1,1 +1,0 @@
-[Previous MockLogger.swift content]

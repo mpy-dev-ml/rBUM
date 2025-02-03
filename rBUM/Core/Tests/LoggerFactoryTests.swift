@@ -1,1 +1,0 @@
-[Previous LoggerFactoryTests.swift content]
