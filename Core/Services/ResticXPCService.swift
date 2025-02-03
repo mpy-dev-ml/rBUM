@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import os.log
 
 /// XPC service for executing Restic commands outside the sandbox
 public final class ResticXPCService {
@@ -13,7 +14,7 @@ public final class ResticXPCService {
     /// Service name for the XPC helper
     private let serviceName = "dev.mpy.rBUM.ResticHelper"
     
-    private init(logger: LoggerProtocol = LoggerFactory.createLogger(category: "ResticXPCService")) {
+    private init(logger: LoggerProtocol = DefaultLogger(subsystem: "dev.mpy.rBUM", category: "ResticXPCService")) {
         self.logger = logger
     }
     
@@ -21,7 +22,8 @@ public final class ResticXPCService {
     private func getAuditSessionID() -> au_asid_t {
         var asid: au_asid_t = AU_DEFAUDITSID
         if #available(macOS 11.0, *) {
-            asid = audit_token_to_asid(ProcessInfo.processInfo.auditToken)
+            // Use process audit session ID directly
+            asid = au_asid_t(audit_session_self())
         }
         return asid
     }
@@ -47,17 +49,15 @@ public final class ResticXPCService {
         )
         
         // Configure security attributes
-        let securityAttributes: [String: Bool] = [
-            NSXPCConnectionPrivileged: false,
-            NSXPCConnectionPrivilegedAttribute: false
-        ]
         connection.remoteObjectInterface = interface
         connection.exportedInterface = interface
-        connection.auditSessionIdentifier = getAuditSessionID()
         
-        for (key, value) in securityAttributes {
-            connection.setValue(value, forKeyPath: key)
-        }
+        // Set up connection security
+        let sessionID = audit_session_self()
+        connection.setValue(sessionID, forKey: "auditSessionIdentifier")
+        
+        // Set up connection attributes
+        connection.setValue(false, forKey: "privileged")
         
         // Set up error handling
         connection.invalidationHandler = { [weak self] in

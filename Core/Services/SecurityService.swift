@@ -86,17 +86,15 @@ extension SecurityService: SecurityServiceProtocol {
         do {
             try await xpcService.connect()
             let isValid = try await xpcService.validatePermissions()
-            
             if isValid {
                 logger.info("XPC service validated successfully", file: #file, function: #function, line: #line)
             } else {
-                logger.error("XPC service validation failed: invalid permissions", file: #file, function: #function, line: #line)
+                logger.error("XPC service permissions invalid", file: #file, function: #function, line: #line)
             }
-            
             return isValid
         } catch {
             logger.error("XPC service validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcValidationFailed("XPC service validation failed: \(error.localizedDescription)")
+            return false
         }
     }
     
@@ -181,24 +179,11 @@ extension SecurityService: SecurityServiceProtocol {
         }
         
         // Validate XPC service connection
-        _ = try await validateXPCService()
+        guard try await validateXPCService() else {
+            throw SecurityError.xpcValidationFailed("XPC service validation failed")
+        }
         
         logger.info("XPC access prepared for: \(url.path)", file: #file, function: #function, line: #line)
         return bookmark
-    }
-    
-    public func validateXPCService() async throws {
-        logger.debug("Validating XPC service", file: #file, function: #function, line: #line)
-        
-        do {
-            try await xpcService.connect()
-            guard try await xpcService.validatePermissions() else {
-                throw SecurityError.xpcValidationFailed("XPC service permissions invalid")
-            }
-            logger.info("XPC service validated successfully", file: #file, function: #function, line: #line)
-        } catch {
-            logger.error("XPC service validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcValidationFailed("XPC service validation failed: \(error.localizedDescription)")
-        }
     }
 }

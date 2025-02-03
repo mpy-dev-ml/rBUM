@@ -1,4 +1,5 @@
 import Foundation
+import Core
 
 /// Protocol defining backup tag management functionality
 public protocol BackupTagManagerProtocol {
@@ -105,14 +106,14 @@ public final class BackupTagManager: BackupTagManagerProtocol {
         let tag = BackupTag(
             name: name,
             description: description,
-            createdAt: dateProvider.currentDate(),
-            modifiedAt: dateProvider.currentDate()
+            createdAt: dateProvider.now(),
+            modifiedAt: dateProvider.now()
         )
         
         tags.append(tag)
         try saveTags()
         
-        notificationCenter.post(name: .tagCreated, object: tag)
+        notificationCenter.post(name: .backupTagsChanged, object: nil)
         return tag
     }
     
@@ -142,12 +143,12 @@ public final class BackupTagManager: BackupTagManagerProtocol {
         var updatedTag = tag
         updatedTag.name = name
         updatedTag.description = description
-        updatedTag.modifiedAt = dateProvider.currentDate()
+        updatedTag.modifiedAt = dateProvider.now()
         
         tags[index] = updatedTag
         try saveTags()
         
-        notificationCenter.post(name: .tagUpdated, object: updatedTag)
+        notificationCenter.post(name: .backupTagsChanged, object: nil)
     }
     
     public func getAllTags() throws -> [BackupTag] {
@@ -201,4 +202,5 @@ extension Notification.Name {
     static let tagUpdated = Notification.Name("tagUpdated")
     static let tagAssociated = Notification.Name("tagAssociated")
     static let tagRemoved = Notification.Name("tagRemoved")
+    static let backupTagsChanged = Notification.Name("backupTagsChanged")
 }

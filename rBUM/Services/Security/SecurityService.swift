@@ -115,7 +115,7 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "Security"),
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "Security") as! LoggerProtocol,
         fileManager: FileManager = .default,
         workspace: NSWorkspace = .shared
     ) {
