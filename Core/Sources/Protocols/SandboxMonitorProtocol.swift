@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol defining sandbox monitoring operations
-public protocol SandboxMonitorProtocol {
+public protocol SandboxMonitorProtocol: AnyObject {
     /// Monitor changes to sandbox access for a URL
     /// - Parameter url: The URL to monitor
     /// - Returns: An async sequence of sandbox access events

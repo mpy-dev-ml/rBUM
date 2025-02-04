@@ -11,6 +11,10 @@ import os.log
 
 /// Mock logger for testing
 class MockLogger: LoggerProtocol {
+    func warning(_ message: String, file: String, function: String, line: Int) {
+        warningMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+    }
+    
     struct LogMessage {
         let message: String
         let file: String
@@ -20,6 +24,7 @@ class MockLogger: LoggerProtocol {
     
     var debugMessages: [LogMessage] = []
     var infoMessages: [LogMessage] = []
+    var warningMessages: [LogMessage] = []
     var errorMessages: [LogMessage] = []
     
     func debug(_ message: String, file: String, function: String, line: Int) {

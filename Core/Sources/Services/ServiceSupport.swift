@@ -75,7 +75,18 @@ public class DefaultServiceFactory: ServiceFactory {
     }
     
     public func createSecurityService() -> SecurityServiceProtocol {
-        SecurityService(logger: createLogger(category: "SecurityService"))
+        let xpcService = ResticXPCService(
+            logger: createLogger(category: "ResticXPCService"),
+            securityService: SecurityService(
+                logger: createLogger(category: "SecurityService"),
+                xpcService: nil  // This will create a new XPC connection
+            )
+        )
+        
+        return SecurityService(
+            logger: createLogger(category: "SecurityService"),
+            xpcService: xpcService
+        )
     }
     
     public func createKeychainService() -> KeychainServiceProtocol {

@@ -183,7 +183,7 @@ public final class SecurityService: SecurityServiceProtocol {
                          line: #line)
         
         do {
-            return try await xpcService.validate()
+            return try await xpcService.validatePermissions()
         } catch {
             self.logger.error("XPC service validation failed: \(error.localizedDescription)", 
                             file: #file, 

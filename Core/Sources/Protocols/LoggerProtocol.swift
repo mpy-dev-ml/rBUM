@@ -47,22 +47,22 @@ public protocol LoggerProtocol {
 
 public extension LoggerProtocol {
     /// Log a debug message with default source location
-    func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+    func debugMessage(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         debug(message, file: file, function: function, line: line)
     }
     
     /// Log an info message with default source location
-    func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+    func infoMessage(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         info(message, file: file, function: function, line: line)
     }
     
     /// Log a warning message with default source location
-    func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+    func warningMessage(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         warning(message, file: file, function: function, line: line)
     }
     
     /// Log an error message with default source location
-    func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+    func errorMessage(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         error(message, file: file, function: function, line: line)
     }
     
@@ -74,13 +74,13 @@ public extension LoggerProtocol {
         
         switch level {
         case .debug:
-            debug("\(operation) completed in \(String(format: "%.3f", duration))s")
+            debugMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         case .info:
-            info("\(operation) completed in \(String(format: "%.3f", duration))s")
+            infoMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         case .error:
-            error("\(operation) completed in \(String(format: "%.3f", duration))s")
+            errorMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         default:
-            info("\(operation) completed in \(String(format: "%.3f", duration))s")
+            infoMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         }
         
         return result
@@ -94,13 +94,13 @@ public extension LoggerProtocol {
         
         switch level {
         case .debug:
-            debug("\(operation) completed in \(String(format: "%.3f", duration))s")
+            debugMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         case .info:
-            info("\(operation) completed in \(String(format: "%.3f", duration))s")
+            infoMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         case .error:
-            error("\(operation) completed in \(String(format: "%.3f", duration))s")
+            errorMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         default:
-            info("\(operation) completed in \(String(format: "%.3f", duration))s")
+            infoMessage("\(operation) completed in \(String(format: "%.3f", duration))s")
         }
         
         return result

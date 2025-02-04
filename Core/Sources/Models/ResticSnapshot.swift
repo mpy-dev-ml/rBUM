@@ -8,7 +8,9 @@
 import Foundation
 
 /// Represents a snapshot in a Restic repository
-public struct ResticSnapshot: Codable, Identifiable, Equatable {
+@objc public final class ResticSnapshot: NSObject, NSSecureCoding, Identifiable {
+    public static var supportsSecureCoding: Bool { true }
+    
     /// Unique identifier of the snapshot
     public let id: String
     /// Time when the snapshot was created
@@ -24,19 +26,36 @@ public struct ResticSnapshot: Codable, Identifiable, Equatable {
         String(id.prefix(8))
     }
     
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case time
-        case hostname
-        case tags
-        case paths
-    }
-    
     public init(id: String, time: Date, hostname: String, tags: [String]? = nil, paths: [String]) {
         self.id = id
         self.time = time
         self.hostname = hostname
         self.tags = tags
         self.paths = paths
+        super.init()
+    }
+    
+    public func encode(with coder: NSCoder) {
+        coder.encode(id, forKey: "id")
+        coder.encode(time, forKey: "time")
+        coder.encode(hostname, forKey: "hostname")
+        coder.encode(tags, forKey: "tags")
+        coder.encode(paths, forKey: "paths")
+    }
+    
+    public required init?(coder: NSCoder) {
+        guard let id = coder.decodeObject(of: NSString.self, forKey: "id") as String?,
+              let time = coder.decodeObject(of: NSDate.self, forKey: "time") as Date?,
+              let hostname = coder.decodeObject(of: NSString.self, forKey: "hostname") as String?,
+              let paths = coder.decodeObject(of: [NSArray.self, NSString.self], forKey: "paths") as? [String] else {
+            return nil
+        }
+        
+        self.id = id
+        self.time = time
+        self.hostname = hostname
+        self.tags = coder.decodeObject(of: [NSArray.self, NSString.self], forKey: "tags") as? [String]
+        self.paths = paths
+        super.init()
     }
 }
