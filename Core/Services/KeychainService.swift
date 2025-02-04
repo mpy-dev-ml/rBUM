@@ -10,20 +10,20 @@ public final class KeychainService {
     
     /// Initialize the keychain service
     /// - Parameters:
-    ///   - logger: Logger for tracking operations
     ///   - serviceName: Name of the service for keychain items
     ///   - accessGroup: Optional access group for XPC sharing
     ///   - accessibilityLevel: Keychain item accessibility level
+    ///   - logger: Logger for tracking operations
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "KeychainService") as! any LoggerProtocol as LoggerProtocol,
         serviceName: String = "dev.mpy.rBUM",
         accessGroup: String? = nil,
-        accessibilityLevel: CFString = kSecAttrAccessibleAfterFirstUnlock
+        accessibilityLevel: CFString = kSecAttrAccessibleAfterFirstUnlock,
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "KeychainService")
     ) {
-        self.logger = logger
         self.serviceName = serviceName
         self.accessGroup = accessGroup
         self.accessibilityLevel = accessibilityLevel
+        self.logger = logger
     }
     
     /// Create a query dictionary for keychain operations

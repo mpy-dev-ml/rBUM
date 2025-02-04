@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Core
+import Foundation
 
 private let logger = LoggerFactory.createLogger(category: "App")
 
@@ -22,8 +23,9 @@ struct rBUMApp: App {
     init() {
         // Initialize dependencies
         let fileManager = FileManager.default
-        let securityService = SecurityService()
-        let dateProvider = DefaultDateProvider()
+        let xpcService = ResticXPCService()
+        let securityService = SecurityService(xpcService: xpcService)
+        let dateProvider = DateProvider()
         let notificationCenter = NotificationCenter.default
         
         // Initialize repository services
@@ -42,22 +44,21 @@ struct rBUMApp: App {
         
         self.resticService = ResticCommandService(
             fileManager: fileManager,
-            securityService: securityService,
-            processExecutor: processExecutor,
-            dateProvider: dateProvider
+            securityService: securityService
         )
         
         self.repositoryCreationService = RepositoryCreationService(
             fileManager: fileManager,
             securityService: securityService,
-            repositoryService: resticService,
             credentialsManager: credentialsManager,
             repositoryStorage: repositoryStorage,
-            dateProvider: dateProvider,
-            notificationCenter: notificationCenter
+            resticService: resticService
         )
         
-        logger.debug("App initialized", privacy: .public)
+        logger.debug("App initialized")
+        
+        // Setup app delegate
+        setupAppDelegate()
     }
     
     var body: some Scene {
@@ -76,9 +77,9 @@ struct rBUMApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates...") {
-                    logger.info("Check for updates requested")
-                    // TODO: Implement update check
+                    checkForUpdates()
                 }
+                .keyboardShortcut("U", modifiers: [.command, .shift])
             }
             SidebarCommands()
         }
@@ -88,6 +89,45 @@ struct rBUMApp: App {
             SettingsView()
         }
         #endif
+    }
+    
+    // MARK: - Private Methods
+    
+    private func setupAppDelegate() {
+        logger.debug("Setting up app delegate")
+        
+        // Register for notifications
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            handleAppTermination()
+        }
+    }
+    
+    private func handleAppTermination() {
+        logger.debug("Handling app termination")
+        
+        // Clean up resources
+        cleanupResources()
+        
+        // Save state
+        saveApplicationState()
+    }
+    
+    private func cleanupResources() {
+        logger.debug("Cleaning up resources")
+    }
+    
+    private func saveApplicationState() {
+        logger.debug("Saving application state")
+    }
+    
+    private func checkForUpdates() {
+        logger.debug("Checking for updates")
+        
+        // TODO: Implement update checking
     }
 }
 

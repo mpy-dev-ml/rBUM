@@ -15,17 +15,20 @@ public class SandboxMonitor {
     /// Maximum duration for resource access (in seconds)
     private let maxAccessDuration: TimeInterval = 300 // 5 minutes
     
+    /// Initialize sandbox monitor
+    /// - Parameters:
+    ///   - logger: Logger for tracking operations
+    ///   - fileManager: FileManager instance to use
+    ///   - permissionManager: Permission manager instance
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxMonitor") as! LoggerProtocol,
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxMonitor"),
         fileManager: FileManager = .default,
         permissionManager: PermissionManager = PermissionManager()
     ) {
         self.logger = logger
         self.fileManager = fileManager
         self.permissionManager = permissionManager
-        
-        // Start monitoring
-        startMonitoring()
+        setupMonitoring()
     }
     
     /// Track resource access
@@ -112,7 +115,7 @@ public class SandboxMonitor {
     
     // MARK: - Private Methods
     
-    private func startMonitoring() {
+    private func setupMonitoring() {
         // Start periodic violation checks
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self = self else { return }

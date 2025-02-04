@@ -13,10 +13,10 @@ public class PermissionManager {
     private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
     
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "PermissionManager") as! any LoggerProtocol as LoggerProtocol,
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "PermissionManager"),
         securityService: SecurityServiceProtocol = SecurityService(
-            logger: LoggerFactory.createLogger(category: "SecurityService") as! LoggerProtocol,
-            xpcService: ResticXPCService.shared
+            logger: LoggerFactory.createLogger(category: "SecurityService"),
+            xpcService: ResticXPCService()
         ),
         keychain: KeychainServiceProtocol = KeychainService()
     ) {

@@ -1,10 +1,10 @@
     import Foundation
 import os.log
-import Core
 
+#if os(macOS)
 /// Logger implementation using os.log with sandbox compliance and privacy controls
 public final class OSLogger: LoggerProtocol {
-    private let logger: Logger
+    private let logger: os.Logger
     private let queue: DispatchQueue
     
     /// The subsystem identifier for this logger
@@ -20,25 +20,25 @@ public final class OSLogger: LoggerProtocol {
     public init(subsystem: String, category: String) {
         self.subsystem = subsystem
         self.category = category
-        self.logger = Logger(subsystem: subsystem, category: category)
+        self.logger = os.Logger(subsystem: subsystem, category: category)
         self.queue = DispatchQueue(label: "dev.mpy.rBUM.logger.\(category)", qos: .utility)
     }
     
-    public func debug(_ message: String, file: String, function: String, line: Int) {
+    public func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         queue.async {
             let filename = self.sanitizeSourcePath(file)
             self.logger.debug("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
         }
     }
     
-    public func info(_ message: String, file: String, function: String, line: Int) {
+    public func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         queue.async {
             let filename = self.sanitizeSourcePath(file)
             self.logger.info("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .auto)")
         }
     }
     
-    public func error(_ message: String, file: String, function: String, line: Int) {
+    public func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         queue.async {
             let filename = self.sanitizeSourcePath(file)
             self.logger.error("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
@@ -49,9 +49,13 @@ public final class OSLogger: LoggerProtocol {
     
     /// Sanitize file paths to avoid leaking sandbox paths
     private func sanitizeSourcePath(_ path: String) -> String {
-        guard let filename = path.components(separatedBy: "/").last else {
-            return "UnknownFile"
+        guard let lastComponent = path.split(separator: "/").last else {
+            return path
         }
-        return filename
+        return String(lastComponent)
     }
 }
+
+/// Default logger implementation for the current platform
+public typealias DefaultLogger = OSLogger
+#endif

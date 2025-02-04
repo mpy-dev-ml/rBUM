@@ -273,7 +273,7 @@ final class BackupService: BackupServiceProtocol {
         } catch {
             logger.error("Operation failed: \(error.localizedDescription, privacy: .public)", file: #file, function: #function, line: #line)
             throw error
-        } finally {
+        }; finally {
             // Stop accessing in reverse order
             for url in securedURLs.reversed() {
                 bookmarkService.stopAccessing(url)

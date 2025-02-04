@@ -1,5 +1,10 @@
+import Foundation
+import Core
+import AppKit
+import os.log
+
 /// Service for executing restic commands via XPC
-class ResticCommandService {
+final class ResticCommandService: ResticCommandServiceProtocol {
     private let logger: LoggerProtocol
     private let fileManager: FileManager
     private let securityService: SecurityServiceProtocol
@@ -35,222 +40,158 @@ class ResticCommandService {
         xpcConnection?.invalidate()
     }
     
+    // MARK: - ResticCommandServiceProtocol
+    
+    public func initRepository(credentials: RepositoryCredentials) async throws {
+        try await executeResticCommand(.initialize, for: credentials.repository)
+    }
+    
+    public func createBackup(paths: [URL], to repository: Repository, credentials: RepositoryCredentials, tags: [String]?) async throws {
+        try await executeResticCommand(.backup, for: repository)
+    }
+    
+    public func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot] {
+        let result = try await executeResticCommand(.snapshots, for: repository)
+        // TODO: Parse snapshots from result
+        return []
+    }
+    
+    public func restoreSnapshot(_ snapshot: Snapshot, to path: URL, credentials: RepositoryCredentials) async throws {
+        try await executeResticCommand(.restore, for: snapshot.repository)
+    }
+    
+    public func checkRepository(_ repository: Repository, credentials: RepositoryCredentials) async throws {
+        try await executeResticCommand(.check, for: repository)
+    }
+    
+    // MARK: - Private Methods
+    
     /// Execute a restic command
     /// - Parameters:
     ///   - command: The command to execute
     ///   - repository: The repository to operate on
     /// - Returns: The result of the command execution
     /// - Throws: ResticError if the command fails
-    func executeResticCommand(_ command: ResticCommand, for repository: Repository) async throws -> ProcessResult {
-        logger.debug("Executing restic command: \(command.rawValue, privacy: .public)")
+    private func executeResticCommand(_ command: ResticCommand, for repository: Repository) async throws -> ProcessResult {
+        logger.debug("Executing restic command: \(command.rawValue)")
         
         // Monitor file access
-        sandboxDiagnostics.monitorFileAccess(url: repository.path, operation: "read")
+        sandboxDiagnostics.monitorFileAccess(url: URL(fileURLWithPath: repository.path), operation: "read")
         
         // Track resources we need to access
         var accessedResources: [URL] = []
-        defer {
-            // Always clean up resource access
-            for resource in accessedResources {
-                securityService.stopAccessing(resource)
-            }
+        
+        // Ensure we have access to the repository
+        let repoURL = URL(fileURLWithPath: repository.path)
+        if try await securityService.validateAccess(to: repoURL) {
+            accessedResources.append(repoURL)
+            logger.debug("Repository access validated")
         }
         
+        // Setup XPC service
+        guard let service = try await getResticService() else {
+            throw ResticError.serviceUnavailable
+        }
+        
+        // Execute command
         do {
-            // Validate repository access
-            guard securityService.startAccessing(repository.path) else {
-                logger.error("Repository access denied: \(repository.path.path, privacy: .private)")
-                throw ResticError.accessDenied(repository.path.path)
-            }
-            accessedResources.append(repository.path)
-            
-            // Ensure working directory exists and is accessible
-            try await ensureWorkingDirectory()
-            
-            // Get restic service proxy
-            guard let service = xpcConnection?.remoteObjectProxy as? ResticServiceProtocol else {
-                throw ResticError.serviceUnavailable
-            }
-            
-            // Execute command via XPC
-            return try await withCheckedThrowingContinuation { continuation in
-                let environment = [
-                    "RESTIC_PASSWORD": repository.password,
-                    "PATH": "/usr/local/bin:/usr/bin:/bin",
-                    "TMPDIR": workingDirectory.path,
-                    "HOME": fileManager.homeDirectoryForCurrentUser.path
-                ]
-                
-                service.executeCommand(
-                    "/usr/local/bin/restic",
-                    arguments: buildArguments(command, for: repository),
-                    environment: environment,
-                    workingDirectory: workingDirectory.path
-                ) { data, error in
-                    if let error = error {
-                        continuation.resume(throwing: ResticError.commandFailed(error.localizedDescription))
-                        return
-                    }
-                    
-                    guard let data = data else {
-                        continuation.resume(throwing: ResticError.noOutput)
-                        return
-                    }
-                    
-                    let result = ProcessResult(
-                        standardOutput: String(data: data, encoding: .utf8) ?? "",
-                        standardError: "",
-                        exitCode: 0
-                    )
-                    
-                    continuation.resume(returning: result)
-                }
-            }
-            
+            let result = try await service.executeCommand(command.rawValue)
+            logger.debug("Command execution completed")
+            return result
         } catch {
-            logger.error("Failed to execute command: \(error.localizedDescription, privacy: .private)")
-            throw error
+            logger.error("Command execution failed: \(error.localizedDescription)")
+            throw ResticError.commandFailed(error)
+        } finally {
+            // Stop accessing resources
+            for url in accessedResources {
+                try? await securityService.stopAccessing(url)
+            }
         }
     }
-    
-    // MARK: - Private Methods
     
     private func setupXPCConnection() {
         xpcConnection = NSXPCConnection(serviceName: "dev.mpy.rBUM.ResticService")
         xpcConnection?.remoteObjectInterface = NSXPCInterface(with: ResticServiceProtocol.self)
         
         // Monitor IPC access
-        sandboxDiagnostics.monitorIPCAccess("dev.mpy.rBUM.ResticService")
-        
-        xpcConnection?.invalidationHandler = { [weak self] in
-            self?.logger.error("XPC connection invalidated", privacy: .public)
-            self?.xpcConnection = nil
-        }
+        sandboxDiagnostics.monitorIPCAccess(service: "ResticService")
         
         xpcConnection?.resume()
+        logger.debug("XPC connection setup complete")
     }
     
-    /// Ensure the working directory exists and is properly configured
-    private func ensureWorkingDirectory() async throws {
-        do {
-            // Create working directory if it doesn't exist
-            if !fileManager.fileExists(atPath: workingDirectory.path) {
-                try fileManager.createDirectory(
-                    at: workingDirectory,
-                    withIntermediateDirectories: true,
-                    attributes: [
-                        FileAttributeKey.posixPermissions: 0o700
-                    ]
-                )
-                logger.debug("Created working directory: \(workingDirectory.path, privacy: .private)")
+    private func validateWorkingDirectory() throws {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: workingDirectory.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            logger.error("Working directory validation failed")
+            throw ResticError.invalidWorkingDirectory
+        }
+        
+        // Check directory attributes
+        let attributes = try fileManager.attributesOfItem(atPath: workingDirectory.path)
+        guard let creationDate = attributes[.creationDate] as? Date else {
+            throw ResticError.invalidWorkingDirectory
+        }
+        
+        // Setup directory enumerator
+        let options: FileManager.DirectoryEnumerationOptions = [.skipsHiddenFiles]
+        guard let enumerator = fileManager.enumerator(
+            at: workingDirectory,
+            includingPropertiesForKeys: [.creationDate],
+            options: options
+        ) else {
+            throw ResticError.invalidWorkingDirectory
+        }
+        
+        // Check all files in directory
+        for case let fileURL as URL in enumerator {
+            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
+            guard let fileDate = attributes[.creationDate] as? Date,
+                  fileDate >= creationDate else {
+                logger.error("Found invalid file in working directory: \(fileURL.lastPathComponent)")
+                throw ResticError.invalidWorkingDirectory
             }
-            
-            // Clean up old files
-            let contents = try fileManager.contentsOfDirectory(
-                at: workingDirectory,
-                includingPropertiesForKeys: [.creationDateKey],
-                options: .skipsHiddenFiles
-            )
-            
-            let oldFiles = contents.filter { url in
-                guard let creation = try? url.resourceValues(forKeys: [.creationDateKey]).creationDate else {
-                    return false
-                }
-                return Date().timeIntervalSince(creation) > 24 * 60 * 60 // 24 hours
-            }
-            
-            for file in oldFiles {
-                try fileManager.removeItem(at: file)
-                logger.debug("Cleaned up old file: \(file.path, privacy: .private)")
-            }
-            
-        } catch {
-            logger.error("Failed to configure working directory: \(error.localizedDescription, privacy: .private)")
-            throw ResticError.workingDirectoryError(error.localizedDescription)
         }
     }
     
-    /// Build command arguments for restic
-    private func buildArguments(_ command: ResticCommand, for repository: Repository) -> [String] {
-        var args = [String]()
+    private func getResticService() async throws -> ResticServiceProtocol? {
+        guard let connection = xpcConnection else {
+            throw ResticError.serviceUnavailable
+        }
         
-        // Add repository path
-        args.append("--repo")
-        args.append(repository.path.path)
-        
-        // Add command-specific arguments
-        args.append(contentsOf: command.arguments)
-        
-        logger.debug("Built command arguments", privacy: .public)
-        return args
+        return try await withCheckedThrowingContinuation { continuation in
+            connection.remoteObjectProxyWithErrorHandler { error in
+                self.logger.error("XPC connection failed: \(error.localizedDescription)")
+                continuation.resume(throwing: ResticError.serviceUnavailable)
+            } as? ResticServiceProtocol
+        }
     }
 }
 
 /// Represents a restic command with its arguments
-enum ResticCommand {
-    case initialize
-    case check
-    case backup([URL])
-    case restore(String, to: URL)
-    case snapshots
-    case prune
-    case unlock
-    
-    var arguments: [String] {
-        switch self {
-        case .initialize:
-            return ["init"]
-        case .check:
-            return ["check"]
-        case .backup(let urls):
-            return ["backup"] + urls.map { $0.path }
-        case .restore(let snapshot, let target):
-            return ["restore", snapshot, "--target", target.path]
-        case .snapshots:
-            return ["snapshots"]
-        case .prune:
-            return ["prune"]
-        case .unlock:
-            return ["unlock"]
-        }
-    }
-    
-    var rawValue: String {
-        switch self {
-        case .initialize: return "init"
-        case .check: return "check"
-        case .backup: return "backup"
-        case .restore: return "restore"
-        case .snapshots: return "snapshots"
-        case .prune: return "prune"
-        case .unlock: return "unlock"
-        }
-    }
+private enum ResticCommand: String {
+    case initialize = "init"
+    case backup = "backup"
+    case restore = "restore"
+    case snapshots = "snapshots"
+    case check = "check"
 }
 
 /// Errors that can occur during restic operations
-enum ResticError: LocalizedError {
-    case executableNotFound
-    case accessDenied(String)
-    case commandFailed(String)
-    case workingDirectoryError(String)
+private enum ResticError: Error {
     case serviceUnavailable
-    case noOutput
+    case commandFailed(Error)
+    case invalidWorkingDirectory
     
     var errorDescription: String? {
         switch self {
-        case .executableNotFound:
-            return "Restic executable not found"
-        case .accessDenied(let path):
-            return "Access denied to path: \(path)"
-        case .commandFailed(let error):
-            return "Command failed: \(error)"
-        case .workingDirectoryError(let error):
-            return "Working directory error: \(error)"
         case .serviceUnavailable:
-            return "Restic service is unavailable"
-        case .noOutput:
-            return "Command produced no output"
+            return "Restic service is not available"
+        case .commandFailed(let error):
+            return "Command failed: \(error.localizedDescription)"
+        case .invalidWorkingDirectory:
+            return "Invalid working directory"
         }
     }
 }

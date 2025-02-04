@@ -6,13 +6,13 @@
 //
 
 import Foundation
-import os
+import os.log
 
 /// Factory for creating loggers
 public struct LoggerFactory {
     // MARK: - Properties
     
-    private let subsystem = "dev.mpy.rBUM"
+    private static let subsystem = "dev.mpy.rBUM"
     
     // MARK: - Public Methods
     
@@ -21,7 +21,7 @@ public struct LoggerFactory {
     /// - Returns: A new logger instance conforming to LoggerProtocol
     public static func createLogger(category: String) -> LoggerProtocol {
         #if os(macOS)
-        return OSLogger(subsystem: "dev.mpy.rBUM", category: category)
+        return OSLogger(subsystem: subsystem, category: category)
         #else
         #error("Platform not supported")
         #endif

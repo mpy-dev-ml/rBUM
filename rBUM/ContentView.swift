@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Core
 
 struct ContentView: View {
     @StateObject private var viewModel: ContentViewModel
@@ -30,8 +31,7 @@ struct ContentView: View {
                     creationService: creationService
                 )
             case .backups:
-                Text("Backup List")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                BackupListView()
             case .schedules:
                 Text("Schedule List")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

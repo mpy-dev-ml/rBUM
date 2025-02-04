@@ -1,7 +1,7 @@
 import Foundation
 
 /// Service implementing security operations with sandbox compliance and XPC support
-public final class SecurityService {
+public final class SecurityService: SecurityServiceProtocol {
     private let logger: LoggerProtocol
     private let xpcService: ResticXPCServiceProtocol
     private var activeBookmarks: [URL: Data] = [:]
@@ -12,11 +12,35 @@ public final class SecurityService {
     ///   - logger: Logger for tracking operations
     ///   - xpcService: XPC service for command execution
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SecurityService") as! LoggerProtocol,
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SecurityService"),
         xpcService: ResticXPCServiceProtocol
     ) {
         self.logger = logger
         self.xpcService = xpcService
+        setupNotifications()
+    }
+    
+    private func setupNotifications() {
+        logger.debug("Setting up security notifications")
+        
+        let center = DistributedNotificationCenter.default()
+        
+        // Handle security preference changes
+        center.addObserver(forName: .init("com.apple.security.plist.change"), object: nil, queue: nil) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Sync changes to avoid race conditions
+            self.bookmarkQueue.sync {
+                _ = self.handleSecurityPreferenceChange()
+            }
+        }
+        
+        logger.debug("Security notifications setup complete")
+    }
+    
+    private func handleSecurityPreferenceChange() -> Bool {
+        // Handle security preference change logic here
+        return true
     }
     
     /// Safely access active bookmarks
@@ -29,161 +53,83 @@ public final class SecurityService {
         bookmarkQueue.sync { activeBookmarks[url] = bookmark }
     }
     
-    /// Safely remove active bookmark
+    /// Remove active bookmark
     private func removeActiveBookmark(for url: URL) {
         bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
     }
     
-    /// Handle bookmark creation with proper error handling
-    private func createSecurityScopedBookmark(for url: URL) throws -> Data {
-        logger.debug("Creating security-scoped bookmark for: \(url.path)", file: #file, function: #function, line: #line)
-        
-        do {
-            let bookmark = try url.bookmarkData(
-                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            logger.info("Successfully created bookmark for: \(url.path)", file: #file, function: #function, line: #line)
-            return bookmark
-        } catch {
-            logger.error("Failed to create bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.bookmarkCreationFailed("Failed to create bookmark: \(error.localizedDescription)")
-        }
-    }
+    // MARK: - SecurityServiceProtocol
     
-    /// Handle bookmark resolution with proper error handling
-    private func resolveSecurityScopedBookmark(_ bookmark: Data) throws -> URL {
-        logger.debug("Resolving security-scoped bookmark", file: #file, function: #function, line: #line)
+    public func validateAccess(to url: URL) async throws -> Bool {
+        logger.debug("Validating access to: \(url.path)")
         
-        var isStale = false
-        do {
-            let url = try URL(resolvingBookmarkData: bookmark,
-                            options: .withSecurityScope,
-                            relativeTo: nil,
-                            bookmarkDataIsStale: &isStale)
-            
-            if isStale {
-                logger.error("Bookmark is stale", file: #file, function: #function, line: #line)
-                throw SecurityError.bookmarkStale("Bookmark is stale and needs to be recreated")
-            }
-            
-            logger.info("Successfully resolved bookmark to: \(url.path)", file: #file, function: #function, line: #line)
-            return url
-        } catch {
-            logger.error("Failed to resolve bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.bookmarkResolutionFailed("Failed to resolve bookmark: \(error.localizedDescription)")
-        }
-    }
-}
-
-// MARK: - SecurityServiceProtocol Implementation
-
-extension SecurityService: SecurityServiceProtocol {
-    public func validateXPCService() async throws -> Bool {
-        logger.debug("Validating XPC service", file: #file, function: #function, line: #line)
-        
-        do {
-            try await xpcService.connect()
-            let isValid = try await xpcService.validatePermissions()
-            if isValid {
-                logger.info("XPC service validated successfully", file: #file, function: #function, line: #line)
-            } else {
-                logger.error("XPC service permissions invalid", file: #file, function: #function, line: #line)
-            }
-            return isValid
-        } catch {
-            logger.error("XPC service validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            return false
-        }
-    }
-    
-    public func requestPermission(for url: URL) async throws -> Bool {
-        logger.debug("Requesting permission for: \(url.path)", file: #file, function: #function, line: #line)
-        
-        // Check if we already have an active bookmark
-        if let existingBookmark = getActiveBookmark(for: url) {
+        // Check if we have an active bookmark
+        if let bookmark = getActiveBookmark(for: url) {
             do {
-                _ = try resolveSecurityScopedBookmark(existingBookmark)
-                logger.info("Using existing permission for: \(url.path)", file: #file, function: #function, line: #line)
-                return true
+                var isStale = false
+                let resolvedURL = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
+                
+                if isStale {
+                    logger.debug("Bookmark is stale for: \(url.path)")
+                    removeActiveBookmark(for: url)
+                    return false
+                }
+                
+                if resolvedURL.startAccessingSecurityScopedResource() {
+                    logger.debug("Successfully accessed: \(url.path)")
+                    return true
+                }
             } catch {
-                // Existing bookmark is invalid, remove it
+                logger.error("Failed to resolve bookmark: \(error.localizedDescription)")
                 removeActiveBookmark(for: url)
             }
         }
         
-        // Create new bookmark
-        do {
-            let bookmark = try createSecurityScopedBookmark(for: url)
-            setActiveBookmark(bookmark, for: url)
-            logger.info("Permission granted for: \(url.path)", file: #file, function: #function, line: #line)
-            return true
-        } catch {
-            logger.error("Permission denied for: \(url.path)", file: #file, function: #function, line: #line)
-            return false
-        }
+        return false
     }
     
-    public func createBookmark(for url: URL) async throws -> Data {
-        logger.debug("Creating bookmark for: \(url.path)", file: #file, function: #function, line: #line)
-        
-        // Ensure we have permission
-        guard try await requestPermission(for: url) else {
-            throw SecurityError.permissionDenied("Permission not granted for URL")
-        }
-        
-        // Create bookmark
-        let bookmark = try createSecurityScopedBookmark(for: url)
-        setActiveBookmark(bookmark, for: url)
-        
-        logger.info("Created and stored bookmark for: \(url.path)", file: #file, function: #function, line: #line)
-        return bookmark
-    }
-    
-    public func resolveBookmark(_ bookmark: Data) async throws -> URL {
-        logger.debug("Resolving bookmark", file: #file, function: #function, line: #line)
-        let url = try resolveSecurityScopedBookmark(bookmark)
-        setActiveBookmark(bookmark, for: url)
-        return url
-    }
-    
-    public func startAccessing(_ url: URL) -> Bool {
-        logger.debug("Starting access for: \(url.path)", file: #file, function: #function, line: #line)
-        
-        let success = url.startAccessingSecurityScopedResource()
-        if success {
-            logger.info("Started accessing: \(url.path)", file: #file, function: #function, line: #line)
-        } else {
-            logger.error("Failed to start accessing: \(url.path)", file: #file, function: #function, line: #line)
-        }
-        
-        return success
-    }
-    
-    public func stopAccessing(_ url: URL) {
-        logger.debug("Stopping access for: \(url.path)", file: #file, function: #function, line: #line)
+    public func stopAccessing(_ url: URL) async throws {
+        logger.debug("Stopping access to: \(url.path)")
         url.stopAccessingSecurityScopedResource()
-        logger.info("Stopped accessing: \(url.path)", file: #file, function: #function, line: #line)
     }
     
-    public func prepareForXPCAccess(_ url: URL) async throws -> Data {
-        logger.debug("Preparing XPC access for: \(url.path)", file: #file, function: #function, line: #line)
+    public func persistAccess(to url: URL) async throws -> Data {
+        logger.debug("Persisting access to: \(url.path)")
         
-        // Ensure we have a valid bookmark
-        let bookmark: Data
-        if let existingBookmark = getActiveBookmark(for: url) {
-            bookmark = existingBookmark
-        } else {
-            bookmark = try await createBookmark(for: url)
-        }
-        
-        // Validate XPC service connection
-        guard try await validateXPCService() else {
-            throw SecurityError.xpcValidationFailed("XPC service validation failed")
-        }
-        
-        logger.info("XPC access prepared for: \(url.path)", file: #file, function: #function, line: #line)
+        let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        setActiveBookmark(bookmark, for: url)
         return bookmark
+    }
+    
+    public func validateXPCService() async throws -> Bool {
+        logger.debug("Validating XPC service")
+        
+        do {
+            return try await xpcService.validate()
+        } catch {
+            logger.error("XPC service validation failed: \(error.localizedDescription)")
+            throw SecurityError.xpcServiceUnavailable
+        }
+    }
+}
+
+/// Errors that can occur during security operations
+public enum SecurityError: Error {
+    case accessDenied
+    case bookmarkInvalid
+    case bookmarkStale
+    case xpcServiceUnavailable
+    
+    public var errorDescription: String? {
+        switch self {
+        case .accessDenied:
+            return "Access denied to requested resource"
+        case .bookmarkInvalid:
+            return "Invalid security-scoped bookmark"
+        case .bookmarkStale:
+            return "Security-scoped bookmark is stale"
+        case .xpcServiceUnavailable:
+            return "XPC service is not available"
+        }
     }
 }

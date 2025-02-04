@@ -8,7 +8,11 @@ public class SandboxDiagnostics {
     private let subsystem = "dev.mpy.rBUM"
     private let signpostLog: OSLog
     
-    public init(logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxDiagnostics") as! LoggerProtocol) {
+    /// Initialize sandbox diagnostics
+    /// - Parameter logger: Logger for tracking operations
+    public init(
+        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxDiagnostics")
+    ) {
         self.logger = logger
         self.signpostLog = OSLog(subsystem: subsystem, category: "Sandbox")
         setupSignposts()
