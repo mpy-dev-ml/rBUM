@@ -9,7 +9,7 @@ import Foundation
 import Core
 
 /// Service for managing backup operations
-public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable {
+public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable {
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol
@@ -42,90 +42,61 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     }
     
     // MARK: - BackupServiceProtocol Implementation
-    public func createRepository(at url: URL, password: String) async throws {
-        try await measure("Create Repository") {
-            // Store credentials first
-            let credentials = KeychainCredentials(repositoryUrl: url, password: password)
-            try keychainService.storeCredentials(credentials)
+    public func initializeRepository(_ repository: Repository) async throws {
+        try await measure("Initialize Repository") {
+            try await resticService.initializeRepository(at: URL(fileURLWithPath: repository.path))
             
-            // Initialize repository
-            try await resticService.initialize(repository: url, password: password)
-            
-            logger.info("Successfully created repository at \(url.path)")
+            logger.info("Repository initialized at \(repository.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
         }
     }
     
-    public func startBackup(source: URL, to repository: URL) async throws -> UUID {
-        let backupId = UUID()
-        
-        try await measure("Start Backup \(backupId)") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw BackupError.invalidRepository
-            }
-            
+    public func createBackup(to repository: Repository, paths: [String], tags: [String]?) async throws {
+        try await measure("Create Backup") {
             // Track backup operation
+            let operationId = UUID()
             accessQueue.async(flags: .barrier) {
-                self.activeBackups.insert(backupId)
+                self.activeBackups.insert(operationId)
             }
             
-            // Start backup in background
-            Task.detached { [weak self] in
-                guard let self = self else { return }
-                
-                do {
-                    try await self.resticService.backup(source: source, to: repository)
-                    self.logger.info("Backup \(backupId) completed successfully")
-                } catch {
-                    self.logger.error("Backup \(backupId) failed: \(error.localizedDescription)")
-                }
-                
-                // Remove from active backups
-                self.accessQueue.async(flags: .barrier) {
-                    self.activeBackups.remove(backupId)
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeBackups.remove(operationId)
                 }
             }
             
-            logger.info("Started backup \(backupId) from \(source.path) to \(repository.path)")
-        }
-        
-        return backupId
-    }
-    
-    public func cancelBackup(_ id: UUID) {
-        accessQueue.async(flags: .barrier) {
-            if activeBackups.contains(id) {
-                activeBackups.remove(id)
-                logger.info("Cancelled backup \(id)")
-            } else {
-                logger.warning("Attempted to cancel non-existent backup \(id)")
+            // Create backup
+            for path in paths {
+                guard let url = URL(string: path) else {
+                    logger.error("Invalid path: \(path)",
+                               file: #file,
+                               function: #function,
+                               line: #line)
+                    throw BackupError.invalidPath(path)
+                }
+                
+                try await resticService.backup(
+                    from: url,
+                    to: URL(fileURLWithPath: repository.path)
+                )
             }
         }
     }
     
-    public func listSnapshots(in repository: URL) async throws -> [Snapshot] {
+    public func listSnapshots(in repository: Repository) async throws -> [Snapshot] {
         try await measure("List Snapshots") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw BackupError.invalidRepository
-            }
+            let snapshotIds = try await resticService.listSnapshots()
             
-            return try await resticService.listSnapshots(in: repository)
-        }
-    }
-    
-    public func restore(snapshot: String, from repository: URL, to destination: URL) async throws {
-        try await measure("Restore Snapshot") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw BackupError.invalidRepository
+            return snapshotIds.map { id in
+                Snapshot(
+                    id: id,
+                    time: Date(),
+                    repository: repository,
+                    tags: nil
+                )
             }
-            
-            try await resticService.restore(from: repository, snapshot: snapshot, to: destination)
-            logger.info("Successfully restored snapshot \(snapshot) to \(destination.path)")
         }
     }
     
@@ -134,22 +105,18 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         await measure("Backup Service Health Check") {
             do {
                 // Check dependencies
-                guard await resticService.performHealthCheck(),
-                      await keychainService.performHealthCheck() else {
-                    return false
-                }
+                let resticHealthy = await resticService.performHealthCheck()
+                let keychainHealthy = await keychainService.performHealthCheck()
                 
-                // Check for stuck backups
-                let stuckBackups = accessQueue.sync { activeBackups }
-                if !stuckBackups.isEmpty {
-                    logger.warning("Found \(stuckBackups.count) potentially stuck backups")
-                    return false
-                }
+                // Check active operations
+                let operationsHealthy = isHealthy
                 
-                logger.info("Backup service health check passed")
-                return true
+                return resticHealthy && keychainHealthy && operationsHealthy
             } catch {
-                logger.error("Backup service health check failed: \(error.localizedDescription)")
+                logger.error("Health check failed: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
         }
@@ -159,20 +126,17 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
 // MARK: - Backup Errors
 public enum BackupError: LocalizedError {
     case invalidRepository
-    case backupInProgress
-    case snapshotNotFound(String)
-    case restoreFailed(String)
+    case invalidPath(String)
+    case backupFailed(Error)
     
     public var errorDescription: String? {
         switch self {
         case .invalidRepository:
-            return "Invalid or unauthorized repository"
-        case .backupInProgress:
-            return "A backup operation is already in progress"
-        case .snapshotNotFound(let id):
-            return "Snapshot not found: \(id)"
-        case .restoreFailed(let message):
-            return "Restore operation failed: \(message)"
+            return "Invalid repository configuration"
+        case .invalidPath(let path):
+            return "Invalid path: \(path)"
+        case .backupFailed(let error):
+            return "Backup failed: \(error.localizedDescription)"
         }
     }
 }

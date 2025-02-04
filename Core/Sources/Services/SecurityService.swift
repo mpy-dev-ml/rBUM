@@ -1,3 +1,10 @@
+//
+//  SecurityService.swift
+//  Core
+//
+//  Created by Matthew Yeager on 04/02/2025.
+//
+
 import Foundation
 import AppKit
 
@@ -19,7 +26,10 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     private func setupNotifications() {
-        logger.debug("Setting up security notifications")
+        logger.debug("Setting up security notifications",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         
         NotificationCenter.default.addObserver(
             self,
@@ -52,9 +62,9 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func requestPermission(for url: URL) async throws -> Bool {
-        self.logger.debug("Requesting permission for: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Requesting permission for: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         let panel = NSOpenPanel()
@@ -83,9 +93,9 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func createBookmark(for url: URL) throws -> Data {
-        self.logger.debug("Creating bookmark for: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Creating bookmark for: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         do {
@@ -99,9 +109,9 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func resolveBookmark(_ bookmark: Data) throws -> URL {
-        self.logger.debug("Resolving bookmark", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Resolving bookmark",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         var isStale = false
@@ -112,48 +122,48 @@ public final class SecurityService: SecurityServiceProtocol {
                             bookmarkDataIsStale: &isStale)
             
             if isStale {
-                self.logger.debug("Bookmark is stale", 
-                                file: #file, 
-                                function: #function, 
+                self.logger.debug("Bookmark is stale",
+                                file: #file,
+                                function: #function,
                                 line: #line)
                 throw SecurityError.bookmarkStale("Bookmark needs to be recreated")
             }
             
-            self.logger.debug("Bookmark resolved successfully", 
-                            file: #file, 
-                            function: #function, 
+            self.logger.debug("Bookmark resolved successfully",
+                            file: #file,
+                            function: #function,
                             line: #line)
             return url
             
         } catch {
-            self.logger.error("Failed to resolve bookmark: \(error.localizedDescription)", 
-                            file: #file, 
-                            function: #function, 
+            self.logger.error("Failed to resolve bookmark: \(error.localizedDescription)",
+                            file: #file,
+                            function: #function,
                             line: #line)
             throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
         }
     }
     
     public func startAccessing(_ url: URL) throws -> Bool {
-        self.logger.debug("Starting access for: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Starting access for: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         return url.startAccessingSecurityScopedResource()
     }
     
     public func stopAccessing(_ url: URL) async throws {
-        self.logger.debug("Stopping access for: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Stopping access for: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         url.stopAccessingSecurityScopedResource()
     }
     
     public func validateAccess(to url: URL) async throws -> Bool {
-        self.logger.debug("Validating access to: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Validating access to: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         do {
@@ -166,9 +176,9 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func persistAccess(to url: URL) async throws -> Data {
-        self.logger.debug("Persisting access to: \(url.path)", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Persisting access to: \(url.path)",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -177,17 +187,17 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func validateXPCService() async throws -> Bool {
-        self.logger.debug("Validating XPC service", 
-                         file: #file, 
-                         function: #function, 
+        self.logger.debug("Validating XPC service",
+                         file: #file,
+                         function: #function,
                          line: #line)
         
         do {
             return try await xpcService.validatePermissions()
         } catch {
-            self.logger.error("XPC service validation failed: \(error.localizedDescription)", 
-                            file: #file, 
-                            function: #function, 
+            self.logger.error("XPC service validation failed: \(error.localizedDescription)",
+                            file: #file,
+                            function: #function,
                             line: #line)
             throw SecurityError.xpcValidationFailed(error.localizedDescription)
         }

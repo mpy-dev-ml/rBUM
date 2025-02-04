@@ -9,7 +9,7 @@ import Foundation
 import Core
 
 /// Service for managing restore operations
-public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable {
+public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol
@@ -42,90 +42,44 @@ public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol,
     }
     
     // MARK: - RestoreServiceProtocol Implementation
-    public func listSnapshots(in repository: URL) async throws -> [Snapshot] {
-        try await measure("List Snapshots") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw RestoreError.invalidRepository
-            }
-            
-            return try await resticService.listSnapshots(in: repository)
-        }
-    }
-    
-    public func startRestore(snapshot: String, from repository: URL, to destination: URL) async throws -> UUID {
-        let restoreId = UUID()
-        
-        try await measure("Start Restore \(restoreId)") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw RestoreError.invalidRepository
-            }
-            
+    public func restore(from source: URL, to destination: URL) async throws {
+        try await measure("Restore Files") {
             // Track restore operation
+            let operationId = UUID()
             accessQueue.async(flags: .barrier) {
-                self.activeRestores.insert(restoreId)
+                self.activeRestores.insert(operationId)
             }
             
-            // Start restore in background
-            Task.detached { [weak self] in
-                guard let self = self else { return }
-                
-                do {
-                    try await self.resticService.restore(from: repository, snapshot: snapshot, to: destination)
-                    self.logger.info("Restore \(restoreId) completed successfully")
-                } catch {
-                    self.logger.error("Restore \(restoreId) failed: \(error.localizedDescription)")
-                }
-                
-                // Remove from active restores
-                self.accessQueue.async(flags: .barrier) {
-                    self.activeRestores.remove(restoreId)
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeRestores.remove(operationId)
                 }
             }
             
-            logger.info("Started restore \(restoreId) of snapshot \(snapshot) to \(destination.path)")
-        }
-        
-        return restoreId
-    }
-    
-    public func cancelRestore(_ id: UUID) {
-        accessQueue.async(flags: .barrier) {
-            if activeRestores.contains(id) {
-                activeRestores.remove(id)
-                logger.info("Cancelled restore \(id)")
-            } else {
-                logger.warning("Attempted to cancel non-existent restore \(id)")
+            // Verify permissions
+            guard try await verifyPermissions(for: destination) else {
+                throw RestoreError.insufficientPermissions
             }
+            
+            // Execute restore
+            try await resticService.restore(from: source, to: destination)
+            
+            logger.info("Restore completed from \(source.path) to \(destination.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
         }
     }
     
-    public func validateRestoreLocation(_ url: URL) async throws -> Bool {
-        try await measure("Validate Restore Location") {
-            do {
-                // Check if location is accessible
-                guard await securityService.checkAccess(to: url) else {
-                    logger.warning("No access to restore location: \(url.path)")
-                    return false
-                }
-                
-                // Check if location has enough space
-                let attributes = try FileManager.default.attributesOfFileSystem(forPath: url.path)
-                guard let freeSpace = attributes[.systemFreeSize] as? Int64,
-                      freeSpace > 1_000_000_000 /* 1GB minimum */ else {
-                    logger.warning("Insufficient space at restore location: \(url.path)")
-                    return false
-                }
-                
-                logger.info("Successfully validated restore location: \(url.path)")
-                return true
-            } catch {
-                logger.error("Failed to validate restore location: \(error.localizedDescription)")
-                return false
-            }
+    public func listSnapshots() async throws -> [String] {
+        try await measure("List Snapshots") {
+            return try await resticService.listSnapshots()
+        }
+    }
+    
+    public func verifyPermissions(for url: URL) async throws -> Bool {
+        try await measure("Verify Permissions") {
+            return try await securityService.validateAccess(to: url)
         }
     }
     
@@ -134,22 +88,18 @@ public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol,
         await measure("Restore Service Health Check") {
             do {
                 // Check dependencies
-                guard await resticService.performHealthCheck(),
-                      await keychainService.performHealthCheck() else {
-                    return false
-                }
+                let resticHealthy = await resticService.performHealthCheck()
+                let keychainHealthy = await keychainService.performHealthCheck()
                 
-                // Check for stuck restores
-                let stuckRestores = accessQueue.sync { activeRestores }
-                if !stuckRestores.isEmpty {
-                    logger.warning("Found \(stuckRestores.count) potentially stuck restores")
-                    return false
-                }
+                // Check active operations
+                let operationsHealthy = isHealthy
                 
-                logger.info("Restore service health check passed")
-                return true
+                return resticHealthy && keychainHealthy && operationsHealthy
             } catch {
-                logger.error("Restore service health check failed: \(error.localizedDescription)")
+                logger.error("Health check failed: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
         }
@@ -158,24 +108,15 @@ public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol,
 
 // MARK: - Restore Errors
 public enum RestoreError: LocalizedError {
-    case invalidRepository
-    case restoreInProgress
-    case snapshotNotFound(String)
-    case destinationError(String)
-    case insufficientSpace
+    case insufficientPermissions
+    case restoreFailed(Error)
     
     public var errorDescription: String? {
         switch self {
-        case .invalidRepository:
-            return "Invalid or unauthorized repository"
-        case .restoreInProgress:
-            return "A restore operation is already in progress"
-        case .snapshotNotFound(let id):
-            return "Snapshot not found: \(id)"
-        case .destinationError(let message):
-            return "Destination error: \(message)"
-        case .insufficientSpace:
-            return "Insufficient space at restore location"
+        case .insufficientPermissions:
+            return "Insufficient permissions to restore to destination"
+        case .restoreFailed(let error):
+            return "Restore failed: \(error.localizedDescription)"
         }
     }
 }

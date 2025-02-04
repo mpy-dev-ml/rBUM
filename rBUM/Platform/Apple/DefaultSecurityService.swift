@@ -2,15 +2,16 @@
 //  DefaultSecurityService.swift
 //  rBUM
 //
-//  Created by Matthew Yeager on 02/02/2025.
+//  Created by Matthew Yeager on 04/02/2025.
 //
 
 import Foundation
 import Core
 import Security
+import AppKit
 
 /// macOS-specific implementation of security service
-public final class DefaultSecurityService: BaseSandboxedService, SecurityServiceProtocol, HealthCheckable {
+public class DefaultSecurityService: BaseSandboxedService, Measurable {
     // MARK: - Properties
     private let bookmarkService: BookmarkServiceProtocol
     private let keychainService: KeychainServiceProtocol
@@ -22,7 +23,7 @@ public final class DefaultSecurityService: BaseSandboxedService, SecurityService
     public var isHealthy: Bool {
         // Check if we have any stuck operations
         accessQueue.sync {
-            activeOperations.isEmpty
+            self.activeOperations.isEmpty
         }
     }
     
@@ -46,162 +47,120 @@ public final class DefaultSecurityService: BaseSandboxedService, SecurityService
     }
     
     // MARK: - SecurityServiceProtocol Implementation
+    public func requestPermission(for url: URL) async throws -> Bool {
+        try await measure("Request Permission") {
+            // First check if we already have access
+            if try await validateAccess(to: url) {
+                return true
+            }
+            
+            // Show open panel to request access
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = true
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = url
+            panel.message = "Please grant access to this location"
+            panel.prompt = "Grant Access"
+            
+            let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow())
+            return response == .OK
+        }
+    }
+    
+    public func createBookmark(for url: URL) throws -> Data {
+        try bookmarkService.createBookmark(for: url)
+    }
+    
+    public func resolveBookmark(_ bookmark: Data) throws -> URL {
+        try bookmarkService.resolveBookmark(bookmark)
+    }
+    
     public func validateAccess(to url: URL) async throws -> Bool {
         try await measure("Validate Access") {
             do {
-                // Check if we have a valid bookmark
-                guard try await bookmarkService.validateBookmark(for: url) else {
-                    logger.warning("No valid bookmark for \(url.path)")
-                    return false
-                }
-                
-                // Check file system attributes
-                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-                guard let posixPermissions = attributes[.posixPermissions] as? Int else {
-                    logger.warning("Could not get POSIX permissions for \(url.path)")
-                    return false
-                }
-                
-                // Check if we have read access (owner read permission)
-                let hasReadAccess = (posixPermissions & 0o400) != 0
-                if !hasReadAccess {
-                    logger.warning("No read permission for \(url.path)")
-                    return false
-                }
-                
-                logger.info("Successfully validated access to \(url.path)")
-                return true
+                let bookmark = try bookmarkService.createBookmark(for: url)
+                return try bookmarkService.validateBookmark(bookmark)
             } catch {
-                logger.error("Failed to validate access: \(error.localizedDescription)")
+                logger.error("Failed to validate access: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
         }
     }
     
-    public func requestAccess(to url: URL) async throws -> Bool {
-        let operationId = UUID()
-        
-        return try await measure("Request Access") {
-            // Track operation
-            accessQueue.async(flags: .barrier) {
-                self.activeOperations.insert(operationId)
-            }
-            
-            defer {
-                accessQueue.async(flags: .barrier) {
-                    self.activeOperations.remove(operationId)
-                }
-            }
-            
+    public override func startAccessing(_ url: URL) -> Bool {
+        do {
+            return try bookmarkService.startAccessing(url)
+        } catch {
+            logger.error("Failed to start accessing: \(error.localizedDescription)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
+            return false
+        }
+    }
+    
+    public override func stopAccessing(_ url: URL) {
+        Task {
             do {
-                // Try to create bookmark if we don't have one
-                if !(try await bookmarkService.validateBookmark(for: url)) {
-                    _ = try await bookmarkService.createBookmark(for: url)
-                }
-                
-                // Start tracking access
-                sandboxMonitor.trackResourceAccess(to: url)
-                
-                // Start accessing the resource
-                guard try await bookmarkService.startAccessing(url) else {
-                    logger.warning("Failed to start accessing \(url.path)")
-                    return false
-                }
-                
-                logger.info("Successfully requested access to \(url.path)")
-                return true
+                try await bookmarkService.stopAccessing(url)
             } catch {
-                logger.error("Failed to request access: \(error.localizedDescription)")
-                throw Core.SecurityError.accessDenied(error.localizedDescription)
+                logger.error("Failed to stop accessing: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
             }
         }
     }
     
-    public func revokeAccess(to url: URL) {
-        let operationId = UUID()
-        
-        measure("Revoke Access") {
-            // Track operation
-            accessQueue.async(flags: .barrier) {
-                self.activeOperations.insert(operationId)
-            }
-            
-            defer {
-                accessQueue.async(flags: .barrier) {
-                    self.activeOperations.remove(operationId)
-                }
-            }
-            
-            // Stop tracking access
-            sandboxMonitor.stopTrackingResource(url)
-            
-            // Stop accessing the resource
-            bookmarkService.stopAccessing(url)
-            
-            logger.info("Revoked access to \(url.path)")
+    public func persistAccess(to url: URL) async throws -> Data {
+        try await measure("Persist Access") {
+            let bookmark = try bookmarkService.createBookmark(for: url)
+            _ = try await sandboxMonitor.startMonitoring(url: url)
+            return bookmark
         }
     }
     
-    public func validateEncryption() async throws -> Bool {
-        try await measure("Validate Encryption") {
-            do {
-                // Check if keychain is accessible
-                guard await keychainService.performHealthCheck() else {
-                    logger.warning("Keychain health check failed")
-                    return false
-                }
-                
-                // Check if we can store and retrieve a test item
-                let testData = "test".data(using: .utf8)!
-                try keychainService.storeGenericPassword(testData, service: "test", account: "test")
-                let retrieved = try keychainService.retrieveGenericPassword(service: "test", account: "test")
-                
-                guard retrieved == testData else {
-                    logger.warning("Keychain data integrity check failed")
-                    return false
-                }
-                
-                // Clean up test item
-                try keychainService.deleteGenericPassword(service: "test", account: "test")
-                
-                logger.info("Successfully validated encryption")
-                return true
-            } catch {
-                logger.error("Failed to validate encryption: \(error.localizedDescription)")
-                return false
-            }
+    public func revokeAccess(to url: URL) async throws {
+        try await measure("Revoke Access") {
+            try await sandboxMonitor.stopMonitoring(for: url)
         }
     }
     
     // MARK: - HealthCheckable Implementation
     public func performHealthCheck() async -> Bool {
-        await measure("Default Security Service Health Check") {
+        await measure("Security Health Check") {
             do {
-                // Check dependencies
-                guard await bookmarkService.performHealthCheck(),
-                      await keychainService.performHealthCheck(),
-                      await sandboxMonitor.performHealthCheck() else {
-                    return false
-                }
+                // Check sandbox monitor
+                let monitorHealthy = sandboxMonitor.isHealthy
                 
-                // Check for stuck operations
-                let stuckOperations = accessQueue.sync { activeOperations }
-                if !stuckOperations.isEmpty {
-                    logger.warning("Found \(stuckOperations.count) potentially stuck operations")
-                    return false
-                }
+                // Check active operations
+                let operationsHealthy = isHealthy
                 
-                // Validate encryption
-                guard try await validateEncryption() else {
-                    return false
-                }
-                
-                logger.info("Default security service health check passed")
-                return true
+                return monitorHealthy && operationsHealthy
             } catch {
-                logger.error("Default security service health check failed: \(error.localizedDescription)")
+                logger.error("Health check failed: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
+        }
+    }
+    
+    // MARK: - Private Helpers
+    private func trackOperation(_ id: UUID) {
+        accessQueue.async(flags: .barrier) {
+            self.activeOperations.insert(id)
+        }
+    }
+    
+    private func untrackOperation(_ id: UUID) {
+        accessQueue.async(flags: .barrier) {
+            self.activeOperations.remove(id)
         }
     }
 }

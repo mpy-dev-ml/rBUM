@@ -1,9 +1,25 @@
+//
+//  KeychainService.swift
+//  Core
+//
+//  Created by Matthew Yeager on 04/02/2025.
+//
+
 import Foundation
 import Security
 
 /// Service for managing secure storage in the Keychain
-public final class KeychainService: BaseSandboxedService, KeychainServiceProtocol, HealthCheckable {
-    public var isHealthy: Bool
+public final class KeychainService: BaseSandboxedService, KeychainServiceProtocol, HealthCheckable, Measurable {
+    // MARK: - Properties
+    private let queue: DispatchQueue
+    public private(set) var isHealthy: Bool
+    
+    // MARK: - Initialization
+    public override init(logger: LoggerProtocol, securityService: SecurityServiceProtocol) {
+        self.queue = DispatchQueue(label: "dev.mpy.rBUM.keychain", qos: .userInitiated)
+        self.isHealthy = true // Default to true, will be updated by health checks
+        super.init(logger: logger, securityService: securityService)
+    }
     
     public func save(_ data: Data, for key: String, accessGroup: String? = nil) throws {
         try queue.sync {
@@ -82,15 +98,6 @@ public final class KeychainService: BaseSandboxedService, KeychainServiceProtoco
     public func validateXPCAccess(accessGroup: String) throws -> Bool {
         // No implementation
         return false
-    }
-    
-    // MARK: - Properties
-    private let queue: DispatchQueue
-    
-    // MARK: - Initialization
-    public override init(logger: LoggerProtocol, securityService: SecurityServiceProtocol) {
-        self.queue = DispatchQueue(label: "dev.mpy.rBUM.keychain", qos: .userInitiated)
-        super.init(logger: logger, securityService: securityService)
     }
     
     // MARK: - HealthCheckable Implementation

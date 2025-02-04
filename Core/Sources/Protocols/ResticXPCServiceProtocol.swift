@@ -1,39 +1,49 @@
+//
+//  ResticXPCServiceProtocol.swift
+//  Core
+//
+//  Created by Matthew Yeager on 04/02/2025.
+//
+
 import Foundation
 
-/// Protocol defining the XPC service interface for executing Restic commands
-///
-/// This protocol defines the communication interface between the main sandboxed app
-/// and the XPC service that executes Restic commands. The XPC service must:
-/// 1. Handle command execution outside the sandbox
-/// 2. Properly manage security-scoped bookmarks
-/// 3. Clean up resources after command execution
-/// 4. Handle permission validation
-@objc public protocol ResticXPCServiceProtocol: NSObjectProtocol {
-    /// Establish connection with the XPC service
-    /// - Throws: SecurityError if connection fails
-    @objc func connect() async throws
+/// Protocol for XPC service that executes Restic commands
+@objc public protocol ResticXPCServiceProtocol: HealthCheckable {
+    /// Ping the service to check availability
+    /// - Returns: true if service is available
+    func ping() async -> Bool?
     
-    /// Execute a Restic command through the XPC service
+    /// Initialize a new repository
     /// - Parameters:
-    ///   - command: The command to execute
-    ///   - bookmark: Optional security-scoped bookmark for file access
-    /// - Returns: Result of the command execution
-    /// - Throws: SecurityError if execution fails or permissions are invalid
-    @objc func executeCommand(_ command: String, withBookmark bookmark: Data?) async throws -> ProcessResult
+    ///   - url: Repository URL
+    ///   - username: Repository username
+    ///   - password: Repository password
+    /// - Throws: ResticError if initialization fails
+    func initializeRepository(at url: URL, username: String, password: String) async throws
     
-    /// Start accessing a security-scoped resource in the XPC service
-    /// - Parameter url: The URL to start accessing
-    /// - Returns: true if access was successfully started
-    /// - Note: Must be balanced with a corresponding stopAccessing call
-    @objc func startAccessing(_ url: URL) -> Bool
+    /// Create a backup
+    /// - Parameters:
+    ///   - source: Source path
+    ///   - destination: Destination path
+    ///   - username: Repository username
+    ///   - password: Repository password
+    /// - Throws: ResticError if backup fails
+    func backup(from source: URL, to destination: URL, username: String, password: String) async throws
     
-    /// Stop accessing a security-scoped resource in the XPC service
-    /// - Parameter url: The URL to stop accessing
-    /// - Note: Must be called after startAccessing when resource access is no longer needed
-    @objc func stopAccessing(_ url: URL)
+    /// List snapshots in repository
+    /// - Parameters:
+    ///   - username: Repository username
+    ///   - password: Repository password
+    /// - Returns: List of snapshot IDs
+    /// - Throws: ResticError if listing fails
+    func listSnapshots(username: String, password: String) async throws -> [String]
     
-    /// Validate that the XPC service has necessary permissions
-    /// - Returns: true if all permissions are valid
-    /// - Throws: SecurityError if validation fails
-    @objc func validatePermissions() async throws -> Bool
+    /// Restore from backup
+    /// - Parameters:
+    ///   - source: Source path
+    ///   - destination: Destination path
+    ///   - username: Repository username
+    ///   - password: Repository password
+    /// - Throws: ResticError if restore fails
+    func restore(from source: URL, to destination: URL, username: String, password: String) async throws
 }

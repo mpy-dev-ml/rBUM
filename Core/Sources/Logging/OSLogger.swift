@@ -1,4 +1,11 @@
-    import Foundation
+//
+//  OSLogger.swift
+//  Core
+//
+//  Created by Matthew Yeager on 04/02/2025.
+//
+
+import Foundation
 import os.log
 
 #if os(macOS)
@@ -9,15 +16,16 @@ public final class OSLogger: LoggerProtocol, HealthCheckable {
     private let subsystem: String
     private let category: String
     
-    public var isHealthy: Bool {
-        true // Logger is typically always healthy unless system-level issues
-    }
-    
     // MARK: - Initialization
     public init(subsystem: String = "dev.mpy.rBUM", category: String) {
         self.subsystem = subsystem
         self.category = category
         self.logger = os.Logger(subsystem: subsystem, category: category)
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func isHealthy() -> Bool {
+        true // Logger is typically always healthy unless system-level issues
     }
     
     // MARK: - LoggerProtocol Implementation
@@ -37,34 +45,8 @@ public final class OSLogger: LoggerProtocol, HealthCheckable {
         logger.error("\(message, privacy: .public) [\(file):\(line) \(function)]")
     }
     
-    // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async -> Bool {
-        // Log a test message to verify logger is working
-        logger.debug("Health check: Logger is operational")
-        return isHealthy
+    public func fault(_ message: String, file: String, function: String, line: Int) {
+        logger.fault("\(message, privacy: .public) [\(file):\(line) \(function)]")
     }
 }
-
-// MARK: - OSLogger Factory
-
-extension OSLogger {
-    /// Create a new OSLogger instance with default subsystem
-    /// - Parameter category: Category for the logger
-    /// - Returns: A new OSLogger instance
-    public static func create(category: String) -> OSLogger {
-        OSLogger(category: category)
-    }
-    
-    /// Create a new OSLogger instance with custom subsystem
-    /// - Parameters:
-    ///   - subsystem: Subsystem identifier
-    ///   - category: Category for the logger
-    /// - Returns: A new OSLogger instance
-    public static func create(subsystem: String, category: String) -> OSLogger {
-        OSLogger(subsystem: subsystem, category: category)
-    }
-}
-
-/// Default logger implementation for the current platform
-public typealias DefaultLogger = OSLogger
 #endif

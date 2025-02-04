@@ -1,8 +1,15 @@
+//
+//  ResticCommandService.swift
+//  rBUM
+//
+//  Created by Matthew Yeager on 30/01/2025.
+//
+
 import Foundation
 import Core
 
 /// Service for executing Restic commands via XPC
-public final class ResticCommandService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable {
+public final class ResticCommandService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable, Measurable {
     // MARK: - Properties
     private let xpcService: ResticXPCServiceProtocol
     private let keychainService: KeychainServiceProtocol
@@ -35,29 +42,10 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
     }
     
     // MARK: - ResticServiceProtocol Implementation
-    public func initialize(repository: URL, password: String) async throws {
+    public func initializeRepository(at url: URL) async throws {
         try await measure("Initialize Repository") {
-            // Store credentials first
-            let credentials = KeychainCredentials(repositoryUrl: repository, password: password)
-            try keychainService.storeCredentials(credentials)
-            
-            // Initialize repository
-            try await xpcService.initializeRepository(at: repository.path, password: password)
-            logger.info("Successfully initialized repository at \(repository.path)")
-        }
-    }
-    
-    public func backup(source: URL, to repository: URL) async throws {
-        let operationId = UUID()
-        
-        try await measure("Backup Operation \(operationId)") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw ResticError.invalidRepository
-            }
-            
             // Track operation
+            let operationId = UUID()
             accessQueue.async(flags: .barrier) {
                 self.activeOperations.insert(operationId)
             }
@@ -68,47 +56,63 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 }
             }
             
-            // Execute backup
+            // Execute via XPC
+            try await xpcService.initializeRepository(
+                at: url,
+                username: url.lastPathComponent,  // Use appropriate credentials here
+                password: UUID().uuidString      // Use appropriate credentials here
+            )
+            
+            logger.info("Repository initialized at \(url.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
+        }
+    }
+    
+    public func backup(from source: URL, to destination: URL) async throws {
+        try await measure("Create Backup") {
+            // Track operation
+            let operationId = UUID()
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            // Execute backup via XPC
             try await xpcService.backup(
-                source: source.path,
-                to: repository.path,
-                password: credentials.password
+                from: source,
+                to: destination,
+                username: destination.lastPathComponent,  // Use appropriate credentials here
+                password: UUID().uuidString              // Use appropriate credentials here
             )
             
-            logger.info("Successfully backed up \(source.path) to \(repository.path)")
+            logger.info("Backup completed from \(source.path) to \(destination.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
         }
     }
     
-    public func listSnapshots(in repository: URL) async throws -> [Snapshot] {
+    public func listSnapshots() async throws -> [String] {
         try await measure("List Snapshots") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw ResticError.invalidRepository
-            }
-            
-            // Get snapshots
-            let snapshots = try await xpcService.listSnapshots(
-                in: repository.path,
-                password: credentials.password
+            // Execute via XPC
+            return try await xpcService.listSnapshots(
+                username: "default",  // Use appropriate credentials here
+                password: UUID().uuidString  // Use appropriate credentials here
             )
-            
-            logger.info("Found \(snapshots.count) snapshots in \(repository.path)")
-            return snapshots
         }
     }
     
-    public func restore(from repository: URL, snapshot: String, to destination: URL) async throws {
-        let operationId = UUID()
-        
-        try await measure("Restore Operation \(operationId)") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw ResticError.invalidRepository
-            }
-            
+    public func restore(from source: URL, to destination: URL) async throws {
+        try await measure("Restore Backup") {
             // Track operation
+            let operationId = UUID()
             accessQueue.async(flags: .barrier) {
                 self.activeOperations.insert(operationId)
             }
@@ -119,46 +123,18 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 }
             }
             
-            // Execute restore
+            // Execute restore via XPC
             try await xpcService.restore(
-                from: repository.path,
-                snapshot: snapshot,
-                to: destination.path,
-                password: credentials.password
+                from: source,
+                to: destination,
+                username: source.lastPathComponent,  // Use appropriate credentials here
+                password: UUID().uuidString          // Use appropriate credentials here
             )
             
-            logger.info("Successfully restored snapshot \(snapshot) to \(destination.path)")
-        }
-    }
-    
-    public func verify(repository: URL) async throws {
-        let operationId = UUID()
-        
-        try await measure("Verify Repository \(operationId)") {
-            // Validate repository credentials
-            let credentials = try keychainService.retrieveCredentials()
-            guard credentials.repositoryUrl == repository else {
-                throw ResticError.invalidRepository
-            }
-            
-            // Track operation
-            accessQueue.async(flags: .barrier) {
-                self.activeOperations.insert(operationId)
-            }
-            
-            defer {
-                accessQueue.async(flags: .barrier) {
-                    self.activeOperations.remove(operationId)
-                }
-            }
-            
-            // Execute verify
-            try await xpcService.verify(
-                repository: repository.path,
-                password: credentials.password
-            )
-            
-            logger.info("Successfully verified repository at \(repository.path)")
+            logger.info("Restore completed from \(source.path) to \(destination.path)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
         }
     }
     
@@ -166,49 +142,25 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
     public func performHealthCheck() async -> Bool {
         await measure("Restic Command Service Health Check") {
             do {
-                // Check dependencies
-                guard await xpcService.performHealthCheck(),
-                      await keychainService.performHealthCheck() else {
+                // Check XPC service
+                guard let xpcHealthy = await xpcService.ping(), xpcHealthy else {
                     return false
                 }
                 
-                // Check for stuck operations
-                let stuckOperations = accessQueue.sync { activeOperations }
-                if !stuckOperations.isEmpty {
-                    logger.warning("Found \(stuckOperations.count) potentially stuck operations")
-                    return false
-                }
+                // Check keychain service
+                let keychainHealthy = await keychainService.performHealthCheck()
                 
-                logger.info("Restic command service health check passed")
-                return true
+                // Check active operations
+                let operationsHealthy = isHealthy
+                
+                return xpcHealthy && keychainHealthy && operationsHealthy
             } catch {
-                logger.error("Restic command service health check failed: \(error.localizedDescription)")
+                logger.error("Health check failed: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
                 return false
             }
-        }
-    }
-}
-
-// MARK: - Restic Errors
-public enum ResticError: LocalizedError {
-    case invalidRepository
-    case operationInProgress
-    case snapshotNotFound(String)
-    case xpcError(String)
-    case verificationFailed(String)
-    
-    public var errorDescription: String? {
-        switch self {
-        case .invalidRepository:
-            return "Invalid or unauthorized repository"
-        case .operationInProgress:
-            return "A Restic operation is already in progress"
-        case .snapshotNotFound(let id):
-            return "Snapshot not found: \(id)"
-        case .xpcError(let message):
-            return "XPC error: \(message)"
-        case .verificationFailed(let message):
-            return "Repository verification failed: \(message)"
         }
     }
 }

@@ -1,60 +1,49 @@
+//
+//  SandboxMonitor.swift
+//  Core
+//
+//  Created by Matthew Yeager on 04/02/2025.
+//
+
 import Foundation
 import AppKit
 
 /// Service for monitoring sandbox compliance and resource access
-public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol, HealthCheckable {
+public final class SandboxMonitor: BaseSandboxedService {
     // MARK: - Properties
     private let monitorQueue: DispatchQueue
-    private var activeResources: [URL: ResourceAccess] = [:]
+    private var activeResources: Set<URL> = []
     private let maxResourceAccessDuration: TimeInterval
     
-    public var isHealthy: Bool {
-        // Check if any resources have been accessed for too long
-        !activeResources.values.contains { $0.hasExceededMaxDuration }
-    }
+    public weak var delegate: SandboxMonitorDelegate?
     
-    // MARK: - Types
-    private struct ResourceAccess {
-        let startTime: Date
-        let maxDuration: TimeInterval
-        var continuation: AsyncStream<SandboxAccessEvent>.Continuation?
-        
-        var hasExceededMaxDuration: Bool {
-            Date().timeIntervalSince(startTime) > maxDuration
-        }
+    public var isHealthy: Bool {
+        // For now, just check if we're able to monitor
+        !activeResources.isEmpty
     }
     
     // MARK: - Initialization
-    public init(maxResourceAccessDuration: TimeInterval = 3600) {
+    public init(logger: LoggerProtocol, securityService: SecurityServiceProtocol, maxResourceAccessDuration: TimeInterval = 3600) {
         self.monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandbox.monitor", attributes: .concurrent)
         self.maxResourceAccessDuration = maxResourceAccessDuration
-        super.init(logger: LoggerFactory.createLogger(category: "SandboxMonitor"))
+        super.init(logger: logger, securityService: securityService)
         setupNotifications()
     }
-    
-    // MARK: - SandboxMonitorProtocol Implementation
-    public func monitorAccess(for url: URL) -> AsyncStream<SandboxAccessEvent> {
-        AsyncStream { continuation in
-            monitorQueue.async(flags: .barrier) { [weak self] in
-                guard let self = self else {
-                    continuation.finish()
-                    return
-                }
-                
-                let access = ResourceAccess(
-                    startTime: Date(),
-                    maxDuration: self.maxResourceAccessDuration,
-                    continuation: continuation
-                )
-                
-                self.activeResources[url] = access
-                
-                // Initial access check
-                if url.startAccessingSecurityScopedResource() {
-                    continuation.yield(.accessGranted)
-                } else {
-                    continuation.yield(.accessDenied)
-                }
+}
+
+// MARK: - SandboxMonitorProtocol Implementation
+extension SandboxMonitor: SandboxMonitorProtocol {
+    public func startMonitoring(url: URL) -> Bool {
+        monitorQueue.sync(flags: .barrier) {
+            guard !activeResources.contains(url) else { return true }
+            
+            if startAccessing(url) {
+                activeResources.insert(url)
+                delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
+                return true
+            } else {
+                delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                return false
             }
         }
     }
@@ -63,83 +52,50 @@ public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol,
         monitorQueue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             
-            if let access = self.activeResources[url] {
-                access.continuation?.finish()
-                url.stopAccessingSecurityScopedResource()
-                self.activeResources.removeValue(forKey: url)
+            if self.activeResources.contains(url) {
+                self.activeResources.remove(url)
+                self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
             }
         }
     }
     
     public func isMonitoring(url: URL) -> Bool {
         monitorQueue.sync {
-            activeResources.keys.contains(url)
+            activeResources.contains(url)
         }
     }
-    
-    // MARK: - Private Methods
-    private func setupNotifications() {
+}
+
+// MARK: - Private Methods
+private extension SandboxMonitor {
+    func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(applicationWillTerminate(_:)),
-            name: NSApplication.willTerminateNotification,
+            selector: #selector(handleResourceAccessChange(_:)),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleResourceAccessChange(_:)),
+            name: NSApplication.willResignActiveNotification,
             object: nil
         )
     }
     
-    @objc private func applicationWillTerminate(_ notification: Notification) {
-        monitorQueue.sync(flags: .barrier) {
-            for (url, access) in activeResources {
-                access.continuation?.finish()
-                url.stopAccessingSecurityScopedResource()
-            }
-            activeResources.removeAll()
-        }
-    }
-    
-    // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async -> Bool {
-        await measure("Sandbox Monitor Health Check") {
-            let overextendedResources = monitorQueue.sync {
-                activeResources.filter { $0.value.hasExceededMaxDuration }
-            }
+    @objc func handleResourceAccessChange(_ notification: Notification) {
+        monitorQueue.async { [weak self] in
+            guard let self = self else { return }
             
-            if !overextendedResources.isEmpty {
-                logger.warning("Found \(overextendedResources.count) resources exceeding max access duration")
-                for (url, _) in overextendedResources {
-                    logger.error("Resource access exceeded max duration: \(url.path)")
+            for url in self.activeResources {
+                if self.startAccessing(url) {
+                    self.delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
+                } else {
+                    self.activeResources.remove(url)
+                    self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
                 }
-                return false
             }
-            
-            logger.info("Sandbox monitor health check passed")
-            return true
-        }
-    }
-}
-
-// MARK: - SandboxAccessEvent Definition
-public enum SandboxAccessEvent {
-    case accessGranted
-    case accessDenied
-    case accessRevoked
-    case accessExpired
-}
-
-// MARK: - Sandbox Monitor Errors
-public enum SandboxMonitorError: LocalizedError {
-    case resourceAccessExpired(URL)
-    case resourceNotTracked(URL)
-    case invalidResourceState(String)
-    
-    public var errorDescription: String? {
-        switch self {
-        case .resourceAccessExpired(let url):
-            return "Resource access has expired: \(url.path)"
-        case .resourceNotTracked(let url):
-            return "Resource is not being tracked: \(url.path)"
-        case .invalidResourceState(let message):
-            return "Invalid resource state: \(message)"
         }
     }
 }
