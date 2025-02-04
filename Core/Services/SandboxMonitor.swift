@@ -1,176 +1,131 @@
 import Foundation
 
-/// Service for monitoring and detecting potential sandbox violations
-public class SandboxMonitor {
-    private let logger: LoggerProtocol
-    private let fileManager: FileManager
-    private let permissionManager: PermissionManager
+/// Service for monitoring sandbox compliance and resource access
+public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let monitorQueue: DispatchQueue
+    private var activeResources: [URL: ResourceAccess] = [:]
+    private let maxResourceAccessDuration: TimeInterval
     
-    /// Queue for processing sandbox operations
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.sandboxMonitor")
+    public var isHealthy: Bool {
+        // Check if any resources have been accessed for too long
+        !activeResources.values.contains { $0.hasExceededMaxDuration }
+    }
     
-    /// Active resource access tracking
-    private var activeAccess: [URL: Date] = [:]
+    // MARK: - Types
+    private struct ResourceAccess {
+        let startTime: Date
+        let maxDuration: TimeInterval
+        
+        var hasExceededMaxDuration: Bool {
+            Date().timeIntervalSince(startTime) > maxDuration
+        }
+    }
     
-    /// Maximum duration for resource access (in seconds)
-    private let maxAccessDuration: TimeInterval = 300 // 5 minutes
-    
-    /// Initialize sandbox monitor
-    /// - Parameters:
-    ///   - logger: Logger for tracking operations
-    ///   - fileManager: FileManager instance to use
-    ///   - permissionManager: Permission manager instance
+    // MARK: - Initialization
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SandboxMonitor"),
-        fileManager: FileManager = .default,
-        permissionManager: PermissionManager = PermissionManager()
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        maxResourceAccessDuration: TimeInterval = 300 // 5 minutes default
     ) {
-        self.logger = logger
-        self.fileManager = fileManager
-        self.permissionManager = permissionManager
-        setupMonitoring()
+        self.maxResourceAccessDuration = maxResourceAccessDuration
+        self.monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandboxMonitor", attributes: .concurrent)
+        super.init(logger: logger, securityService: securityService)
+        
+        // Start periodic health check
+        startPeriodicHealthCheck()
     }
     
-    /// Track resource access
-    /// - Parameter url: The URL being accessed
-    public func trackAccess(to url: URL) {
-        queue.async {
-            self.activeAccess[url] = Date()
-            self.logger.debug(
-                "Started tracking access to: \(url.path)",
-                file: #file,
-                function: #function,
-                line: #line
+    // MARK: - SandboxMonitorProtocol Implementation
+    public func trackResourceAccess(to url: URL) {
+        monitorQueue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            self.activeResources[url] = ResourceAccess(
+                startTime: Date(),
+                maxDuration: self.maxResourceAccessDuration
             )
+            self.logger.debug("Started tracking resource access to \(url.path)")
         }
     }
     
-    /// Stop tracking resource access
-    /// - Parameter url: The URL to stop tracking
-    public func stopTracking(_ url: URL) {
-        queue.async {
-            self.activeAccess[url] = nil
-            self.logger.debug(
-                "Stopped tracking access to: \(url.path)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
+    public func stopTrackingResource(_ url: URL) {
+        monitorQueue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            self.activeResources.removeValue(forKey: url)
+            self.logger.debug("Stopped tracking resource access to \(url.path)")
         }
     }
     
-    /// Check if a URL is safe to access
-    /// - Parameter url: The URL to check
-    /// - Returns: true if the URL is safe to access
-    public func isSafeToAccess(_ url: URL) async throws -> Bool {
-        // Check if URL is within app container
-        if url.path.starts(with: fileManager.homeDirectoryForCurrentUser.path) {
+    public func checkResourceAccess(_ url: URL) -> Bool {
+        monitorQueue.sync {
+            guard let access = activeResources[url] else {
+                return false
+            }
+            return !access.hasExceededMaxDuration
+        }
+    }
+    
+    public func listActiveResources() -> [URL] {
+        monitorQueue.sync {
+            Array(activeResources.keys)
+        }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Sandbox Monitor Health Check") {
+            let overextendedResources = monitorQueue.sync {
+                activeResources.filter { $0.value.hasExceededMaxDuration }
+            }
+            
+            if !overextendedResources.isEmpty {
+                logger.warning("Found \(overextendedResources.count) resources exceeding max access duration")
+                for (url, _) in overextendedResources {
+                    logger.error("Resource access exceeded max duration: \(url.path)")
+                }
+                return false
+            }
+            
+            logger.info("Sandbox monitor health check passed")
             return true
         }
-        
-        // Check if we have valid permission
-        return try await permissionManager.hasValidPermission(for: url)
     }
     
-    /// Get list of potential sandbox violations
-    /// - Returns: Array of violation reports
-    public func detectViolations() async -> [SandboxViolation] {
-        var violations: [SandboxViolation] = []
-        
-        // Check for long-running access
-        let longRunningAccess = queue.sync {
-            activeAccess.filter { entry in
-                Date().timeIntervalSince(entry.value) > maxAccessDuration
-            }
-        }
-        
-        for (url, startTime) in longRunningAccess {
-            violations.append(.longRunningAccess(
-                url: url,
-                duration: Date().timeIntervalSince(startTime)
-            ))
-        }
-        
-        // Check for access to system directories
-        let systemPaths = [
-            "/System",
-            "/Library",
-            "/usr",
-            "/bin",
-            "/sbin"
-        ]
-        
-        let activeSystemAccess = queue.sync {
-            activeAccess.filter { entry in
-                systemPaths.contains { entry.key.path.starts(with: $0) }
-            }
-        }
-        
-        for (url, _) in activeSystemAccess {
-            violations.append(.systemDirectoryAccess(url: url))
-        }
-        
-        return violations
-    }
-    
-    // MARK: - Private Methods
-    
-    private func setupMonitoring() {
-        // Start periodic violation checks
-        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            Task {
-                let violations = await self.detectViolations()
-                for violation in violations {
-                    self.logger.error(
-                        "Sandbox violation detected: \(violation.description)",
-                        file: #file,
-                        function: #function,
-                        line: #line
-                    )
+    // MARK: - Private Helpers
+    private func startPeriodicHealthCheck() {
+        Task {
+            while !Task.isCancelled {
+                if !await performHealthCheck() {
+                    // Clean up overextended resources
+                    monitorQueue.async(flags: .barrier) { [weak self] in
+                        guard let self = self else { return }
+                        let overextended = self.activeResources.filter { $0.value.hasExceededMaxDuration }
+                        for (url, _) in overextended {
+                            self.activeResources.removeValue(forKey: url)
+                            self.logger.warning("Automatically removed overextended resource access: \(url.path)")
+                        }
+                    }
                 }
+                try? await Task.sleep(nanoseconds: UInt64(60 * 1_000_000_000)) // Check every minute
             }
         }
     }
 }
 
-/// Represents a sandbox violation
-public enum SandboxViolation {
-    case longRunningAccess(url: URL, duration: TimeInterval)
-    case systemDirectoryAccess(url: URL)
+// MARK: - Sandbox Monitor Errors
+public enum SandboxMonitorError: LocalizedError {
+    case resourceAccessExpired(URL)
+    case resourceNotTracked(URL)
+    case invalidResourceState(String)
     
-    var description: String {
+    public var errorDescription: String? {
         switch self {
-        case .longRunningAccess(let url, let duration):
-            return "Long-running access (\(Int(duration))s) to: \(url.path)"
-        case .systemDirectoryAccess(let url):
-            return "Attempted access to system directory: \(url.path)"
+        case .resourceAccessExpired(let url):
+            return "Resource access has expired: \(url.path)"
+        case .resourceNotTracked(let url):
+            return "Resource is not being tracked: \(url.path)"
+        case .invalidResourceState(let message):
+            return "Invalid resource state: \(message)"
         }
-    }
-}
-
-/// Extension to integrate sandbox monitoring with SecurityService
-extension SecurityService {
-    /// Start accessing a security-scoped resource with monitoring
-    /// - Parameter url: The URL to access
-    /// - Returns: true if access was granted
-    public func startAccessingWithMonitoring(_ url: URL) -> Bool {
-        let monitor = SandboxMonitor()
-        
-        guard startAccessing(url) else {
-            return false
-        }
-        
-        monitor.trackAccess(to: url)
-        return true
-    }
-    
-    /// Stop accessing a security-scoped resource and update monitoring
-    /// - Parameter url: The URL to stop accessing
-    public func stopAccessingWithMonitoring(_ url: URL) {
-        let monitor = SandboxMonitor()
-        stopAccessing(url)
-        monitor.stopTracking(url)
     }
 }

@@ -11,333 +11,224 @@ import XCTest
 
 final class BackupIntegrationTests: XCTestCase {
     // MARK: - Properties
-    
-    private var backupService: BackupService!
-    private var repositoryService: RepositoryService!
-    private var securityService: SecurityService!
-    private var bookmarkService: BookmarkService!
-    private var keychainService: KeychainService!
-    private var logger: TestLogger!
-    
-    private var testDirectory: URL!
-    private var backupDirectory: URL!
+    private var backupService: ResticCommandService!
+    private var securityService: DefaultSecurityService!
+    private var mockLogger: MockLogger!
+    private var mockXPCService: MockXPCService!
+    private var mockKeychainService: MockKeychainService!
+    private var mockBookmarkService: MockBookmarkService!
+    private let fileManager = FileManager.default
     
     // MARK: - Setup
+    override func setUp() {
+        super.setUp()
+        mockLogger = MockLogger()
+        mockXPCService = MockXPCService()
+        mockKeychainService = MockKeychainService()
+        mockBookmarkService = MockBookmarkService()
+        
+        securityService = DefaultSecurityService(
+            logger: mockLogger,
+            bookmarkService: mockBookmarkService,
+            keychainService: mockKeychainService
+        )
+        
+        backupService = ResticCommandService(
+            logger: mockLogger,
+            xpcService: mockXPCService,
+            keychainService: mockKeychainService
+        )
+    }
     
-    override func setUp() async throws {
-        try await super.setUp()
-        
-        // Create test directories
-        let fileManager = FileManager.default
-        testDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try fileManager.createDirectory(at: testDirectory, withIntermediateDirectories: true)
-        
-        backupDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+    override func tearDown() {
+        backupService = nil
+        securityService = nil
+        mockLogger.clear()
+        mockXPCService.clear()
+        mockKeychainService.clear()
+        mockBookmarkService.clear()
+        super.tearDown()
+    }
+    
+    // MARK: - Helper Functions
+    private func createTestDirectory(name: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+    
+    private func createTestFile(in directory: URL, name: String, content: String) throws -> URL {
+        let fileURL = directory.appendingPathComponent(name)
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
+    }
+    
+    // MARK: - Integration Tests
+    func testFullBackupWorkflow() async throws {
+        // Given
+        let sourceURL = try createTestDirectory(name: "test-source")
+        let repoURL = try createTestDirectory(name: "test-repo")
+        let restoreURL = try createTestDirectory(name: "test-restore")
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: repoURL)
+            try? FileManager.default.removeItem(at: restoreURL)
+        }
         
         // Create test files
-        try "Test content 1".write(to: testDirectory.appendingPathComponent("file1.txt"), atomically: true, encoding: .utf8)
-        try "Test content 2".write(to: testDirectory.appendingPathComponent("file2.txt"), atomically: true, encoding: .utf8)
+        let testFile1 = try createTestFile(in: sourceURL, name: "test1.txt", content: "Test content 1")
+        let testFile2 = try createTestFile(in: sourceURL, name: "test2.txt", content: "Test content 2")
         
-        // Create subdirectory with files
-        let subDirectory = testDirectory.appendingPathComponent("subdir")
-        try fileManager.createDirectory(at: subDirectory, withIntermediateDirectories: true)
-        try "Test content 3".write(to: subDirectory.appendingPathComponent("file3.txt"), atomically: true, encoding: .utf8)
+        // Setup mocks
+        mockKeychainService.hasValidCredentials = true
+        mockBookmarkService.isValidBookmark = true
+        mockBookmarkService.canStartAccessing = true
+        mockXPCService.commandOutput = "repository initialized"
         
-        // Initialize services
-        logger = TestLogger()
+        // When - Initialize Repository
+        try await backupService.initializeRepository(at: repoURL)
+        XCTAssertTrue(mockLogger.containsMessage("Successfully initialized repository"))
         
-        keychainService = KeychainService(
-            serviceName: "dev.mpy.rBUM.test",
-            accessGroup: "dev.mpy.rBUM.test.shared",
-            logger: logger
-        )
+        // When - Validate Access
+        let hasAccess = try await securityService.validateAccess(to: sourceURL)
+        XCTAssertTrue(hasAccess)
+        XCTAssertTrue(mockLogger.containsMessage("Successfully validated access"))
         
-        bookmarkService = BookmarkService(
-            persistenceService: BookmarkPersistenceService(logger: logger),
-            fileManager: FileManager.default,
-            logger: logger
-        )
+        // When - Perform Backup
+        mockXPCService.commandOutput = "snapshot abc123 saved"
+        try await backupService.backup(source: sourceURL, to: repoURL)
+        XCTAssertTrue(mockLogger.containsMessage("Successfully backed up files"))
         
-        securityService = SecurityService(
-            keychainService: keychainService,
-            bookmarkService: bookmarkService,
-            logger: logger
-        )
-        
-        repositoryService = RepositoryService(
-            securityService: securityService,
-            logger: logger
-        )
-        
-        backupService = BackupService(
-            repositoryService: repositoryService,
-            securityService: securityService,
-            logger: logger
-        )
-    }
-    
-    override func tearDown() async throws {
-        // Clean up test directories
-        try FileManager.default.removeItem(at: testDirectory)
-        try FileManager.default.removeItem(at: backupDirectory)
-        
-        backupService = nil
-        repositoryService = nil
-        securityService = nil
-        bookmarkService = nil
-        keychainService = nil
-        logger = nil
-        
-        try await super.tearDown()
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func createTestRepository() throws -> Repository {
-        let credentials = RepositoryCredentials(password: "test-password")
-        let repository = Repository(
-            id: UUID(),
-            name: "Test Repository",
-            description: "Test Description",
-            path: backupDirectory.path,
-            created: Date(),
-            lastAccessed: Date()
-        )
-        
-        try securityService.saveCredentials(credentials, for: repository.id)
-        try repositoryService.saveRepository(repository)
-        
-        return repository
-    }
-    
-    // MARK: - Tests
-    
-    func testCompleteBackupFlow() async throws {
-        // Create repository
-        let repository = try createTestRepository()
-        
-        // Create backup configuration
-        let backupConfig = BackupConfiguration(
-            id: UUID(),
-            name: "Test Backup",
-            repositoryId: repository.id,
-            sourcePaths: [testDirectory.path],
-            excludePatterns: ["*.tmp"],
-            tags: ["test"],
-            schedule: nil,
-            created: Date(),
-            lastRun: nil
-        )
-        
-        // Perform backup
-        let progress = Progress()
-        let result = try await backupService.performBackup(
-            config: backupConfig,
-            progress: progress
-        )
-        
-        // Verify backup success
-        XCTAssertTrue(result.success)
-        XCTAssertNil(result.error)
-        XCTAssertNotNil(result.snapshotId)
-        
-        // Verify files were backed up
-        let snapshots = try await backupService.listSnapshots(for: repository.id)
-        XCTAssertEqual(snapshots.count, 1)
-        
-        let snapshot = snapshots[0]
-        XCTAssertEqual(snapshot.fileCount, 3)
-        XCTAssertGreaterThan(snapshot.size, 0)
-        
-        // Verify snapshot contents
-        let files = try await backupService.listFiles(
-            snapshot: snapshot.id,
-            repository: repository.id
-        )
-        
-        XCTAssertEqual(files.count, 3)
-        XCTAssertTrue(files.contains { $0.path.hasSuffix("file1.txt") })
-        XCTAssertTrue(files.contains { $0.path.hasSuffix("file2.txt") })
-        XCTAssertTrue(files.contains { $0.path.hasSuffix("file3.txt") })
-        
-        // Test file restoration
-        let restoreDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: restoreDirectory, withIntermediateDirectories: true)
-        
-        let restoreProgress = Progress()
-        try await backupService.restoreFiles(
-            from: snapshot.id,
-            repository: repository.id,
-            to: restoreDirectory.path,
-            progress: restoreProgress
-        )
-        
-        // Verify restored files
-        let restoredFiles = try FileManager.default.contentsOfDirectory(
-            at: restoreDirectory,
-            includingPropertiesForKeys: nil
-        )
-        XCTAssertEqual(restoredFiles.count, 3)
-        
-        // Clean up restore directory
-        try FileManager.default.removeItem(at: restoreDirectory)
-    }
-    
-    func testBackupWithEncryption() async throws {
-        // Create repository with encryption
-        let repository = try createTestRepository()
-        
-        // Create backup configuration
-        let backupConfig = BackupConfiguration(
-            id: UUID(),
-            name: "Encrypted Backup",
-            repositoryId: repository.id,
-            sourcePaths: [testDirectory.path],
-            excludePatterns: [],
-            tags: ["encrypted"],
-            schedule: nil,
-            created: Date(),
-            lastRun: nil
-        )
-        
-        // Perform backup
-        let progress = Progress()
-        let result = try await backupService.performBackup(
-            config: backupConfig,
-            progress: progress
-        )
-        
-        XCTAssertTrue(result.success)
-        
-        // Verify encryption
-        let snapshotPath = backupDirectory.appendingPathComponent("snapshots")
-            .appendingPathComponent(result.snapshotId!.uuidString)
-        
-        // Read raw backup data
-        let backupData = try Data(contentsOf: snapshotPath)
-        
-        // Verify data is encrypted (not plaintext)
-        let originalContent = "Test content 1"
-        XCTAssertFalse(String(data: backupData, encoding: .utf8)?.contains(originalContent) ?? false)
-    }
-    
-    func testConcurrentBackups() async throws {
-        // Create repository
-        let repository = try createTestRepository()
-        
-        // Create multiple backup configurations
-        let configs = (0..<5).map { i in
-            BackupConfiguration(
-                id: UUID(),
-                name: "Backup \(i)",
-                repositoryId: repository.id,
-                sourcePaths: [testDirectory.path],
-                excludePatterns: [],
-                tags: ["concurrent"],
-                schedule: nil,
-                created: Date(),
-                lastRun: nil
-            )
-        }
-        
-        // Perform backups concurrently
-        try await withThrowingTaskGroup(of: BackupResult.self) { group in
-            for config in configs {
-                group.addTask {
-                    let progress = Progress()
-                    return try await self.backupService.performBackup(
-                        config: config,
-                        progress: progress
-                    )
+        // When - List Snapshots
+        mockXPCService.commandOutput = """
+        {
+            "snapshots": [
+                {
+                    "id": "abc123",
+                    "time": "2025-02-04T09:32:54Z",
+                    "paths": ["/test"]
                 }
-            }
-            
-            // Verify all backups succeeded
-            var results: [BackupResult] = []
-            for try await result in group {
-                results.append(result)
-            }
-            
-            XCTAssertEqual(results.count, configs.count)
-            XCTAssertTrue(results.allSatisfy { $0.success })
+            ]
         }
+        """
+        let snapshots = try await backupService.listSnapshots(in: repoURL)
+        XCTAssertEqual(snapshots.count, 1)
+        XCTAssertEqual(snapshots.first?.id, "abc123")
+        XCTAssertTrue(mockLogger.containsMessage("Successfully listed snapshots"))
         
-        // Verify snapshots
-        let snapshots = try await backupService.listSnapshots(for: repository.id)
-        XCTAssertEqual(snapshots.count, configs.count)
+        // When - Restore Files
+        mockXPCService.commandOutput = "restored snapshot abc123"
+        try await backupService.restore(from: repoURL, to: restoreURL, snapshot: "abc123")
+        XCTAssertTrue(mockLogger.containsMessage("Successfully restored files"))
+        
+        // Then - Verify Restored Files
+        let restoredFile1 = restoreURL.appendingPathComponent("test1.txt")
+        let restoredFile2 = restoreURL.appendingPathComponent("test2.txt")
+        
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restoredFile1.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restoredFile2.path))
     }
     
-    func testBackupRecovery() async throws {
-        // Create repository
-        let repository = try createTestRepository()
+    func testBackupWorkflowWithFailures() async throws {
+        // Given
+        let sourceURL = try createTestDirectory(name: "test-source")
+        let repoURL = try createTestDirectory(name: "test-repo")
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: repoURL)
+        }
         
-        // Create backup configuration
-        let backupConfig = BackupConfiguration(
-            id: UUID(),
-            name: "Recovery Test",
-            repositoryId: repository.id,
-            sourcePaths: [testDirectory.path],
-            excludePatterns: [],
-            tags: ["recovery"],
-            schedule: nil,
-            created: Date(),
-            lastRun: nil
-        )
+        // Create test file
+        let testFile = try createTestFile(in: sourceURL, name: "test.txt", content: "Test content")
         
-        // Perform initial backup
-        let progress = Progress()
-        let result = try await backupService.performBackup(
-            config: backupConfig,
-            progress: progress
-        )
+        // Test 1: Repository Initialization Failure
+        mockXPCService.shouldFail = true
+        await XCTAssertThrowsError(try await backupService.initializeRepository(at: repoURL)) { error in
+            XCTAssertTrue(error is ResticError)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to initialize repository"))
+        }
         
-        XCTAssertTrue(result.success)
+        // Test 2: Access Validation Failure
+        mockBookmarkService.isValidBookmark = false
+        await XCTAssertThrowsError(try await securityService.validateAccess(to: sourceURL)) { error in
+            XCTAssertTrue(error is SecurityError)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to validate bookmark"))
+        }
         
-        // Delete original files
-        try FileManager.default.removeItem(at: testDirectory)
+        // Test 3: Backup Failure
+        mockBookmarkService.isValidBookmark = true
+        mockXPCService.shouldFail = true
+        await XCTAssertThrowsError(try await backupService.backup(source: sourceURL, to: repoURL)) { error in
+            XCTAssertTrue(error is ResticError)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to backup files"))
+        }
         
-        // Restore from backup
-        let restoreDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: restoreDirectory, withIntermediateDirectories: true)
+        // Test 4: Missing Credentials
+        mockKeychainService.hasValidCredentials = false
+        await XCTAssertThrowsError(try await backupService.initializeRepository(at: repoURL)) { error in
+            XCTAssertTrue(error is ResticError)
+            XCTAssertTrue(mockLogger.containsMessage("Missing required credentials"))
+        }
+    }
+    
+    func testConcurrentBackupOperations() async throws {
+        // Given
+        let source1URL = try createTestDirectory(name: "test-source-1")
+        let source2URL = try createTestDirectory(name: "test-source-2")
+        let repo1URL = try createTestDirectory(name: "test-repo-1")
+        let repo2URL = try createTestDirectory(name: "test-repo-2")
+        defer {
+            try? FileManager.default.removeItem(at: source1URL)
+            try? FileManager.default.removeItem(at: source2URL)
+            try? FileManager.default.removeItem(at: repo1URL)
+            try? FileManager.default.removeItem(at: repo2URL)
+        }
         
-        let restoreProgress = Progress()
-        try await backupService.restoreFiles(
-            from: result.snapshotId!,
-            repository: repository.id,
-            to: restoreDirectory.path,
-            progress: restoreProgress
-        )
+        // Create test files
+        try createTestFile(in: source1URL, name: "test1.txt", content: "Test content 1")
+        try createTestFile(in: source2URL, name: "test2.txt", content: "Test content 2")
         
-        // Verify restored files
-        let restoredFiles = try FileManager.default.contentsOfDirectory(
-            at: restoreDirectory,
-            includingPropertiesForKeys: nil,
-            options: .skipsHiddenFiles
-        )
+        // Setup mocks
+        mockKeychainService.hasValidCredentials = true
+        mockBookmarkService.isValidBookmark = true
+        mockBookmarkService.canStartAccessing = true
+        mockXPCService.commandOutput = "repository initialized"
         
-        XCTAssertEqual(restoredFiles.count, 2) // file1.txt, file2.txt in root
+        // When - Run concurrent operations
+        async let operation1 = backupService.initializeRepository(at: repo1URL)
+        async let operation2 = backupService.initializeRepository(at: repo2URL)
         
-        let subdir = restoreDirectory.appendingPathComponent("subdir")
-        let subdirFiles = try FileManager.default.contentsOfDirectory(
-            at: subdir,
-            includingPropertiesForKeys: nil,
-            options: .skipsHiddenFiles
-        )
+        // Then
+        try await [operation1, operation2]
+        XCTAssertTrue(mockLogger.containsMessage("Successfully initialized repository"))
+    }
+    
+    func testBackupWithLargeFiles() async throws {
+        // Given
+        let sourceURL = try createTestDirectory(name: "test-source-large")
+        let repoURL = try createTestDirectory(name: "test-repo-large")
+        defer {
+            try? FileManager.default.removeItem(at: sourceURL)
+            try? FileManager.default.removeItem(at: repoURL)
+        }
         
-        XCTAssertEqual(subdirFiles.count, 1) // file3.txt in subdir
+        // Create a large test file (10MB)
+        let largeContent = String(repeating: "A", count: 10 * 1024 * 1024)
+        try createTestFile(in: sourceURL, name: "large-file.txt", content: largeContent)
         
-        // Verify file contents
-        let file1Content = try String(contentsOf: restoreDirectory.appendingPathComponent("file1.txt"))
-        XCTAssertEqual(file1Content, "Test content 1")
+        // Setup mocks
+        mockKeychainService.hasValidCredentials = true
+        mockBookmarkService.isValidBookmark = true
+        mockBookmarkService.canStartAccessing = true
+        mockXPCService.commandOutput = "repository initialized"
         
-        let file2Content = try String(contentsOf: restoreDirectory.appendingPathComponent("file2.txt"))
-        XCTAssertEqual(file2Content, "Test content 2")
+        // When
+        try await backupService.initializeRepository(at: repoURL)
         
-        let file3Content = try String(contentsOf: subdir.appendingPathComponent("file3.txt"))
-        XCTAssertEqual(file3Content, "Test content 3")
+        mockXPCService.commandOutput = "snapshot abc123 saved"
+        try await backupService.backup(source: sourceURL, to: repoURL)
         
-        // Clean up restore directory
-        try FileManager.default.removeItem(at: restoreDirectory)
+        // Then
+        XCTAssertTrue(mockLogger.containsMessage("Successfully backed up files"))
     }
 }

@@ -1,119 +1,150 @@
 import Foundation
-import Security
-import os.log
 
-/// XPC service for executing Restic commands outside the sandbox
-@objc public final class ResticXPCService: NSObject, ResticXPCServiceProtocol {
-    private let serviceName: String
-    private let logger: LoggerProtocol
-    private var connection: NSXPCConnection?
+/// Service for managing Restic operations through XPC
+public final class ResticXPCService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let xpcConnection: NSXPCConnection
+    private let commandQueue: DispatchQueue
     
+    public var isHealthy: Bool {
+        xpcConnection.isValid
+    }
+    
+    // MARK: - Initialization
     public init(
-        serviceName: String = "dev.mpy.rBUM.ResticXPCService",
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "ResticXPCService")
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        xpcConnection: NSXPCConnection? = nil
     ) {
-        self.serviceName = serviceName
-        self.logger = logger
-        super.init()
+        self.commandQueue = DispatchQueue(label: "dev.mpy.rBUM.resticService", qos: .userInitiated)
+        
+        if let connection = xpcConnection {
+            self.xpcConnection = connection
+        } else {
+            // Create XPC connection
+            let connection = NSXPCConnection(serviceName: "dev.mpy.rBUM.resticService")
+            connection.remoteObjectInterface = NSXPCInterface(with: ResticXPCProtocol.self)
+            connection.resume()
+            self.xpcConnection = connection
+        }
+        
+        super.init(logger: logger, securityService: securityService)
+        setupXPCErrorHandler()
     }
     
     deinit {
-        disconnect()
+        xpcConnection.invalidate()
     }
     
-    public override func isEqual(_ object: Any?) -> Bool {
-        guard let other = object as? ResticXPCService else { return false }
-        return serviceName == other.serviceName
-    }
-    
-    public override var hash: Int {
-        return serviceName.hash
-    }
-    
-    public override var description: String {
-        return "ResticXPCService(serviceName: \(serviceName))"
-    }
-    
-    @objc public func connect() async throws {
-        logger.debug("Connecting to XPC service", file: #file, function: #function, line: #line)
-        
-        guard connection == nil else {
-            logger.debug("Already connected to XPC service", file: #file, function: #function, line: #line)
-            return
-        }
-        
-        let connection = NSXPCConnection(serviceName: serviceName)
-        connection.remoteObjectInterface = NSXPCInterface(with: ResticXPCServiceProtocol.self)
-        connection.resume()
-        
-        self.connection = connection
-        logger.info("Connected to XPC service", file: #file, function: #function, line: #line)
-    }
-    
-    private func disconnect() {
-        logger.debug("Disconnecting from XPC service", file: #file, function: #function, line: #line)
-        
-        connection?.invalidate()
-        connection = nil
-        
-        logger.info("Disconnected from XPC service", file: #file, function: #function, line: #line)
-    }
-    
-    @objc public func executeCommand(_ command: String, withBookmark bookmark: Data?) async throws -> ProcessResult {
-        logger.debug("Executing command: \(command)", file: #file, function: #function, line: #line)
-        
-        guard let connection = connection else {
-            logger.error("Not connected to XPC service", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcConnectionFailed("Not connected to XPC service")
-        }
-        
-        let proxy = connection.remoteObjectProxyWithErrorHandler { error in
-            self.logger.error("XPC connection error: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-        } as? ResticXPCServiceProtocol
-        
-        guard let proxy = proxy else {
-            logger.error("Failed to get XPC proxy", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcServiceError("Failed to get XPC proxy")
-        }
-        
-        do {
-            let result = try await proxy.executeCommand(command, withBookmark: bookmark)
-            logger.debug("Command execution completed", file: #file, function: #function, line: #line)
-            return result
-        } catch {
-            logger.error("Command execution failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcServiceError("Command execution failed: \(error.localizedDescription)")
+    // MARK: - ResticServiceProtocol Implementation
+    public func initialize(repository: URL, password: String) async throws {
+        try await measure("Initialize Repository") {
+            guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+                throw ResticError.xpcConnectionFailed
+            }
+            
+            try await withSafeAccess(to: repository) {
+                try await proxy.initialize(repository: repository, password: password)
+            }
         }
     }
     
-    @objc public func startAccessing(_ url: URL) -> Bool {
-        logger.debug("Starting resource access: \(url.path)", file: #file, function: #function, line: #line)
-        let success = url.startAccessingSecurityScopedResource()
-        if success {
-            logger.debug("Successfully started resource access", file: #file, function: #function, line: #line)
-        } else {
-            logger.error("Failed to start resource access", file: #file, function: #function, line: #line)
+    public func backup(source: URL, to repository: URL) async throws {
+        try await measure("Backup Operation") {
+            guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+                throw ResticError.xpcConnectionFailed
+            }
+            
+            try await withSafeAccess(to: repository) {
+                try await withSafeAccess(to: source) {
+                    try await proxy.backup(source: source, repository: repository)
+                }
+            }
         }
-        return success
     }
     
-    @objc public func stopAccessing(_ url: URL) {
-        logger.debug("Stopping resource access: \(url.path)", file: #file, function: #function, line: #line)
-        url.stopAccessingSecurityScopedResource()
-        logger.debug("Stopped resource access", file: #file, function: #function, line: #line)
+    public func restore(from repository: URL, snapshot: String, to destination: URL) async throws {
+        try await measure("Restore Operation") {
+            guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+                throw ResticError.xpcConnectionFailed
+            }
+            
+            try await withSafeAccess(to: repository) {
+                try await withSafeAccess(to: destination) {
+                    try await proxy.restore(repository: repository, snapshot: snapshot, destination: destination)
+                }
+            }
+        }
     }
     
-    @objc public func validatePermissions() async throws -> Bool {
-        logger.debug("Validating permissions", file: #file, function: #function, line: #line)
+    public func listSnapshots(in repository: URL) async throws -> [Snapshot] {
+        try await measure("List Snapshots") {
+            guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+                throw ResticError.xpcConnectionFailed
+            }
+            
+            return try await withSafeAccess(to: repository) {
+                try await proxy.listSnapshots(repository: repository)
+            }
+        }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Restic Service Health Check") {
+            do {
+                guard isHealthy else {
+                    logger.error("XPC connection is invalid")
+                    return false
+                }
+                
+                guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+                    logger.error("Failed to get XPC proxy")
+                    return false
+                }
+                
+                try await proxy.ping()
+                logger.info("Restic service health check passed")
+                return true
+            } catch {
+                logger.error("Restic service health check failed: \(error.localizedDescription)")
+                return false
+            }
+        }
+    }
+    
+    // MARK: - Private Helpers
+    private func setupXPCErrorHandler() {
+        xpcConnection.interruptionHandler = { [weak self] in
+            self?.logger.error("XPC connection interrupted")
+        }
         
-        // For now, just check if we can connect
-        do {
-            try await connect()
-            logger.info("Permissions validated successfully", file: #file, function: #function, line: #line)
-            return true
-        } catch {
-            logger.error("Permission validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.xpcValidationFailed("Permission validation failed: \(error.localizedDescription)")
+        xpcConnection.invalidationHandler = { [weak self] in
+            self?.logger.error("XPC connection invalidated")
+        }
+    }
+}
+
+// MARK: - Restic Errors
+public enum ResticError: LocalizedError {
+    case xpcConnectionFailed
+    case initializationFailed(String)
+    case backupFailed(String)
+    case restoreFailed(String)
+    case snapshotListFailed(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .xpcConnectionFailed:
+            return "Failed to establish XPC connection"
+        case .initializationFailed(let message):
+            return "Repository initialization failed: \(message)"
+        case .backupFailed(let message):
+            return "Backup operation failed: \(message)"
+        case .restoreFailed(let message):
+            return "Restore operation failed: \(message)"
+        case .snapshotListFailed(let message):
+            return "Failed to list snapshots: \(message)"
         }
     }
 }

@@ -1,206 +1,261 @@
 import Foundation
 import Core
 
-/// Protocol for persisting and retrieving security-scoped bookmarks
-public protocol BookmarkPersistenceServiceProtocol {
-    /// Persist a bookmark for a URL
-    /// - Parameters:
-    ///   - data: The bookmark data to persist
-    ///   - url: The URL the bookmark is for
-    func persistBookmark(_ data: Data, forURL url: URL) async throws
+/// Service for persisting and managing security-scoped bookmarks
+public final class BookmarkPersistenceService: BaseSandboxedService, BookmarkPersistenceProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let keychainService: KeychainServiceProtocol
+    private let operationQueue: OperationQueue
+    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.bookmarkPersistence", attributes: .concurrent)
+    private var activeOperations: Set<UUID> = []
+    private var activeBookmarks: Set<URL> = []
     
-    /// Retrieve a bookmark for a URL
-    /// - Parameter url: The URL to retrieve the bookmark for
-    /// - Returns: The bookmark data if found
-    func retrieveBookmark(forURL url: URL) async throws -> Data?
+    public var isHealthy: Bool {
+        // Check if we have any stuck operations or leaked bookmarks
+        accessQueue.sync {
+            activeOperations.isEmpty && activeBookmarks.isEmpty
+        }
+    }
     
-    /// Remove a bookmark for a URL
-    /// - Parameter url: The URL to remove the bookmark for
-    func removeBookmark(forURL url: URL) async throws
+    // MARK: - Initialization
+    public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        keychainService: KeychainServiceProtocol
+    ) {
+        self.keychainService = keychainService
+        
+        self.operationQueue = OperationQueue()
+        self.operationQueue.name = "dev.mpy.rBUM.bookmarkPersistenceQueue"
+        self.operationQueue.maxConcurrentOperationCount = 1
+        
+        super.init(logger: logger, securityService: securityService)
+    }
     
-    /// List all persisted bookmarks
-    /// - Returns: Dictionary of URLs and their bookmark data
-    func listBookmarks() async throws -> [URL: Data]
+    // MARK: - BookmarkPersistenceProtocol Implementation
+    public func createBookmark(for url: URL, readOnly: Bool = false) async throws -> Data {
+        let operationId = UUID()
+        
+        return try await measure("Create Bookmark") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            do {
+                var options: URL.BookmarkCreationOptions = [.withSecurityScope]
+                if readOnly {
+                    options.insert(.securityScopeAllowOnlyReadAccess)
+                }
+                
+                // Create bookmark
+                let bookmark = try url.bookmarkData(
+                    options: options,
+                    includingResourceValuesForKeys: [
+                        .isDirectoryKey,
+                        .volumeURLKey,
+                        .volumeNameKey
+                    ],
+                    relativeTo: nil
+                )
+                
+                // Store in keychain
+                try keychainService.storeBookmark(bookmark, for: url)
+                
+                logger.info("Created bookmark for \(url.path)")
+                return bookmark
+            } catch {
+                logger.error("Failed to create bookmark: \(error.localizedDescription)")
+                throw BookmarkError.creationFailed(error.localizedDescription)
+            }
+        }
+    }
+    
+    public func resolveBookmark(_ bookmark: Data) async throws -> URL {
+        let operationId = UUID()
+        
+        return try await measure("Resolve Bookmark") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            do {
+                var isStale = false
+                let url = try URL(
+                    resolvingBookmarkData: bookmark,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                if isStale {
+                    logger.warning("Bookmark is stale for \(url.path)")
+                    throw BookmarkError.staleBookmark
+                }
+                
+                logger.info("Resolved bookmark for \(url.path)")
+                return url
+            } catch let error as BookmarkError {
+                throw error
+            } catch {
+                logger.error("Failed to resolve bookmark: \(error.localizedDescription)")
+                throw BookmarkError.resolutionFailed(error.localizedDescription)
+            }
+        }
+    }
+    
+    public func startAccessing(_ url: URL) async throws -> Bool {
+        let operationId = UUID()
+        
+        return try await measure("Start Accessing Resource") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            do {
+                // Get bookmark from keychain
+                let bookmark = try keychainService.retrieveBookmark(for: url)
+                
+                // Resolve bookmark
+                let resolvedUrl = try await resolveBookmark(bookmark)
+                
+                // Start accessing
+                guard resolvedUrl.startAccessingSecurityScopedResource() else {
+                    logger.warning("Failed to start accessing \(url.path)")
+                    return false
+                }
+                
+                // Track active bookmark
+                accessQueue.async(flags: .barrier) {
+                    self.activeBookmarks.insert(url)
+                }
+                
+                logger.info("Started accessing \(url.path)")
+                return true
+            } catch {
+                logger.error("Failed to start accessing: \(error.localizedDescription)")
+                return false
+            }
+        }
+    }
+    
+    public func stopAccessing(_ url: URL) {
+        let operationId = UUID()
+        
+        measure("Stop Accessing Resource") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            url.stopAccessingSecurityScopedResource()
+            
+            // Remove from active bookmarks
+            accessQueue.async(flags: .barrier) {
+                self.activeBookmarks.remove(url)
+            }
+            
+            logger.info("Stopped accessing \(url.path)")
+        }
+    }
+    
+    public func validateBookmark(for url: URL) async throws -> Bool {
+        try await measure("Validate Bookmark") {
+            do {
+                // Check if bookmark exists in keychain
+                let bookmark = try keychainService.retrieveBookmark(for: url)
+                
+                // Try to resolve it
+                _ = try await resolveBookmark(bookmark)
+                
+                logger.info("Successfully validated bookmark for \(url.path)")
+                return true
+            } catch {
+                logger.warning("Failed to validate bookmark: \(error.localizedDescription)")
+                return false
+            }
+        }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Bookmark Persistence Service Health Check") {
+            do {
+                // Check dependencies
+                guard await keychainService.performHealthCheck() else {
+                    return false
+                }
+                
+                // Check for stuck operations
+                let stuckOperations = accessQueue.sync { activeOperations }
+                if !stuckOperations.isEmpty {
+                    logger.warning("Found \(stuckOperations.count) potentially stuck operations")
+                    return false
+                }
+                
+                // Check for leaked bookmarks
+                let leakedBookmarks = accessQueue.sync { activeBookmarks }
+                if !leakedBookmarks.isEmpty {
+                    logger.warning("Found \(leakedBookmarks.count) potentially leaked bookmarks")
+                    return false
+                }
+                
+                logger.info("Bookmark persistence service health check passed")
+                return true
+            } catch {
+                logger.error("Bookmark persistence service health check failed: \(error.localizedDescription)")
+                return false
+            }
+        }
+    }
 }
 
-/// Error types for bookmark persistence operations
-public enum BookmarkPersistenceError: LocalizedError {
-    case persistenceFailed(String)
-    case retrievalFailed(String)
-    case deletionFailed(String)
-    case invalidBookmarkData
-    case bookmarkNotFound
-    case sandboxViolation(String)
+// MARK: - Bookmark Errors
+public enum BookmarkError: LocalizedError {
+    case creationFailed(String)
+    case resolutionFailed(String)
+    case staleBookmark
+    case accessDenied
+    case invalidBookmark
     
     public var errorDescription: String? {
         switch self {
-        case .persistenceFailed(let reason):
-            return "Failed to persist bookmark: \(reason)"
-        case .retrievalFailed(let reason):
-            return "Failed to retrieve bookmark: \(reason)"
-        case .deletionFailed(let reason):
-            return "Failed to delete bookmark: \(reason)"
-        case .invalidBookmarkData:
-            return "Invalid bookmark data"
-        case .bookmarkNotFound:
-            return "Bookmark not found"
-        case .sandboxViolation(let reason):
-            return "Sandbox violation: \(reason)"
-        }
-    }
-}
-
-/// Service for persisting security-scoped bookmarks in a sandbox-compliant manner
-public final class BookmarkPersistenceService: BookmarkPersistenceServiceProtocol {
-    private let fileManager: FileManager
-    private let logger: LoggerProtocol
-    private let keychain: Keychain
-    private let queue: DispatchQueue
-    
-    /// URL where bookmarks are stored
-    private var bookmarksDirectory: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("rBUM/Bookmarks", isDirectory: true)
-    }
-    
-    /// Initialize the bookmark persistence service
-    /// - Parameters:
-    ///   - fileManager: FileManager instance to use
-    ///   - logger: Logger instance to use
-    ///   - keychain: Keychain instance to use
-    public init(
-        fileManager: FileManager = .default,
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "BookmarkPersistence"),
-        keychain: Keychain = Keychain()
-    ) {
-        self.fileManager = fileManager
-        self.logger = logger
-        self.keychain = keychain
-        self.queue = DispatchQueue(label: "dev.mpy.rBUM.bookmarkPersistence", qos: .userInitiated)
-        
-        Task {
-            try? await self.createBookmarksDirectory()
-        }
-    }
-    
-    public func persistBookmark(_ data: Data, forURL url: URL) async throws {
-        try await queue.run {
-            self.logger.debug("Saving bookmark", file: #file, function: #function, line: #line)
-            
-            do {
-                let key = self.keychainKey(for: url)
-                try self.keychain.save(data, forAccount: key)
-                self.logger.info("Successfully saved bookmark", file: #file, function: #function, line: #line)
-            } catch {
-                self.logger.error("Failed to save bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                throw BookmarkPersistenceError.persistenceFailed(error.localizedDescription)
-            }
-        }
-    }
-    
-    public func retrieveBookmark(forURL url: URL) async throws -> Data? {
-        try await queue.run {
-            self.logger.debug("Retrieving bookmark", file: #file, function: #function, line: #line)
-            
-            do {
-                let key = self.keychainKey(for: url)
-                let data = try self.keychain.retrieve(forAccount: key)
-                self.logger.info("Successfully retrieved bookmark", file: #file, function: #function, line: #line)
-                return data
-            } catch KeychainError.retrieveFailed {
-                self.logger.info("No bookmark found", file: #file, function: #function, line: #line)
-                return nil
-            } catch {
-                self.logger.error("Failed to retrieve bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                throw BookmarkPersistenceError.retrievalFailed(error.localizedDescription)
-            }
-        }
-    }
-    
-    public func removeBookmark(forURL url: URL) async throws {
-        try await queue.run {
-            self.logger.debug("Removing bookmark", file: #file, function: #function, line: #line)
-            
-            do {
-                let key = self.keychainKey(for: url)
-                try self.keychain.delete(forAccount: key)
-                self.logger.info("Successfully removed bookmark", file: #file, function: #function, line: #line)
-            } catch {
-                self.logger.error("Failed to remove bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                throw BookmarkPersistenceError.deletionFailed(error.localizedDescription)
-            }
-        }
-    }
-    
-    public func listBookmarks() async throws -> [URL: Data] {
-        try await queue.run {
-            self.logger.debug("Listing bookmarks", file: #file, function: #function, line: #line)
-            
-            do {
-                let accounts = try self.keychain.listAccounts()
-                var bookmarks: [URL: Data] = [:]
-                
-                for account in accounts {
-                    if let url = self.url(fromKey: account),
-                       let data = try? self.keychain.retrieve(forAccount: account) {
-                        bookmarks[url] = data
-                    }
-                }
-                
-                self.logger.info("Successfully listed \(bookmarks.count) bookmarks", file: #file, function: #function, line: #line)
-                return bookmarks
-            } catch {
-                self.logger.error("Failed to list bookmarks: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                throw BookmarkPersistenceError.retrievalFailed(error.localizedDescription)
-            }
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func createBookmarksDirectory() async throws {
-        try await queue.run {
-            guard !self.fileManager.fileExists(atPath: self.bookmarksDirectory.path) else { return }
-            
-            do {
-                try self.fileManager.createDirectory(at: self.bookmarksDirectory,
-                                             withIntermediateDirectories: true,
-                                             attributes: nil)
-                self.logger.info("Created bookmarks directory", file: #file, function: #function, line: #line)
-            } catch {
-                self.logger.error("Failed to create bookmarks directory: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                throw BookmarkPersistenceError.persistenceFailed("Failed to create bookmarks directory")
-            }
-        }
-    }
-    
-    private func keychainKey(for url: URL) -> String {
-        "bookmark_\(url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? "")"
-    }
-    
-    private func url(fromKey key: String) -> URL? {
-        guard key.hasPrefix("bookmark_"),
-              let encodedString = key.dropFirst("bookmark_".count).removingPercentEncoding,
-              let url = URL(string: encodedString) else {
-            return nil
-        }
-        return url
-    }
-}
-
-// MARK: - DispatchQueue Extension
-
-private extension DispatchQueue {
-    func run<T>(_ block: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { continuation in
-            async {
-                do {
-                    let result = try block()
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+        case .creationFailed(let message):
+            return "Failed to create bookmark: \(message)"
+        case .resolutionFailed(let message):
+            return "Failed to resolve bookmark: \(message)"
+        case .staleBookmark:
+            return "Bookmark is stale and needs to be recreated"
+        case .accessDenied:
+            return "Access denied to bookmarked resource"
+        case .invalidBookmark:
+            return "Invalid or corrupted bookmark"
         }
     }
 }

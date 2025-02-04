@@ -11,239 +11,146 @@ import XCTest
 
 final class BookmarkServiceTests: XCTestCase {
     // MARK: - Properties
-    
-    private var bookmarkService: BookmarkService!
-    private var persistenceService: MockBookmarkPersistenceService!
-    private var logger: TestLogger!
-    private var fileManager: MockFileManager!
+    private var service: BookmarkService!
+    private var mockLogger: MockLogger!
+    private var mockKeychainService: MockKeychainService!
+    private let fileManager = FileManager.default
     
     // MARK: - Setup
-    
-    override func setUp() async throws {
-        try await super.setUp()
+    override func setUp() {
+        super.setUp()
+        mockLogger = MockLogger()
+        mockKeychainService = MockKeychainService()
         
-        logger = TestLogger()
-        persistenceService = MockBookmarkPersistenceService()
-        fileManager = MockFileManager()
-        
-        bookmarkService = BookmarkService(
-            persistenceService: persistenceService,
-            fileManager: fileManager,
-            logger: logger
+        service = BookmarkService(
+            logger: mockLogger,
+            keychainService: mockKeychainService
         )
     }
     
-    override func tearDown() async throws {
-        bookmarkService = nil
-        persistenceService = nil
-        logger = nil
-        fileManager = nil
-        try await super.tearDown()
+    override func tearDown() {
+        service = nil
+        mockLogger.clear()
+        mockKeychainService.clear()
+        super.tearDown()
     }
     
-    // MARK: - Bookmark Creation Tests
-    
-    func testCreateBookmark() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        fileManager.mockBookmarkData = "test-bookmark-data".data(using: .utf8)!
+    // MARK: - Bookmark Management Tests
+    func testCreateAndValidateBookmark() async throws {
+        // Given
+        let testURL = try URL.temporaryTestDirectory(name: "test-bookmark")
+        defer { cleanupTestURLs(testURL) }
         
-        let bookmarkData = try bookmarkService.createBookmark(for: testURL)
+        // When
+        let bookmark = try await service.createBookmark(for: testURL)
+        let isValid = try await service.validateBookmark(bookmark, for: testURL)
         
-        XCTAssertEqual(bookmarkData, fileManager.mockBookmarkData)
-        XCTAssertTrue(fileManager.createBookmarkDataCalled)
-        XCTAssertTrue(persistenceService.saveBookmarkCalled)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Creating bookmark") })
+        // Then
+        XCTAssertTrue(isValid)
+        verifyLogMessages(mockLogger,
+            contains: "Successfully created bookmark",
+                     "Successfully validated bookmark")
     }
     
-    func testCreateBookmarkWithInvalidURL() throws {
-        let invalidURL = URL(fileURLWithPath: "")
-        fileManager.shouldFailBookmarkCreation = true
+    func testStartAndStopAccessing() async throws {
+        // Given
+        let testURL = try URL.temporaryTestDirectory(name: "test-access")
+        defer { cleanupTestURLs(testURL) }
         
-        XCTAssertThrowsError(try bookmarkService.createBookmark(for: invalidURL)) { error in
+        let bookmark = try await service.createBookmark(for: testURL)
+        
+        // When
+        let startResult = try await service.startAccessing(testURL, with: bookmark)
+        let stopResult = try await service.stopAccessing(testURL)
+        
+        // Then
+        XCTAssertTrue(startResult)
+        XCTAssertTrue(stopResult)
+        verifyLogMessages(mockLogger,
+            contains: "Successfully started accessing URL",
+                     "Successfully stopped accessing URL")
+    }
+    
+    func testBookmarkStaleness() async throws {
+        // Given
+        let testURL = try URL.temporaryTestDirectory(name: "test-stale")
+        defer { cleanupTestURLs(testURL) }
+        
+        let bookmark = try await service.createBookmark(for: testURL)
+        try fileManager.moveItem(at: testURL, to: testURL.appendingPathComponent("moved"))
+        
+        // When/Then
+        await XCTAssertThrowsError(try await service.validateBookmark(bookmark, for: testURL)) { error in
             XCTAssertTrue(error is BookmarkError)
-            XCTAssertEqual(error as? BookmarkError, .creationFailed)
         }
-        
-        // Verify error logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Failed to create bookmark") })
+        verifyLogMessages(mockLogger,
+            contains: "Bookmark validation failed")
     }
     
-    // MARK: - Bookmark Resolution Tests
-    
-    func testResolveBookmark() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        let bookmarkData = "test-bookmark-data".data(using: .utf8)!
-        fileManager.mockResolvedURL = testURL
+    func testAccessWithInvalidBookmark() async throws {
+        // Given
+        let testURL = try URL.temporaryTestDirectory(name: "test-invalid")
+        defer { cleanupTestURLs(testURL) }
         
-        let resolvedURL = try bookmarkService.resolveBookmark(bookmarkData)
+        let invalidBookmark = Data()
         
-        XCTAssertEqual(resolvedURL, testURL)
-        XCTAssertTrue(fileManager.resolveBookmarkDataCalled)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Resolving bookmark") })
+        // When/Then
+        await XCTAssertThrowsError(try await service.startAccessing(testURL, with: invalidBookmark)) { error in
+            XCTAssertTrue(error is BookmarkError)
+        }
+        verifyLogMessages(mockLogger,
+            contains: "Failed to start accessing URL")
     }
-    
-    func testResolveStaleBookmark() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        let bookmarkData = "test-bookmark-data".data(using: .utf8)!
-        fileManager.mockResolvedURL = testURL
-        fileManager.mockBookmarkIsStale = true
-        
-        // First resolution should recreate the bookmark
-        let resolvedURL = try bookmarkService.resolveBookmark(bookmarkData)
-        
-        XCTAssertEqual(resolvedURL, testURL)
-        XCTAssertTrue(fileManager.resolveBookmarkDataCalled)
-        XCTAssertTrue(fileManager.createBookmarkDataCalled)
-        XCTAssertTrue(persistenceService.saveBookmarkCalled)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Bookmark is stale") })
-        XCTAssertTrue(logger.messages.contains { $0.contains("Recreated stale bookmark") })
-    }
-    
-    // MARK: - Access Control Tests
-    
-    func testAccessControl() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        fileManager.mockResolvedURL = testURL
-        
-        XCTAssertTrue(bookmarkService.startAccessing(testURL))
-        XCTAssertTrue(fileManager.startAccessingSecurityScopedResourceCalled)
-        
-        bookmarkService.stopAccessing(testURL)
-        XCTAssertTrue(fileManager.stopAccessingSecurityScopedResourceCalled)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Started accessing") })
-        XCTAssertTrue(logger.messages.contains { $0.contains("Stopped accessing") })
-    }
-    
-    func testNestedAccess() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        fileManager.mockResolvedURL = testURL
-        
-        // First access
-        XCTAssertTrue(bookmarkService.startAccessing(testURL))
-        XCTAssertEqual(fileManager.startAccessingCount, 1)
-        
-        // Nested access
-        XCTAssertTrue(bookmarkService.startAccessing(testURL))
-        XCTAssertEqual(fileManager.startAccessingCount, 1) // Should not increment
-        
-        // First stop
-        bookmarkService.stopAccessing(testURL)
-        XCTAssertEqual(fileManager.stopAccessingCount, 0) // Should not stop yet
-        
-        // Second stop
-        bookmarkService.stopAccessing(testURL)
-        XCTAssertEqual(fileManager.stopAccessingCount, 1) // Should stop now
-    }
-    
-    // MARK: - Persistence Tests
-    
-    func testBookmarkPersistence() throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        let bookmarkData = "test-bookmark-data".data(using: .utf8)!
-        fileManager.mockBookmarkData = bookmarkData
-        
-        // Create and save bookmark
-        let savedData = try bookmarkService.createBookmark(for: testURL)
-        XCTAssertTrue(persistenceService.saveBookmarkCalled)
-        XCTAssertEqual(persistenceService.lastSavedBookmark, savedData)
-        
-        // Retrieve bookmark
-        persistenceService.mockBookmarkData = bookmarkData
-        let retrievedData = try persistenceService.retrieveBookmark(for: testURL)
-        XCTAssertEqual(retrievedData, bookmarkData)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Saved bookmark") })
-        XCTAssertTrue(logger.messages.contains { $0.contains("Retrieved bookmark") })
-    }
-    
-    // MARK: - Concurrency Tests
     
     func testConcurrentAccess() async throws {
-        let testURL = URL(fileURLWithPath: "/test/path")
-        fileManager.mockResolvedURL = testURL
-        let iterations = 100
-        
-        await withThrowingTaskGroup(of: Void.self) { group in
-            for _ in 0..<iterations {
-                group.addTask {
-                    XCTAssertTrue(self.bookmarkService.startAccessing(testURL))
-                    try await Task.sleep(nanoseconds: 1_000_000)
-                    self.bookmarkService.stopAccessing(testURL)
-                }
-            }
+        // Given
+        let testURL1 = try URL.temporaryTestDirectory(name: "test-concurrent-1")
+        let testURL2 = try URL.temporaryTestDirectory(name: "test-concurrent-2")
+        defer {
+            cleanupTestURLs(testURL1, testURL2)
         }
         
-        XCTAssertEqual(fileManager.startAccessingCount, 1)
-        XCTAssertEqual(fileManager.stopAccessingCount, 1)
-    }
-}
-
-// MARK: - Test Helpers
-
-private final class MockFileManager: FileManagerProtocol {
-    var createBookmarkDataCalled = false
-    var resolveBookmarkDataCalled = false
-    var startAccessingSecurityScopedResourceCalled = false
-    var stopAccessingSecurityScopedResourceCalled = false
-    
-    var startAccessingCount = 0
-    var stopAccessingCount = 0
-    
-    var shouldFailBookmarkCreation = false
-    var mockBookmarkIsStale = false
-    var mockBookmarkData: Data?
-    var mockResolvedURL: URL?
-    
-    func createBookmarkData(for url: URL) throws -> Data {
-        createBookmarkDataCalled = true
+        let bookmark1 = try await service.createBookmark(for: testURL1)
+        let bookmark2 = try await service.createBookmark(for: testURL2)
         
-        if shouldFailBookmarkCreation {
-            throw BookmarkError.creationFailed
-        }
+        // When
+        async let access1 = service.startAccessing(testURL1, with: bookmark1)
+        async let access2 = service.startAccessing(testURL2, with: bookmark2)
         
-        return mockBookmarkData ?? Data()
+        // Then
+        let (result1, result2) = try await (access1, access2)
+        XCTAssertTrue(result1)
+        XCTAssertTrue(result2)
+        
+        // Cleanup
+        try await service.stopAccessing(testURL1)
+        try await service.stopAccessing(testURL2)
     }
     
-    func resolveBookmarkData(_ data: Data) throws -> (URL, Bool) {
-        resolveBookmarkDataCalled = true
-        return (mockResolvedURL ?? URL(fileURLWithPath: "/test"), mockBookmarkIsStale)
+    // MARK: - Health Check Tests
+    func testHealthCheck() async {
+        // Given
+        mockKeychainService.isHealthy = true
+        
+        // When
+        let isHealthy = await service.performHealthCheck()
+        
+        // Then
+        XCTAssertTrue(isHealthy)
+        verifyLogMessages(mockLogger,
+            contains: "Health check completed successfully")
     }
     
-    func startAccessingSecurityScopedResource(_ url: URL) -> Bool {
-        startAccessingSecurityScopedResourceCalled = true
-        startAccessingCount += 1
-        return true
-    }
-    
-    func stopAccessingSecurityScopedResource(_ url: URL) {
-        stopAccessingSecurityScopedResourceCalled = true
-        stopAccessingCount += 1
-    }
-}
-
-private final class MockBookmarkPersistenceService: BookmarkPersistenceServiceProtocol {
-    var saveBookmarkCalled = false
-    var retrieveBookmarkCalled = false
-    
-    var lastSavedBookmark: Data?
-    var mockBookmarkData: Data?
-    
-    func saveBookmark(_ data: Data, for url: URL) throws {
-        saveBookmarkCalled = true
-        lastSavedBookmark = data
-    }
-    
-    func retrieveBookmark(for url: URL) throws -> Data {
-        retrieveBookmarkCalled = true
-        return mockBookmarkData ?? Data()
+    func testHealthCheckFailure() async {
+        // Given
+        mockKeychainService.isHealthy = false
+        
+        // When
+        let isHealthy = await service.performHealthCheck()
+        
+        // Then
+        XCTAssertFalse(isHealthy)
+        verifyLogMessages(mockLogger,
+            contains: "Health check failed")
     }
 }

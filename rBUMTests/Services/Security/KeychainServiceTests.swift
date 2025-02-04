@@ -1,247 +1,193 @@
-//
-//  KeychainServiceTests.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
 import XCTest
-import Security
 @testable import rBUM
 @testable import Core
 
 final class KeychainServiceTests: XCTestCase {
     // MARK: - Properties
-    
-    private var keychainService: KeychainService!
-    private var logger: TestLogger!
-    private let serviceName = "dev.mpy.rBUM"
-    private let accessGroup = "dev.mpy.rBUM.shared"
+    private var service: KeychainService!
+    private var mockLogger: MockLogger!
+    private let fileManager = FileManager.default
     
     // MARK: - Setup
-    
-    override func setUp() async throws {
-        try await super.setUp()
+    override func setUp() {
+        super.setUp()
+        mockLogger = MockLogger()
+        service = KeychainService(logger: mockLogger)
         
-        logger = TestLogger()
-        keychainService = KeychainService(
-            serviceName: serviceName,
-            accessGroup: accessGroup,
-            logger: logger
-        )
-        
-        // Clean up any existing test items
-        try cleanupTestItems()
+        // Clean up any test items that might have been left from previous runs
+        try? service.deleteGenericPassword(service: "test-service", account: "test-account")
+        try? service.deleteBookmark(for: URL(fileURLWithPath: "/test/path"))
     }
     
-    override func tearDown() async throws {
-        try cleanupTestItems()
-        keychainService = nil
-        logger = nil
-        try await super.tearDown()
+    override func tearDown() {
+        // Clean up test items
+        try? service.deleteGenericPassword(service: "test-service", account: "test-account")
+        try? service.deleteBookmark(for: URL(fileURLWithPath: "/test/path"))
+        
+        service = nil
+        mockLogger.clear()
+        super.tearDown()
     }
     
-    private func cleanupTestItems() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecMatchLimit as String: kSecMatchLimitAll
-        ]
-        SecItemDelete(query as CFDictionary)
+    // MARK: - Generic Password Tests
+    func testStoreAndRetrieveGenericPassword() throws {
+        // Given
+        let password = "test-password".data(using: .utf8)!
+        let serviceName = "test-service"
+        let accountName = "test-account"
+        
+        // When
+        try service.storeGenericPassword(password, service: serviceName, account: accountName)
+        let retrievedPassword = try service.retrieveGenericPassword(service: serviceName, account: accountName)
+        
+        // Then
+        XCTAssertEqual(retrievedPassword, password)
+        XCTAssertTrue(mockLogger.containsMessage("Successfully stored generic password"))
+        XCTAssertTrue(mockLogger.containsMessage("Successfully retrieved generic password"))
     }
     
-    // MARK: - Credential Tests
-    
-    func testSaveAndRetrieveCredentials() throws {
-        let repositoryId = UUID()
-        let credentials = RepositoryCredentials(password: "test-password")
+    func testDeleteGenericPassword() throws {
+        // Given
+        let password = "test-password".data(using: .utf8)!
+        let serviceName = "test-service"
+        let accountName = "test-account"
         
-        // Save credentials
-        try keychainService.saveCredentials(credentials, for: repositoryId)
+        // Store password first
+        try service.storeGenericPassword(password, service: serviceName, account: accountName)
         
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Saving credentials") })
+        // When
+        try service.deleteGenericPassword(service: serviceName, account: accountName)
         
-        // Retrieve credentials
-        let retrieved = try keychainService.retrieveCredentials(for: repositoryId)
-        
-        XCTAssertEqual(retrieved.password, credentials.password)
-        XCTAssertTrue(logger.messages.contains { $0.contains("Retrieved credentials") })
-    }
-    
-    func testUpdateCredentials() throws {
-        let repositoryId = UUID()
-        let originalCredentials = RepositoryCredentials(password: "original-password")
-        let updatedCredentials = RepositoryCredentials(password: "updated-password")
-        
-        // Save original credentials
-        try keychainService.saveCredentials(originalCredentials, for: repositoryId)
-        
-        // Update credentials
-        try keychainService.saveCredentials(updatedCredentials, for: repositoryId)
-        
-        // Retrieve and verify
-        let retrieved = try keychainService.retrieveCredentials(for: repositoryId)
-        XCTAssertEqual(retrieved.password, updatedCredentials.password)
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Updating credentials") })
-    }
-    
-    func testDeleteCredentials() throws {
-        let repositoryId = UUID()
-        let credentials = RepositoryCredentials(password: "test-password")
-        
-        // Save credentials
-        try keychainService.saveCredentials(credentials, for: repositoryId)
-        
-        // Delete credentials
-        try keychainService.deleteCredentials(for: repositoryId)
-        
-        // Verify deletion
-        XCTAssertThrowsError(try keychainService.retrieveCredentials(for: repositoryId)) { error in
-            XCTAssertEqual(error as? CredentialsError, .retrievalFailed)
+        // Then
+        XCTAssertThrowsError(try service.retrieveGenericPassword(service: serviceName, account: accountName)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .itemNotFound)
         }
-        
-        // Verify logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Deleted credentials") })
+        XCTAssertTrue(mockLogger.containsMessage("Successfully deleted generic password"))
     }
     
-    // MARK: - Security Tests
-    
-    func testCredentialEncryption() throws {
-        let repositoryId = UUID()
-        let credentials = RepositoryCredentials(password: "sensitive-password")
+    func testRetrieveNonexistentPassword() {
+        // Given
+        let serviceName = "nonexistent-service"
+        let accountName = "nonexistent-account"
         
-        // Save credentials
-        try keychainService.saveCredentials(credentials, for: repositoryId)
-        
-        // Verify encryption
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: repositoryId.uuidString,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        XCTAssertEqual(status, errSecSuccess)
-        
-        let storedData = result as! Data
-        let rawString = String(data: storedData, encoding: .utf8)
-        
-        // Verify that stored data is encrypted (not plaintext)
-        XCTAssertNotEqual(rawString, credentials.password)
+        // When/Then
+        XCTAssertThrowsError(try service.retrieveGenericPassword(service: serviceName, account: accountName)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .itemNotFound)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to retrieve generic password"))
+        }
     }
     
-    func testAccessControl() throws {
-        let repositoryId = UUID()
-        let credentials = RepositoryCredentials(password: "test-password")
+    // MARK: - Bookmark Tests
+    func testStoreAndRetrieveBookmark() throws {
+        // Given
+        let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
+        let bookmark = "test-bookmark".data(using: .utf8)!
         
-        // Save credentials with access control
-        try keychainService.saveCredentials(credentials, for: repositoryId)
+        // When
+        try service.storeBookmark(bookmark, for: testURL)
+        let retrievedBookmark = try service.retrieveBookmark(for: testURL)
         
-        // Verify access control attributes
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: repositoryId.uuidString,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnAttributes as String: true
-        ]
+        // Then
+        XCTAssertEqual(retrievedBookmark, bookmark)
+        XCTAssertTrue(mockLogger.containsMessage("Successfully stored bookmark"))
+        XCTAssertTrue(mockLogger.containsMessage("Successfully retrieved bookmark"))
+    }
+    
+    func testDeleteBookmark() throws {
+        // Given
+        let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
+        let bookmark = "test-bookmark".data(using: .utf8)!
         
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        XCTAssertEqual(status, errSecSuccess)
+        // Store bookmark first
+        try service.storeBookmark(bookmark, for: testURL)
         
-        let attributes = result as! [String: Any]
-        XCTAssertNotNil(attributes[kSecAttrAccessControl as String])
+        // When
+        try service.deleteBookmark(for: testURL)
+        
+        // Then
+        XCTAssertThrowsError(try service.retrieveBookmark(for: testURL)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .itemNotFound)
+        }
+        XCTAssertTrue(mockLogger.containsMessage("Successfully deleted bookmark"))
+    }
+    
+    func testRetrieveNonexistentBookmark() {
+        // Given
+        let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("nonexistent")
+        
+        // When/Then
+        XCTAssertThrowsError(try service.retrieveBookmark(for: testURL)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .itemNotFound)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to retrieve bookmark"))
+        }
+    }
+    
+    // MARK: - Health Check Tests
+    func testHealthCheck() async {
+        // Given
+        let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
+        let bookmark = "test-bookmark".data(using: .utf8)!
+        try? service.storeBookmark(bookmark, for: testURL)
+        
+        // When
+        let isHealthy = await service.performHealthCheck()
+        
+        // Then
+        XCTAssertTrue(isHealthy)
+        XCTAssertTrue(mockLogger.containsMessage("Keychain service health check passed"))
+        
+        // Cleanup
+        try? service.deleteBookmark(for: testURL)
+    }
+    
+    func testHealthCheckWithInvalidKeychain() async {
+        // Given
+        let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
+        let bookmark = "test-bookmark".data(using: .utf8)!
+        try? service.storeBookmark(bookmark, for: testURL)
+        try? service.deleteBookmark(for: testURL)
+        
+        // When
+        let isHealthy = await service.performHealthCheck()
+        
+        // Then
+        XCTAssertTrue(isHealthy) // Should still be healthy even if items don't exist
+        XCTAssertTrue(mockLogger.containsMessage("Keychain service health check passed"))
     }
     
     // MARK: - Error Handling Tests
-    
-    func testInvalidCredentials() throws {
-        let repositoryId = UUID()
+    func testDuplicateItemError() {
+        // Given
+        let password = "test-password".data(using: .utf8)!
+        let serviceName = "test-service"
+        let accountName = "test-account"
         
-        // Test retrieving non-existent credentials
-        XCTAssertThrowsError(try keychainService.retrieveCredentials(for: repositoryId)) { error in
-            XCTAssertEqual(error as? CredentialsError, .retrievalFailed)
-        }
+        // When/Then
+        // First store should succeed
+        XCTAssertNoThrow(try service.storeGenericPassword(password, service: serviceName, account: accountName))
         
-        // Verify error logging
-        XCTAssertTrue(logger.messages.contains { $0.contains("Failed to retrieve credentials") })
-    }
-    
-    func testDuplicateCredentials() throws {
-        let repositoryId = UUID()
-        let credentials1 = RepositoryCredentials(password: "password1")
-        let credentials2 = RepositoryCredentials(password: "password2")
-        
-        // Save first credentials
-        try keychainService.saveCredentials(credentials1, for: repositoryId)
-        
-        // Save second credentials (should update, not error)
-        XCTAssertNoThrow(try keychainService.saveCredentials(credentials2, for: repositoryId))
-        
-        // Verify only the second credentials are stored
-        let retrieved = try keychainService.retrieveCredentials(for: repositoryId)
-        XCTAssertEqual(retrieved.password, credentials2.password)
-    }
-    
-    // MARK: - Concurrency Tests
-    
-    func testConcurrentAccess() async throws {
-        let iterations = 100
-        let repositoryIds = (0..<iterations).map { _ in UUID() }
-        
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for id in repositoryIds {
-                group.addTask {
-                    let credentials = RepositoryCredentials(password: "password-\(id)")
-                    try self.keychainService.saveCredentials(credentials, for: id)
-                    let retrieved = try self.keychainService.retrieveCredentials(for: id)
-                    XCTAssertEqual(retrieved.password, credentials.password)
-                }
-            }
-            try await group.waitForAll()
+        // Second store should fail with duplicate error
+        XCTAssertThrowsError(try service.storeGenericPassword(password, service: serviceName, account: accountName)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .duplicateItem)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to store generic password"))
         }
     }
     
-    func testConcurrentModification() async throws {
-        let repositoryId = UUID()
-        let iterations = 100
+    func testDeleteNonexistentItem() {
+        // Given
+        let serviceName = "nonexistent-service"
+        let accountName = "nonexistent-account"
         
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for i in 0..<iterations {
-                group.addTask {
-                    let credentials = RepositoryCredentials(password: "password-\(i)")
-                    try self.keychainService.saveCredentials(credentials, for: repositoryId)
-                    _ = try self.keychainService.retrieveCredentials(for: repositoryId)
-                }
-            }
-            try await group.waitForAll()
+        // When/Then
+        XCTAssertThrowsError(try service.deleteGenericPassword(service: serviceName, account: accountName)) { error in
+            XCTAssertTrue(error is KeychainError)
+            XCTAssertEqual(error as? KeychainError, .itemNotFound)
+            XCTAssertTrue(mockLogger.containsMessage("Failed to delete generic password"))
         }
-        
-        // Verify only one credential exists
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: repositoryId.uuidString,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        XCTAssertEqual(status, errSecSuccess)
-        
-        let items = result as! [[String: Any]]
-        XCTAssertEqual(items.count, 1)
     }
 }

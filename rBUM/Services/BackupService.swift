@@ -7,319 +7,172 @@
 
 import Foundation
 import Core
-import OSLog
 
-/// Protocol defining backup service operations
-protocol BackupServiceProtocol {
-    /// Create a new backup repository
-    /// - Parameters:
-    ///   - path: Path to create repository at
-    ///   - password: Password for the repository
-    /// - Returns: Created repository
-    /// - Throws: BackupError if creation fails
-    func createRepository(at path: URL, password: String) async throws -> Repository
+/// Service for managing backup operations
+public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let resticService: ResticServiceProtocol
+    private let keychainService: KeychainServiceProtocol
+    private let operationQueue: OperationQueue
+    private var activeBackups: Set<UUID> = []
+    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.backupService", attributes: .concurrent)
     
-    /// Initialize an existing backup repository
-    /// - Parameters:
-    ///   - path: Path to existing repository
-    ///   - password: Password for the repository
-    /// - Returns: Initialized repository
-    /// - Throws: BackupError if initialization fails
-    func initializeRepository(at path: URL, password: String) async throws -> Repository
-    
-    /// Delete a backup repository
-    /// - Parameter repository: Repository to delete
-    /// - Throws: BackupError if deletion fails
-    func deleteRepository(_ repository: Repository) async throws
-    
-    /// List snapshots in a repository
-    /// - Parameter repository: Repository to list snapshots from
-    /// - Returns: Array of snapshots
-    /// - Throws: BackupError if listing fails
-    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot]
-    
-    /// Backup items to a repository
-    /// - Parameters:
-    ///   - repository: Repository to backup to
-    ///   - items: Items to backup
-    /// - Throws: BackupError if backup fails
-    func backup(repository: Repository, items: [URL]) async throws
-}
-
-/// Service responsible for managing backup operations
-final class BackupService: BackupServiceProtocol {
-    // MARK: - Private Properties
-    
-    private let fileManager: FileManagerProtocol
-    private let logger: LoggerProtocol
-    private let securityService: SecurityServiceProtocol
-    private let bookmarkService: BookmarkServiceProtocol
-    private let processExecutor: ProcessExecutorProtocol
-    private let dateProvider: DateProviderProtocol
-    private let notificationCenter: NotificationCenterProtocol
-    private let workingDirectory: URL
+    public var isHealthy: Bool {
+        // Check if we have any stuck backups
+        accessQueue.sync {
+            activeBackups.isEmpty
+        }
+    }
     
     // MARK: - Initialization
-    
-    init(
-        fileManager: FileManagerProtocol = FileManager.default,
-        logger: LoggerProtocol = Logging.logger(for: .backup),
-        securityService: SecurityServiceProtocol = SecurityService(),
-        bookmarkService: BookmarkServiceProtocol = BookmarkService(),
-        processExecutor: ProcessExecutorProtocol = ProcessExecutor(),
-        dateProvider: DateProviderProtocol = DateProvider(),
-        notificationCenter: NotificationCenterProtocol = NotificationCenter.default,
-        workingDirectory: URL = FileManager.default.temporaryDirectory
+    public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        resticService: ResticServiceProtocol,
+        keychainService: KeychainServiceProtocol
     ) {
-        self.fileManager = fileManager
-        self.logger = logger
-        self.securityService = securityService
-        self.bookmarkService = bookmarkService
-        self.processExecutor = processExecutor
-        self.dateProvider = dateProvider
-        self.notificationCenter = notificationCenter
-        self.workingDirectory = workingDirectory
+        self.resticService = resticService
+        self.keychainService = keychainService
         
-        logger.debug("Initialized BackupService with working directory: \(workingDirectory.path)", privacy: .public, file: #file, function: #function, line: #line)
+        self.operationQueue = OperationQueue()
+        self.operationQueue.name = "dev.mpy.rBUM.backupQueue"
+        self.operationQueue.maxConcurrentOperationCount = 1
+        
+        super.init(logger: logger, securityService: securityService)
     }
     
-    // MARK: - Public Methods
-    
-    func createRepository(at path: URL, password: String) async throws -> Repository {
-        logger.info("Creating new repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
-        
-        do {
-            // Validate path access
-            logger.debug("Validating access to path: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-            guard try bookmarkService.validateBookmark(for: path) else {
-                logger.error("Cannot access repository location: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                throw BackupError.accessDenied("Cannot access repository location")
-            }
-            
-            // Create repository directory if needed
-            if !fileManager.fileExists(atPath: path.path) {
-                logger.debug("Creating repository directory at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
-            }
+    // MARK: - BackupServiceProtocol Implementation
+    public func createRepository(at url: URL, password: String) async throws {
+        try await measure("Create Repository") {
+            // Store credentials first
+            let credentials = KeychainCredentials(repositoryUrl: url, password: password)
+            try keychainService.storeCredentials(credentials)
             
             // Initialize repository
-            logger.debug("Initializing repository with restic", privacy: .public, file: #file, function: #function, line: #line)
-            let repository = Repository(
-                name: path.lastPathComponent,
-                path: path.path,
-                credentials: RepositoryCredentials(password: password)
-            )
+            try await resticService.initialize(repository: url, password: password)
             
-            try await resticService.initializeRepository(repository)
-            logger.info("Successfully created repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
-            return repository
-            
-        } catch {
-            logger.error("Failed to create repository: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw BackupError.creationFailed(error.localizedDescription)
+            logger.info("Successfully created repository at \(url.path)")
         }
     }
     
-    func initializeRepository(at path: URL, password: String) async throws -> Repository {
-        logger.info("Initializing repository at: \(path.path, privacy: .private)")
+    public func startBackup(source: URL, to repository: URL) async throws -> UUID {
+        let backupId = UUID()
         
-        do {
-            // Validate path access
-            guard await securityService.checkAccess(to: path) else {
-                logger.error("Access denied to path: \(path.path, privacy: .private)")
-                throw RepositoryError.accessDenied(path.path)
+        try await measure("Start Backup \(backupId)") {
+            // Validate repository credentials
+            let credentials = try keychainService.retrieveCredentials()
+            guard credentials.repositoryUrl == repository else {
+                throw BackupError.invalidRepository
             }
             
-            // Create repository directory if it doesn't exist
-            if !fileManager.fileExists(atPath: path.path) {
-                logger.debug("Creating repository directory at: \(path.path, privacy: .private)")
-                try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
+            // Track backup operation
+            accessQueue.async(flags: .barrier) {
+                self.activeBackups.insert(backupId)
             }
             
-            // Initialize repository
-            let repository = Repository(path: path, password: password)
-            
-            // Initialize restic repository
-            logger.debug("Initializing restic repository", privacy: .public)
-            try await resticService.initializeRepository(repository)
-            
-            // Verify repository
-            logger.debug("Verifying repository integrity", privacy: .public)
-            try await resticService.verifyRepository(repository)
-            
-            logger.info("Successfully initialized repository at: \(path.path, privacy: .private)")
-            return repository
-            
-        } catch {
-            logger.error("Failed to initialize repository: \(error.localizedDescription, privacy: .private)")
-            throw error
-        }
-    }
-    
-    func deleteRepository(_ repository: Repository) async throws {
-        logger.info("Deleting repository at: \(repository.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
-        
-        do {
-            let path = URL(fileURLWithPath: repository.path)
-            
-            // Validate path access
-            logger.debug("Validating access to path: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-            guard try bookmarkService.validateBookmark(for: path) else {
-                logger.error("Cannot access repository location: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                throw BackupError.accessDenied("Cannot access repository location")
-            }
-            
-            // Verify repository exists
-            guard fileManager.fileExists(atPath: path.path) else {
-                logger.error("Repository directory not found at: \(path.path)", privacy: .public, file: #file, function: #function, line: #line)
-                throw BackupError.notFound("Repository directory not found")
-            }
-            
-            // Delete repository directory
-            logger.debug("Removing repository directory", privacy: .public, file: #file, function: #function, line: #line)
-            try fileManager.removeItem(at: path)
-            
-            logger.info("Successfully deleted repository at: \(path.path)", privacy: .private(mask: .hash), file: #file, function: #function, line: #line)
-            
-        } catch {
-            logger.error("Failed to delete repository: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw BackupError.deletionFailed(error.localizedDescription)
-        }
-    }
-    
-    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
-        logger.debug("Listing snapshots for repository: \(repository.path)", privacy: .public, file: #file, function: #function, line: #line)
-        
-        do {
-            let snapshots = try await resticService.listSnapshots(repository: repository)
-            logger.info("Found \(snapshots.count) snapshots in repository", privacy: .public, file: #file, function: #function, line: #line)
-            return snapshots
-        } catch {
-            logger.error("Failed to list snapshots: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw BackupError.listingFailed(error.localizedDescription)
-        }
-    }
-    
-    func backup(repository: Repository, items: [URL]) async throws {
-        logger.info("Starting backup of \(items.count, privacy: .public) items")
-        
-        // Start accessing all resources
-        var accessedItems: [URL] = []
-        defer {
-            // Ensure we stop accessing all resources
-            for item in accessedItems {
-                securityService.stopAccessing(item)
-            }
-        }
-        
-        do {
-            // Start accessing repository
-            guard securityService.startAccessing(repository.path) else {
-                logger.error("Failed to access repository: \(repository.path.path, privacy: .private)")
-                throw BackupError.accessDenied("Cannot access repository")
-            }
-            accessedItems.append(repository.path)
-            
-            // Start accessing each backup item
-            for item in items {
-                guard securityService.startAccessing(item) else {
-                    logger.error("Failed to access backup item: \(item.path, privacy: .private)")
-                    throw BackupError.accessDenied("Cannot access backup item")
+            // Start backup in background
+            Task.detached { [weak self] in
+                guard let self = self else { return }
+                
+                do {
+                    try await self.resticService.backup(source: source, to: repository)
+                    self.logger.info("Backup \(backupId) completed successfully")
+                } catch {
+                    self.logger.error("Backup \(backupId) failed: \(error.localizedDescription)")
                 }
-                accessedItems.append(item)
-            }
-            
-            // Perform backup
-            try await resticService.backup(items, to: repository)
-            
-            logger.info("Successfully backed up \(items.count, privacy: .public) items")
-            
-        } catch {
-            logger.error("Backup failed: \(error.localizedDescription, privacy: .private)")
-            throw error
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    /// Execute an operation with secure access to URLs
-    /// - Parameters:
-    ///   - urls: URLs to secure access for
-    ///   - operation: Operation to execute
-    /// - Returns: Result of operation
-    /// - Throws: BackupError if access fails
-    private func withSecureAccess<T>(
-        to urls: [URL],
-        operation: () async throws -> T
-    ) async throws -> T {
-        var accessedURLs: [URL] = []
-        var securedURLs: [URL] = []
-        
-        do {
-            // Start accessing security-scoped resources
-            for url in urls {
-                if try bookmarkService.startAccessing(url) {
-                    accessedURLs.append(url)
-                    securedURLs.append(url)
-                    logger.debug("Secured access to: \(url.path, privacy: .public)", file: #file, function: #function, line: #line)
-                } else {
-                    logger.error("Failed to secure access to: \(url.path, privacy: .public)", file: #file, function: #function, line: #line)
-                    throw BackupError.accessDenied("Could not access \(url.path)")
+                
+                // Remove from active backups
+                self.accessQueue.async(flags: .barrier) {
+                    self.activeBackups.remove(backupId)
                 }
             }
             
-            // Execute operation
-            return try await operation()
-        } catch {
-            logger.error("Operation failed: \(error.localizedDescription, privacy: .public)", file: #file, function: #function, line: #line)
-            throw error
-        }; finally {
-            // Stop accessing in reverse order
-            for url in securedURLs.reversed() {
-                bookmarkService.stopAccessing(url)
-                logger.debug("Released access to: \(url.path, privacy: .public)", file: #file, function: #function, line: #line)
+            logger.info("Started backup \(backupId) from \(source.path) to \(repository.path)")
+        }
+        
+        return backupId
+    }
+    
+    public func cancelBackup(_ id: UUID) {
+        accessQueue.async(flags: .barrier) {
+            if activeBackups.contains(id) {
+                activeBackups.remove(id)
+                logger.info("Cancelled backup \(id)")
+            } else {
+                logger.warning("Attempted to cancel non-existent backup \(id)")
+            }
+        }
+    }
+    
+    public func listSnapshots(in repository: URL) async throws -> [Snapshot] {
+        try await measure("List Snapshots") {
+            // Validate repository credentials
+            let credentials = try keychainService.retrieveCredentials()
+            guard credentials.repositoryUrl == repository else {
+                throw BackupError.invalidRepository
+            }
+            
+            return try await resticService.listSnapshots(in: repository)
+        }
+    }
+    
+    public func restore(snapshot: String, from repository: URL, to destination: URL) async throws {
+        try await measure("Restore Snapshot") {
+            // Validate repository credentials
+            let credentials = try keychainService.retrieveCredentials()
+            guard credentials.repositoryUrl == repository else {
+                throw BackupError.invalidRepository
+            }
+            
+            try await resticService.restore(from: repository, snapshot: snapshot, to: destination)
+            logger.info("Successfully restored snapshot \(snapshot) to \(destination.path)")
+        }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Backup Service Health Check") {
+            do {
+                // Check dependencies
+                guard await resticService.performHealthCheck(),
+                      await keychainService.performHealthCheck() else {
+                    return false
+                }
+                
+                // Check for stuck backups
+                let stuckBackups = accessQueue.sync { activeBackups }
+                if !stuckBackups.isEmpty {
+                    logger.warning("Found \(stuckBackups.count) potentially stuck backups")
+                    return false
+                }
+                
+                logger.info("Backup service health check passed")
+                return true
+            } catch {
+                logger.error("Backup service health check failed: \(error.localizedDescription)")
+                return false
             }
         }
     }
 }
 
 // MARK: - Backup Errors
-
-/// Errors that can occur during backup operations
-enum BackupError: LocalizedError {
-    case accessDenied(String)
-    case repositoryNotFound
+public enum BackupError: LocalizedError {
     case invalidRepository
-    case fileSystemError(String)
-    case operationFailed(String)
-    case creationFailed(String)
-    case initializationFailed(String)
-    case deletionFailed(String)
-    case listingFailed(String)
-    case notFound(String)
+    case backupInProgress
+    case snapshotNotFound(String)
+    case restoreFailed(String)
     
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
-        case .accessDenied(let path):
-            return "Access denied to \(path)"
-        case .repositoryNotFound:
-            return "Repository not found"
         case .invalidRepository:
-            return "Invalid repository"
-        case .fileSystemError(let message):
-            return "File system error: \(message)"
-        case .operationFailed(let message):
-            return "Operation failed: \(message)"
-        case .creationFailed(let message):
-            return "Failed to create repository: \(message)"
-        case .initializationFailed(let message):
-            return "Failed to initialize repository: \(message)"
-        case .deletionFailed(let message):
-            return "Failed to delete repository: \(message)"
-        case .listingFailed(let message):
-            return "Failed to list snapshots: \(message)"
-        case .notFound(let message):
-            return "Not found: \(message)"
+            return "Invalid or unauthorized repository"
+        case .backupInProgress:
+            return "A backup operation is already in progress"
+        case .snapshotNotFound(let id):
+            return "Snapshot not found: \(id)"
+        case .restoreFailed(let message):
+            return "Restore operation failed: \(message)"
         }
     }
 }

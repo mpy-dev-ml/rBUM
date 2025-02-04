@@ -2,57 +2,66 @@
 import os.log
 
 #if os(macOS)
-/// Logger implementation using os.log with sandbox compliance and privacy controls
-public final class OSLogger: LoggerProtocol {
+/// OSLogger implementation of LoggerProtocol using os.Logger
+public final class OSLogger: LoggerProtocol, HealthCheckable {
+    // MARK: - Properties
     private let logger: os.Logger
-    private let queue: DispatchQueue
+    private let subsystem: String
+    private let category: String
     
-    /// The subsystem identifier for this logger
-    public let subsystem: String
+    public var isHealthy: Bool {
+        true // Logger is typically always healthy unless system-level issues
+    }
     
-    /// The category for this logger
-    public let category: String
-    
-    /// Initialize a new logger
-    /// - Parameters:
-    ///   - subsystem: The subsystem for grouping related logging (e.g., "dev.mpy.rBUM")
-    ///   - category: The category within the subsystem (e.g., "SecurityService")
-    public init(subsystem: String, category: String) {
+    // MARK: - Initialization
+    public init(subsystem: String = "dev.mpy.rBUM", category: String) {
         self.subsystem = subsystem
         self.category = category
         self.logger = os.Logger(subsystem: subsystem, category: category)
-        self.queue = DispatchQueue(label: "dev.mpy.rBUM.logger.\(category)", qos: .utility)
     }
     
-    public func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        queue.async {
-            let filename = self.sanitizeSourcePath(file)
-            self.logger.debug("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
-        }
+    // MARK: - LoggerProtocol Implementation
+    public func debug(_ message: String, file: String, function: String, line: Int) {
+        logger.debug("\(message, privacy: .public) [\(file):\(line) \(function)]")
     }
     
-    public func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        queue.async {
-            let filename = self.sanitizeSourcePath(file)
-            self.logger.info("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .auto)")
-        }
+    public func info(_ message: String, file: String, function: String, line: Int) {
+        logger.info("\(message, privacy: .public) [\(file):\(line) \(function)]")
     }
     
-    public func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        queue.async {
-            let filename = self.sanitizeSourcePath(file)
-            self.logger.error("[\(filename, privacy: .public):\(line, privacy: .public)] \(message, privacy: .private)")
-        }
+    public func warning(_ message: String, file: String, function: String, line: Int) {
+        logger.warning("\(message, privacy: .public) [\(file):\(line) \(function)]")
     }
     
-    // MARK: - Sandbox-Aware Helpers
+    public func error(_ message: String, file: String, function: String, line: Int) {
+        logger.error("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    }
     
-    /// Sanitize file paths to avoid leaking sandbox paths
-    private func sanitizeSourcePath(_ path: String) -> String {
-        guard let lastComponent = path.split(separator: "/").last else {
-            return path
-        }
-        return String(lastComponent)
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        // Log a test message to verify logger is working
+        logger.debug("Health check: Logger is operational")
+        return isHealthy
+    }
+}
+
+// MARK: - OSLogger Factory
+
+extension OSLogger {
+    /// Create a new OSLogger instance with default subsystem
+    /// - Parameter category: Category for the logger
+    /// - Returns: A new OSLogger instance
+    public static func create(category: String) -> OSLogger {
+        OSLogger(category: category)
+    }
+    
+    /// Create a new OSLogger instance with custom subsystem
+    /// - Parameters:
+    ///   - subsystem: Subsystem identifier
+    ///   - category: Category for the logger
+    /// - Returns: A new OSLogger instance
+    public static func create(subsystem: String, category: String) -> OSLogger {
+        OSLogger(subsystem: subsystem, category: category)
     }
 }
 

@@ -6,12 +6,107 @@
 //
 
 import Foundation
-import AppKit
-import SystemConfiguration
-import Security
-import ApplicationServices
 import Core
-import OSLog
+
+/// Service responsible for handling security and sandbox-related operations
+public final class SecurityService: BaseSandboxedService, SecurityServiceProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let bookmarkStore: [URL: Data] = [:]
+    private let accessQueue: DispatchQueue
+    
+    public var isHealthy: Bool {
+        true // Override with actual health check logic
+    }
+    
+    // MARK: - Initialization
+    public init(logger: LoggerProtocol) {
+        self.accessQueue = DispatchQueue(label: "dev.mpy.rBUM.securityService", attributes: .concurrent)
+        super.init(logger: logger, securityService: self)
+    }
+    
+    // MARK: - SecurityServiceProtocol Implementation
+    public func validateBookmark(_ bookmark: Data) throws -> URL {
+        try measure("Validate Bookmark") {
+            var isStale = false
+            guard let url = try URL(resolvingBookmarkData: bookmark,
+                                  options: .withSecurityScope,
+                                  relativeTo: nil,
+                                  bookmarkDataIsStale: &isStale) else {
+                throw ServiceError.operationFailed
+            }
+            
+            if isStale {
+                logger.warning("Bookmark for \(url.path) is stale")
+                throw SandboxError.bookmarkStale
+            }
+            
+            return url
+        }
+    }
+    
+    public func persistBookmark(for url: URL) throws -> Data {
+        try measure("Persist Bookmark") {
+            try url.bookmarkData(options: .withSecurityScope,
+                               includingResourceValuesForKeys: nil,
+                               relativeTo: nil)
+        }
+    }
+    
+    public func startAccessing(_ url: URL) -> Bool {
+        accessQueue.sync {
+            logger.debug("Starting access to \(url.path)")
+            return url.startAccessingSecurityScopedResource()
+        }
+    }
+    
+    public func stopAccessing(_ url: URL) {
+        accessQueue.async {
+            self.logger.debug("Stopping access to \(url.path)")
+            url.stopAccessingSecurityScopedResource()
+        }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Security Service Health Check") {
+            // Add actual health check implementation
+            // For example, verify bookmark store integrity
+            true
+        }
+    }
+    
+    // MARK: - Resource Management
+    public func withSafeAccess<T>(to url: URL, perform action: () throws -> T) throws -> T {
+        try accessQueue.sync {
+            guard startAccessing(url) else {
+                throw SandboxError.accessDenied
+            }
+            defer { stopAccessing(url) }
+            return try action()
+        }
+    }
+    
+    public func withSafeAccess<T>(to url: URL, perform action: () async throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            accessQueue.async {
+                guard self.startAccessing(url) else {
+                    continuation.resume(throwing: SandboxError.accessDenied)
+                    return
+                }
+                defer { self.stopAccessing(url) }
+                
+                Task {
+                    do {
+                        let result = try await action()
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Protocol defining security-related operations for the application
 public protocol SecurityServiceProtocol {
@@ -41,266 +136,6 @@ public protocol SecurityServiceProtocol {
     
     /// Check if we have access to a specific path
     func checkAccess(to url: URL) -> Bool
-}
-
-/// Implementation of SecurityService
-public final class SecurityService: SecurityServiceProtocol {
-    private let logger: LoggerProtocol
-    private let fileManager: FileManager
-    private let workspace: NSWorkspace
-    private let bookmarkPersistenceService: BookmarkPersistenceServiceProtocol
-    
-    /// Manages access to security-scoped resources
-    private class SecurityScopedResourceAccess {
-        private let url: URL
-        private let logger: LoggerProtocol
-        private var isAccessing: Bool = false
-        
-        init(url: URL, logger: LoggerProtocol) {
-            self.url = url
-            self.logger = logger
-        }
-        
-        func start() -> Bool {
-            guard !isAccessing else {
-                logger.debug("Already accessing resource: \(url.path)", file: #file, function: #function, line: #line)
-                return true
-            }
-            
-            isAccessing = url.startAccessingSecurityScopedResource()
-            if isAccessing {
-                logger.debug("Started accessing resource: \(url.path)", file: #file, function: #function, line: #line)
-            } else {
-                logger.error("Failed to start accessing resource: \(url.path)", file: #file, function: #function, line: #line)
-            }
-            
-            return isAccessing
-        }
-        
-        func stop() {
-            guard isAccessing else {
-                logger.debug("Not currently accessing resource: \(url.path)", file: #file, function: #function, line: #line)
-                return
-            }
-            
-            url.stopAccessingSecurityScopedResource()
-            isAccessing = false
-            logger.debug("Stopped accessing resource: \(url.path)", file: #file, function: #function, line: #line)
-        }
-        
-        deinit {
-            if isAccessing {
-                self.logger.info("Resource access not properly stopped: \(url.path)", file: #file, function: #function, line: #line)
-                stop()
-            }
-        }
-    }
-    
-    /// Dictionary to track active security-scoped resource access
-    private var activeAccess: [URL: SecurityScopedResourceAccess] = [:]
-    
-    /// Start accessing a security-scoped resource
-    /// - Parameter url: The URL to access
-    /// - Returns: true if access was granted, false otherwise
-    func startAccessing(_ url: URL) -> Bool {
-        let access = activeAccess[url] ?? SecurityScopedResourceAccess(url: url, logger: logger)
-        activeAccess[url] = access
-        return access.start()
-    }
-    
-    /// Stop accessing a security-scoped resource
-    /// - Parameter url: The URL to stop accessing
-    func stopAccessing(_ url: URL) {
-        activeAccess[url]?.stop()
-        activeAccess[url] = nil
-    }
-    
-    /// Initialize the security service
-    /// - Parameters:
-    ///   - logger: Logger instance to use
-    ///   - fileManager: FileManager instance to use
-    ///   - workspace: NSWorkspace instance to use
-    ///   - bookmarkPersistenceService: Service for persisting security-scoped bookmarks
-    public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SecurityService"),
-        fileManager: FileManager = .default,
-        workspace: NSWorkspace = .shared,
-        bookmarkPersistenceService: BookmarkPersistenceServiceProtocol = BookmarkPersistenceService()
-    ) {
-        self.logger = logger
-        self.fileManager = fileManager
-        self.workspace = workspace
-        self.bookmarkPersistenceService = bookmarkPersistenceService
-        
-        self.logger.debug("Security service initialised", file: #file, function: #function, line: #line)
-    }
-    
-    public func requestPermission(for url: URL) async throws -> Bool {
-        logger.info("Requesting permission for path: \(url.path)", file: #file, function: #function, line: #line)
-        
-        do {
-            let bookmark = try await createBookmark(for: url)
-            logger.debug("Created bookmark for path: \(url.path)", file: #file, function: #function, line: #line)
-            
-            // Start accessing immediately to verify access
-            guard startAccessing(url) else {
-                logger.error("Failed to access resource after creating bookmark: \(url.path)", file: #file, function: #function, line: #line)
-                throw SecurityError.accessDenied(url.path)
-            }
-            
-            // Stop accessing since we're just verifying
-            stopAccessing(url)
-            return true
-            
-        } catch {
-            logger.error("Failed to request permission: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw error
-        }
-    }
-    
-    public func revokePermission(for url: URL) async throws {
-        logger.info("Revoking permission for path: \(url.path)", file: #file, function: #function, line: #line)
-        
-        do {
-            try await bookmarkPersistenceService.removeBookmark(forURL: url)
-            logger.debug("Revoked permission for path: \(url.path)", file: #file, function: #function, line: #line)
-        } catch {
-            logger.error("Failed to revoke permission: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.revocationFailed(url.path)
-        }
-    }
-    
-    public func requestFullDiskAccess() async throws -> Bool {
-        logger.info("Requesting Full Disk Access", file: #file, function: #function, line: #line)
-        
-        guard !(await checkFullDiskAccess()) else {
-            return true
-        }
-        
-        // Open System Settings to Security & Privacy
-        let prefpaneURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
-        let opened = await MainActor.run {
-            workspace.open(prefpaneURL)
-        }
-        
-        if !opened {
-            logger.error("Failed to open System Settings", file: #file, function: #function, line: #line)
-        }
-        
-        // Show instructions to the user
-        throw SecurityError.needsFullDiskAccess(
-            "Full Disk Access is required for backup operations.\n" +
-            "Please grant access in System Settings > Privacy & Security > Full Disk Access"
-        )
-    }
-    
-    public func checkFullDiskAccess() async -> Bool {
-        logger.debug("Checking Full Disk Access permission", file: #file, function: #function, line: #line)
-        
-        // Test by attempting to read a protected directory
-        let homeDir = fileManager.homeDirectoryForCurrentUser
-        let testPath = homeDir.appendingPathComponent("Library/Application Support")
-        
-        do {
-            _ = try fileManager.contentsOfDirectory(atPath: testPath.path)
-            return true
-        } catch {
-            logger.error("Full Disk Access check failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            return false
-        }
-    }
-    
-    public func requestAutomation() async throws -> Bool {
-        logger.info("Requesting Automation permission", file: #file, function: #function, line: #line)
-        
-        guard !(await checkAutomation()) else {
-            return true
-        }
-        
-        // Open System Settings to Security & Privacy > Automation
-        let prefpaneURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
-        let opened = await MainActor.run {
-            workspace.open(prefpaneURL)
-        }
-        
-        if !opened {
-            logger.error("Failed to open System Settings", file: #file, function: #function, line: #line)
-        }
-        
-        throw SecurityError.needsAutomation(
-            "Automation access is required for some backup operations.\n" +
-            "Please grant access in System Settings > Privacy & Security > Automation"
-        )
-    }
-    
-    public func checkAutomation() async -> Bool {
-        logger.debug("Checking Automation permission", file: #file, function: #function, line: #line)
-        
-        return await Task {
-            // Use AXIsProcessTrusted() to check if we have automation access
-            let isTrusted = AXIsProcessTrusted()
-            
-            if !isTrusted {
-                logger.info("Automation access not granted", file: #file, function: #function, line: #line)
-                return false
-            }
-            
-            logger.info("Automation access granted", file: #file, function: #function, line: #line)
-            return true
-        }.value
-    }
-    
-    public func createBookmark(for url: URL) async throws -> Data {
-        logger.debug("Creating bookmark for path: \(url.path)", file: #file, function: #function, line: #line)
-        
-        do {
-            return try url.bookmarkData(
-                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-        } catch {
-            logger.error("Failed to create bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
-        }
-    }
-    
-    public func resolveBookmark(_ data: Data) async throws -> URL {
-        logger.debug("Resolving bookmark", file: #file, function: #function, line: #line)
-        
-        do {
-            var isStale = false
-            let url = try URL(
-                resolvingBookmarkData: data,
-                options: .withSecurityScope,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            
-            if isStale {
-                logger.error("Bookmark is stale for URL: \(url.path)", file: #file, function: #function, line: #line)
-                throw SecurityError.staleBookmark(url.path)
-            }
-            
-            logger.debug("Successfully resolved bookmark to path: \(url.path)", file: #file, function: #function, line: #line)
-            return url
-        } catch {
-            logger.error("Failed to resolve bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
-        }
-    }
-    
-    public func checkAccess(to url: URL) -> Bool {
-        logger.debug("Checking access to path: \(url.path)", file: #file, function: #function, line: #line)
-        
-        do {
-            let resourceValues = try url.resourceValues(forKeys: [.isReadableKey, .isWritableKey])
-            return resourceValues.isReadable == true
-        } catch {
-            logger.error("Failed to check access: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-            return false
-        }
-    }
 }
 
 /// Errors that can occur during security operations

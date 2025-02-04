@@ -6,359 +6,223 @@
 //
 
 import Foundation
-import Security
-import LocalAuthentication
 import Core
+import Security
 
-/// macOS implementation of security service
-final class DefaultSecurityService: SecurityServiceProtocol {
+/// macOS-specific implementation of security service
+public final class DefaultSecurityService: BaseSandboxedService, SecurityServiceProtocol, HealthCheckable {
     // MARK: - Properties
+    private let bookmarkService: BookmarkServiceProtocol
+    private let keychainService: KeychainServiceProtocol
+    private let sandboxMonitor: SandboxMonitorProtocol
+    private let operationQueue: OperationQueue
+    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.defaultSecurity", attributes: .concurrent)
+    private var activeOperations: Set<UUID> = []
     
-    private let logger: LoggerProtocol
-    private let securityClass = kSecClassGenericPassword
-    private let keychainAccessGroup: String?
-    
-    /// Whether hardware security module is available
-    var isSecureHardwareAvailable: Bool {
-        let context = LAContext()
-        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+    public var isHealthy: Bool {
+        // Check if we have any stuck operations
+        accessQueue.sync {
+            activeOperations.isEmpty
+        }
     }
     
     // MARK: - Initialization
-    
-    init(
-        keychainAccessGroup: String? = nil,
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "Security")
+    public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        bookmarkService: BookmarkServiceProtocol,
+        keychainService: KeychainServiceProtocol,
+        sandboxMonitor: SandboxMonitorProtocol
     ) {
-        self.keychainAccessGroup = keychainAccessGroup
-        self.logger = logger
+        self.bookmarkService = bookmarkService
+        self.keychainService = keychainService
+        self.sandboxMonitor = sandboxMonitor
         
-        logger.debug("macOS security service initialised", privacy: .public)
+        self.operationQueue = OperationQueue()
+        self.operationQueue.name = "dev.mpy.rBUM.defaultSecurityQueue"
+        self.operationQueue.maxConcurrentOperationCount = 1
+        
+        super.init(logger: logger, securityService: securityService)
     }
     
-    // MARK: - Sandbox Operations
-    
-    func createSecurityScopedBookmark(
-        for url: URL,
-        readOnly: Bool,
-        requiredKeys: Set<URLResourceKey>?
-    ) async throws -> Data {
-        logger.debug("Creating security-scoped bookmark", metadata: [
-            "path": .string(url.path),
-            "readOnly": .string("\(readOnly)")
-        ], privacy: .public)
-        
-        do {
-            var options: URL.BookmarkCreationOptions = [.withSecurityScope]
-            if readOnly {
-                options.insert(.securityScopeAllowOnlyReadAccess)
-            }
-            
-            let bookmark = try url.bookmarkData(
-                options: options,
-                includingResourceValuesForKeys: requiredKeys,
-                relativeTo: nil
-            )
-            
-            logger.info("Created security-scoped bookmark", metadata: [
-                "path": .string(url.path),
-                "readOnly": .string("\(readOnly)")
-            ], privacy: .public)
-            
-            return bookmark
-            
-        } catch {
-            logger.error("Failed to create bookmark", metadata: [
-                "error": .string(error.localizedDescription),
-                "path": .string(url.path)
-            ], privacy: .public)
-            throw SecurityError.bookmarkCreationFailed
-        }
-    }
-    
-    func resolveSecurityScopedBookmark(_ bookmark: Data) async throws -> URL {
-        logger.debug("Resolving security-scoped bookmark", privacy: .public)
-        
-        do {
-            var isStale = false
-            let url = try URL(
-                resolvingBookmarkData: bookmark,
-                options: .withSecurityScope,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            
-            if isStale {
-                logger.warning("Bookmark is stale", metadata: [
-                    "path": .string(url.path)
-                ], privacy: .public)
-                throw SecurityError.bookmarkStale
-            }
-            
-            logger.info("Resolved security-scoped bookmark", metadata: [
-                "path": .string(url.path)
-            ], privacy: .public)
-            
-            return url
-            
-        } catch let error as SecurityError {
-            throw error
-        } catch {
-            logger.error("Failed to resolve bookmark", metadata: [
-                "error": .string(error.localizedDescription)
-            ], privacy: .public)
-            throw SecurityError.bookmarkResolutionFailed
-        }
-    }
-    
-    func startAccessingSecurityScopedResource(_ bookmark: Data) async throws -> URL {
-        logger.debug("Starting security-scoped resource access", privacy: .public)
-        
-        let url = try await resolveSecurityScopedBookmark(bookmark)
-        
-        guard url.startAccessingSecurityScopedResource() else {
-            logger.error("Failed to start accessing resource", metadata: [
-                "path": .string(url.path)
-            ], privacy: .public)
-            throw SecurityError.accessDenied
-        }
-        
-        logger.info("Started accessing security-scoped resource", metadata: [
-            "path": .string(url.path)
-        ], privacy: .public)
-        
-        return url
-    }
-    
-    func stopAccessingSecurityScopedResource(_ url: URL) {
-        url.stopAccessingSecurityScopedResource()
-        logger.debug("Stopped accessing security-scoped resource", metadata: [
-            "path": .string(url.path)
-        ], privacy: .public)
-    }
-    
-    // MARK: - Keychain Operations
-    
-    func storeCredentials(
-        _ credentials: Data,
-        identifier: String,
-        accessGroup: String?,
-        accessControl: Any?
-    ) throws {
-        var query = baseQuery(for: identifier, accessGroup: accessGroup)
-        query[kSecValueData as String] = credentials
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw mapKeychainError(status)
-        }
-    }
-    
-    func retrieveCredentials(
-        identifier: String,
-        accessGroup: String?
-    ) throws -> Data {
-        var query = baseQuery(for: identifier, accessGroup: accessGroup)
-        query[kSecReturnData as String] = true
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess,
-              let data = result as? Data else {
-            throw mapKeychainError(status)
-        }
-        
-        return data
-    }
-    
-    func deleteCredentials(
-        identifier: String,
-        accessGroup: String?
-    ) throws {
-        let query = baseQuery(for: identifier, accessGroup: accessGroup)
-        let status = SecItemDelete(query as CFDictionary)
-        
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw mapKeychainError(status)
-        }
-    }
-    
-    func updateCredentials(
-        _ credentials: Data,
-        identifier: String,
-        accessGroup: String?
-    ) throws {
-        let query = baseQuery(for: identifier, accessGroup: accessGroup)
-        let attributes = [kSecValueData as String: credentials]
-        
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        guard status == errSecSuccess else {
-            throw mapKeychainError(status)
-        }
-    }
-    
-    func hasCredentials(
-        identifier: String,
-        accessGroup: String?
-    ) -> Bool {
-        var query = baseQuery(for: identifier, accessGroup: accessGroup)
-        query[kSecReturnData as String] = false
-        
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        return status == errSecSuccess
-    }
-    
-    // MARK: - Encryption Operations
-    
-    func generateEncryptionKey(
-        bits: Int,
-        persistKey: Bool,
-        identifier: String?,
-        accessGroup: String?
-    ) throws -> Data {
-        guard bits == 128 || bits == 256 else {
-            throw SecurityError.invalidKey
-        }
-        
-        var error: Unmanaged<CFError>?
-        guard let access = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault,
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            .privateKeyUsage,
-            &error
-        ) else {
-            throw SecurityError.keyGenerationFailed
-        }
-        
-        var attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeAES,
-            kSecAttrKeySizeInBits as String: bits,
-            kSecAttrAccessControl as String: access
-        ]
-        
-        if persistKey, let identifier = identifier {
-            attributes[kSecAttrApplicationTag as String] = identifier
-            if let accessGroup = accessGroup {
-                attributes[kSecAttrAccessGroup as String] = accessGroup
+    // MARK: - SecurityServiceProtocol Implementation
+    public func validateAccess(to url: URL) async throws -> Bool {
+        try await measure("Validate Access") {
+            do {
+                // Check if we have a valid bookmark
+                guard try await bookmarkService.validateBookmark(for: url) else {
+                    logger.warning("No valid bookmark for \(url.path)")
+                    return false
+                }
+                
+                // Check file system attributes
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                guard let posixPermissions = attributes[.posixPermissions] as? Int else {
+                    logger.warning("Could not get POSIX permissions for \(url.path)")
+                    return false
+                }
+                
+                // Check if we have read access (owner read permission)
+                let hasReadAccess = (posixPermissions & 0o400) != 0
+                if !hasReadAccess {
+                    logger.warning("No read permission for \(url.path)")
+                    return false
+                }
+                
+                logger.info("Successfully validated access to \(url.path)")
+                return true
+            } catch {
+                logger.error("Failed to validate access: \(error.localizedDescription)")
+                return false
             }
         }
-        
-        var error2: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error2) else {
-            throw SecurityError.keyGenerationFailed
-        }
-        
-        guard let data = SecKeyCopyExternalRepresentation(key, &error2) as Data? else {
-            throw SecurityError.keyGenerationFailed
-        }
-        
-        return data
     }
     
-    func retrieveEncryptionKey(
-        identifier: String,
-        accessGroup: String?
-    ) throws -> Data {
-        var query = baseQuery(for: identifier, accessGroup: accessGroup)
-        query[kSecReturnRef as String] = true
-        query[kSecClass as String] = kSecClassKey
-        query[kSecAttrKeyType as String] = kSecAttrKeyTypeAES
+    public func requestAccess(to url: URL) async throws -> Bool {
+        let operationId = UUID()
         
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess,
-              let key = result as? SecKey else {
-            throw mapKeychainError(status)
-        }
-        
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(key, &error) as Data? else {
-            throw SecurityError.keyNotFound
-        }
-        
-        return data
-    }
-    
-    func deleteEncryptionKey(
-        identifier: String,
-        accessGroup: String?
-    ) throws {
-        var query = baseQuery(for: identifier, accessGroup: accessGroup)
-        query[kSecClass as String] = kSecClassKey
-        
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw mapKeychainError(status)
+        return try await measure("Request Access") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            do {
+                // Try to create bookmark if we don't have one
+                if !(try await bookmarkService.validateBookmark(for: url)) {
+                    _ = try await bookmarkService.createBookmark(for: url)
+                }
+                
+                // Start tracking access
+                sandboxMonitor.trackResourceAccess(to: url)
+                
+                // Start accessing the resource
+                guard try await bookmarkService.startAccessing(url) else {
+                    logger.warning("Failed to start accessing \(url.path)")
+                    return false
+                }
+                
+                logger.info("Successfully requested access to \(url.path)")
+                return true
+            } catch {
+                logger.error("Failed to request access: \(error.localizedDescription)")
+                throw SecurityError.accessDenied(error.localizedDescription)
+            }
         }
     }
     
-    func encrypt(_ data: Data, using key: Data) throws -> Data {
-        guard let keyData = key as? NSData else {
-            throw SecurityError.invalidKey
+    public func revokeAccess(to url: URL) {
+        let operationId = UUID()
+        
+        measure("Revoke Access") {
+            // Track operation
+            accessQueue.async(flags: .barrier) {
+                self.activeOperations.insert(operationId)
+            }
+            
+            defer {
+                accessQueue.async(flags: .barrier) {
+                    self.activeOperations.remove(operationId)
+                }
+            }
+            
+            // Stop tracking access
+            sandboxMonitor.stopTrackingResource(url)
+            
+            // Stop accessing the resource
+            bookmarkService.stopAccessing(url)
+            
+            logger.info("Revoked access to \(url.path)")
         }
-        
-        let algorithm: SecKeyAlgorithm = .eciesEncryptionCofactorVariableIVX963SHA256AESGCM
-        
-        var error: Unmanaged<CFError>?
-        guard let encrypted = SecKeyCreateEncryptedData(
-            key as! SecKey,
-            algorithm,
-            data as CFData,
-            &error
-        ) as Data? else {
-            throw SecurityError.encryptionFailed
-        }
-        
-        return encrypted
     }
     
-    func decrypt(_ data: Data, using key: Data) throws -> Data {
-        guard let keyData = key as? NSData else {
-            throw SecurityError.invalidKey
+    public func validateEncryption() async throws -> Bool {
+        try await measure("Validate Encryption") {
+            do {
+                // Check if keychain is accessible
+                guard await keychainService.performHealthCheck() else {
+                    logger.warning("Keychain health check failed")
+                    return false
+                }
+                
+                // Check if we can store and retrieve a test item
+                let testData = "test".data(using: .utf8)!
+                try keychainService.storeGenericPassword(testData, service: "test", account: "test")
+                let retrieved = try keychainService.retrieveGenericPassword(service: "test", account: "test")
+                
+                guard retrieved == testData else {
+                    logger.warning("Keychain data integrity check failed")
+                    return false
+                }
+                
+                // Clean up test item
+                try keychainService.deleteGenericPassword(service: "test", account: "test")
+                
+                logger.info("Successfully validated encryption")
+                return true
+            } catch {
+                logger.error("Failed to validate encryption: \(error.localizedDescription)")
+                return false
+            }
         }
-        
-        let algorithm: SecKeyAlgorithm = .eciesEncryptionCofactorVariableIVX963SHA256AESGCM
-        
-        var error: Unmanaged<CFError>?
-        guard let decrypted = SecKeyCreateDecryptedData(
-            key as! SecKey,
-            algorithm,
-            data as CFData,
-            &error
-        ) as Data? else {
-            throw SecurityError.decryptionFailed
-        }
-        
-        return decrypted
     }
     
-    // MARK: - Private Methods
-    
-    private func baseQuery(for identifier: String, accessGroup: String?) -> [String: Any] {
-        var query: [String: Any] = [
-            kSecClass as String: securityClass,
-            kSecAttrAccount as String: identifier
-        ]
-        
-        if let accessGroup = accessGroup ?? keychainAccessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Default Security Service Health Check") {
+            do {
+                // Check dependencies
+                guard await bookmarkService.performHealthCheck(),
+                      await keychainService.performHealthCheck(),
+                      await sandboxMonitor.performHealthCheck() else {
+                    return false
+                }
+                
+                // Check for stuck operations
+                let stuckOperations = accessQueue.sync { activeOperations }
+                if !stuckOperations.isEmpty {
+                    logger.warning("Found \(stuckOperations.count) potentially stuck operations")
+                    return false
+                }
+                
+                // Validate encryption
+                guard try await validateEncryption() else {
+                    return false
+                }
+                
+                logger.info("Default security service health check passed")
+                return true
+            } catch {
+                logger.error("Default security service health check failed: \(error.localizedDescription)")
+                return false
+            }
         }
-        
-        return query
     }
+}
+
+// MARK: - Security Errors
+public enum SecurityError: LocalizedError {
+    case accessDenied(String)
+    case encryptionError(String)
+    case bookmarkError(String)
+    case monitorError(String)
     
-    private func mapKeychainError(_ status: OSStatus) -> SecurityError {
-        switch status {
-        case errSecItemNotFound:
-            return .credentialsNotFound
-        case errSecDuplicateItem:
-            return .credentialsExists
-        case errSecAuthFailed:
-            return .accessDenied
-        default:
-            return .invalidCredentials
+    public var errorDescription: String? {
+        switch self {
+        case .accessDenied(let message):
+            return "Access denied: \(message)"
+        case .encryptionError(let message):
+            return "Encryption error: \(message)"
+        case .bookmarkError(let message):
+            return "Bookmark error: \(message)"
+        case .monitorError(let message):
+            return "Monitor error: \(message)"
         }
     }
 }

@@ -8,195 +8,232 @@
 import Foundation
 import Core
 
-/// Protocol for managing security-scoped bookmarks
-protocol BookmarkServiceProtocol {
-    /// Create a security-scoped bookmark for a URL
-    /// - Parameters:
-    ///   - url: The URL to create a bookmark for
-    ///   - timeout: Optional timeout for the operation
-    /// - Returns: The bookmark data
-    func createBookmark(for url: URL, timeout: TimeInterval) async throws -> Data
-    
-    /// Resolve a security-scoped bookmark
-    /// - Parameters:
-    ///   - bookmarkData: The bookmark data to resolve
-    ///   - timeout: Optional timeout for the operation
-    /// - Returns: Tuple containing the resolved URL and whether the bookmark is stale
-    func resolveBookmark(_ bookmarkData: Data, timeout: TimeInterval) async throws -> (url: URL, isStale: Bool)
-    
-    /// Refresh a stale bookmark
-    /// - Parameters:
-    ///   - url: The URL to refresh the bookmark for
-    ///   - timeout: Optional timeout for the operation
-    /// - Returns: The new bookmark data
-    func refreshBookmark(for url: URL, timeout: TimeInterval) async throws -> Data
-    
-    /// Restore persisted bookmarks
-    /// - Parameter timeout: Optional timeout for the operation
-    func restoreBookmarks(timeout: TimeInterval) async throws
-    
-    /// Stop accessing a security-scoped resource
-    /// - Parameter url: The URL of the resource to stop accessing
-    func stopAccessingResource(_ url: URL)
-}
-
 /// Service for managing security-scoped bookmarks
-final class BookmarkService: BookmarkServiceProtocol {
-    private let logger: LoggerProtocol
-    private let persistenceService: BookmarkPersistenceServiceProtocol
-    private let fileManager: FileManager
+public final class BookmarkService: BaseSandboxedService, BookmarkServiceProtocol, HealthCheckable {
+    // MARK: - Properties
+    private let keychainService: KeychainServiceProtocol
+    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.bookmarkService", attributes: .concurrent)
+    private var activeBookmarks: [URL: BookmarkAccess] = [:]
     
-    init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "BookmarkService"),
-        persistenceService: BookmarkPersistenceServiceProtocol = BookmarkPersistenceService(),
-        fileManager: FileManager = .default
+    public var isHealthy: Bool {
+        // Check if any bookmarks have been accessed for too long
+        accessQueue.sync {
+            !activeBookmarks.values.contains { $0.hasExceededMaxDuration }
+        }
+    }
+    
+    // MARK: - Types
+    private struct BookmarkAccess {
+        let startTime: Date
+        let maxDuration: TimeInterval
+        let bookmark: Data
+        
+        var hasExceededMaxDuration: Bool {
+            Date().timeIntervalSince(startTime) > maxDuration
+        }
+    }
+    
+    // MARK: - Initialization
+    public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        keychainService: KeychainServiceProtocol
     ) {
-        self.logger = logger
-        self.persistenceService = persistenceService
-        self.fileManager = fileManager
-        
-        logger.debug("Bookmark service initialised", privacy: .public)
+        self.keychainService = keychainService
+        super.init(logger: logger, securityService: securityService)
     }
     
-    func createBookmark(for url: URL, timeout: TimeInterval = 30) async throws -> Data {
-        logger.debug("Creating bookmark for URL: \(url.path, privacy: .private)")
-        
-        do {
-            let bookmarkData = try url.bookmarkData(
-                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            
-            try await persistenceService.saveBookmark(bookmarkData, for: url)
-            logger.info("Successfully created bookmark for: \(url.path, privacy: .private)")
-            
-            return bookmarkData
-            
-        } catch {
-            logger.error("Failed to create bookmark: \(error.localizedDescription, privacy: .private)")
-            throw error
-        }
-    }
-    
-    func resolveBookmark(_ bookmarkData: Data, timeout: TimeInterval = 30) async throws -> (url: URL, isStale: Bool) {
-        logger.debug("Resolving bookmark for URL: \(bookmarkData, privacy: .private)")
-        
-        do {
-            var isStale = false
-            
-            let url = try URL(
-                resolvingBookmarkData: bookmarkData,
-                options: [.withSecurityScope],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            
-            if isStale {
-                logger.warning("Bookmark is stale for URL: \(url.path, privacy: .private)")
-                throw BookmarkError.staleBookmark(url.path)
-            }
-            
-            logger.info("Successfully resolved bookmark for: \(url.path, privacy: .private)")
-            return (url, isStale)
-            
-        } catch {
-            logger.error("Failed to resolve bookmark: \(error.localizedDescription, privacy: .private)")
-            throw error
-        }
-    }
-    
-    func refreshBookmark(for url: URL, timeout: TimeInterval = 30) async throws -> Data {
-        return try await withTimeout(timeout) {
+    // MARK: - BookmarkServiceProtocol Implementation
+    public func createBookmark(for url: URL) async throws -> Data {
+        try await measure("Create Bookmark") {
             do {
-                let newBookmarkData = try url.bookmarkData(
+                let bookmark = try url.bookmarkData(
                     options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
-                try await persistenceService.persistBookmark(newBookmarkData, forURL: url)
-                return newBookmarkData
+                
+                // Store in keychain for persistence
+                try keychainService.storeBookmark(bookmark, for: url)
+                
+                logger.info("Created bookmark for \(url.path)")
+                return bookmark
             } catch {
-                logger.error("Failed to refresh bookmark: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkError.refreshFailed(error.localizedDescription)
+                logger.error("Failed to create bookmark: \(error.localizedDescription)")
+                throw BookmarkError.creationFailed(error.localizedDescription)
             }
         }
     }
     
-    func restoreBookmarks(timeout: TimeInterval = 30) async throws {
-        try await withTimeout(timeout) {
+    public func startAccessing(_ url: URL) async throws -> Bool {
+        try await measure("Start Accessing Bookmark") {
             do {
-                let bookmarks = try await persistenceService.listBookmarks()
-                for (url, bookmarkData) in bookmarks {
-                    do {
-                        let (resolvedURL, isStale) = try await resolveBookmark(bookmarkData)
-                        if isStale {
-                            _ = try await refreshBookmark(for: resolvedURL)
-                        }
-                    } catch {
-                        logger.warning("Failed to restore bookmark for URL: \(url.path, privacy: .public)")
-                        continue
+                // Check if already accessing
+                if accessQueue.sync({ activeBookmarks[url] != nil }) {
+                    logger.warning("Already accessing bookmark for \(url.path)")
+                    return true
+                }
+                
+                // Retrieve or create bookmark
+                let bookmark = try await getOrCreateBookmark(for: url)
+                
+                var isStale = false
+                var resolvedURL: URL?
+                
+                do {
+                    resolvedURL = try URL(
+                        resolvingBookmarkData: bookmark,
+                        options: .withSecurityScope,
+                        relativeTo: nil,
+                        bookmarkDataIsStale: &isStale
+                    )
+                } catch {
+                    logger.error("Failed to resolve bookmark: \(error.localizedDescription)")
+                    throw BookmarkError.resolutionFailed(error.localizedDescription)
+                }
+                
+                guard let resolvedURL = resolvedURL else {
+                    logger.error("Failed to resolve bookmark URL")
+                    throw BookmarkError.resolutionFailed("Failed to resolve URL")
+                }
+                
+                // Handle stale bookmark
+                if isStale {
+                    logger.warning("Stale bookmark detected for \(url.path)")
+                    // Create new bookmark
+                    let newBookmark = try await createBookmark(for: url)
+                    accessQueue.async(flags: .barrier) {
+                        self.activeBookmarks[url] = BookmarkAccess(
+                            startTime: Date(),
+                            maxDuration: 300, // 5 minutes
+                            bookmark: newBookmark
+                        )
+                    }
+                } else {
+                    accessQueue.async(flags: .barrier) {
+                        self.activeBookmarks[url] = BookmarkAccess(
+                            startTime: Date(),
+                            maxDuration: 300, // 5 minutes
+                            bookmark: bookmark
+                        )
                     }
                 }
+                
+                // Start accessing
+                guard resolvedURL.startAccessingSecurityScopedResource() else {
+                    logger.error("Failed to start accessing security-scoped resource")
+                    throw BookmarkError.accessDenied
+                }
+                
+                logger.info("Started accessing bookmark for \(url.path)")
+                return true
             } catch {
-                logger.error("Failed to restore bookmarks: \(error.localizedDescription, privacy: .public)")
-                throw BookmarkError.restorationFailed(error.localizedDescription)
+                logger.error("Failed to start accessing bookmark: \(error.localizedDescription)")
+                throw error
             }
         }
     }
     
-    func stopAccessingResource(_ url: URL) {
-        if fileManager.isUbiquitousItem(at: url) {
-            logger.debug("Skipping stop access for iCloud item: \(url.path, privacy: .public)")
-            return
+    public func stopAccessing(_ url: URL) {
+        accessQueue.async(flags: .barrier) {
+            if let access = self.activeBookmarks[url] {
+                url.stopAccessingSecurityScopedResource()
+                self.activeBookmarks.removeValue(forKey: url)
+                self.logger.info("Stopped accessing bookmark for \(url.path)")
+            } else {
+                self.logger.warning("Attempted to stop accessing non-active bookmark for \(url.path)")
+            }
         }
-        url.stopAccessingSecurityScopedResource()
-        logger.debug("Stopped accessing resource: \(url.path, privacy: .public)")
     }
     
-    private func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
+    public func validateBookmark(for url: URL) async throws -> Bool {
+        try await measure("Validate Bookmark") {
+            do {
+                let bookmark = try await getOrCreateBookmark(for: url)
+                var isStale = false
+                
+                _ = try URL(
+                    resolvingBookmarkData: bookmark,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                if isStale {
+                    logger.warning("Stale bookmark detected during validation for \(url.path)")
+                    return false
+                }
+                
+                logger.info("Successfully validated bookmark for \(url.path)")
+                return true
+            } catch {
+                logger.error("Failed to validate bookmark: \(error.localizedDescription)")
+                return false
             }
-            
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw BookmarkError.operationTimeout
-            }
-            
-            let result = try await group.next()
-            group.cancelAll()
-            return result ?? {
-                throw BookmarkError.operationTimeout
-            }()
         }
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("Bookmark Service Health Check") {
+            do {
+                // Check keychain service health
+                guard await keychainService.performHealthCheck() else {
+                    return false
+                }
+                
+                // Check for stuck bookmarks
+                let stuckBookmarks = accessQueue.sync {
+                    activeBookmarks.filter { $0.value.hasExceededMaxDuration }
+                }
+                
+                if !stuckBookmarks.isEmpty {
+                    logger.warning("Found \(stuckBookmarks.count) stuck bookmarks")
+                    // Clean up stuck bookmarks
+                    for (url, _) in stuckBookmarks {
+                        stopAccessing(url)
+                    }
+                    return false
+                }
+                
+                logger.info("Bookmark service health check passed")
+                return true
+            } catch {
+                logger.error("Bookmark service health check failed: \(error.localizedDescription)")
+                return false
+            }
+        }
+    }
+    
+    // MARK: - Private Helpers
+    private func getOrCreateBookmark(for url: URL) async throws -> Data {
+        if let bookmark = try? keychainService.retrieveBookmark(for: url) {
+            return bookmark
+        }
+        return try await createBookmark(for: url)
     }
 }
 
-/// Errors that can occur during bookmark operations
-enum BookmarkError: LocalizedError {
+// MARK: - Bookmark Errors
+public enum BookmarkError: LocalizedError {
     case creationFailed(String)
     case resolutionFailed(String)
-    case refreshFailed(String)
-    case restorationFailed(String)
-    case staleBookmark(String)
-    case operationTimeout
+    case accessDenied
+    case invalidBookmark
+    case bookmarkExpired
     
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
-        case .creationFailed(let reason):
-            return "Failed to create bookmark: \(reason)"
-        case .resolutionFailed(let reason):
-            return "Failed to resolve bookmark: \(reason)"
-        case .refreshFailed(let reason):
-            return "Failed to refresh bookmark: \(reason)"
-        case .restorationFailed(let reason):
-            return "Failed to restore bookmarks: \(reason)"
-        case .staleBookmark(let url):
-            return "Bookmark is stale for URL: \(url)"
-        case .operationTimeout:
-            return "Operation timed out"
+        case .creationFailed(let message):
+            return "Failed to create bookmark: \(message)"
+        case .resolutionFailed(let message):
+            return "Failed to resolve bookmark: \(message)"
+        case .accessDenied:
+            return "Access denied to security-scoped resource"
+        case .invalidBookmark:
+            return "Invalid bookmark data"
+        case .bookmarkExpired:
+            return "Bookmark has expired"
         }
     }
 }
