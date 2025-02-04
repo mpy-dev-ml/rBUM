@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import Core
 
 /// Service for managing secure storage in the Keychain
 public final class KeychainService: BaseSandboxedService, KeychainServiceProtocol, HealthCheckable {
@@ -66,7 +67,7 @@ public final class KeychainService: BaseSandboxedService, KeychainServiceProtoco
             }
             
             guard status == errSecSuccess else {
-                throw KeychainError.storeFailed(status)
+                throw KeychainError.saveFailed("Failed to store credentials (status: \(status))")
             }
             
             logger.info("Successfully stored credentials in keychain")
@@ -88,7 +89,7 @@ public final class KeychainService: BaseSandboxedService, KeychainServiceProtoco
             guard status == errSecSuccess,
                   let data = result as? Data,
                   let credentials = try? JSONDecoder().decode(KeychainCredentials.self, from: data) else {
-                throw KeychainError.retrieveFailed(status)
+                throw KeychainError.retrievalFailed("Failed to retrieve credentials (status: \(status))")
             }
             
             logger.info("Successfully retrieved credentials from keychain")
@@ -105,7 +106,7 @@ public final class KeychainService: BaseSandboxedService, KeychainServiceProtoco
             
             let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else {
-                throw KeychainError.deleteFailed(status)
+                throw KeychainError.deletionFailed("Failed to delete credentials (status: \(status))")
             }
             
             logger.info("Successfully deleted credentials from keychain")
@@ -139,34 +140,13 @@ public final class KeychainService: BaseSandboxedService, KeychainServiceProtoco
         // Add test item
         let addStatus = SecItemAdd(query as CFDictionary, nil)
         guard addStatus == errSecSuccess || addStatus == errSecDuplicateItem else {
-            throw KeychainError.accessDenied
+            throw KeychainError.sandboxViolation("Cannot access keychain")
         }
         
         // Clean up test item
         let deleteStatus = SecItemDelete(query as CFDictionary)
         guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
-            throw KeychainError.accessDenied
-        }
-    }
-}
-
-// MARK: - Keychain Errors
-public enum KeychainError: LocalizedError {
-    case storeFailed(OSStatus)
-    case retrieveFailed(OSStatus)
-    case deleteFailed(OSStatus)
-    case accessDenied
-    
-    public var errorDescription: String? {
-        switch self {
-        case .storeFailed(let status):
-            return "Failed to store item in keychain: \(status)"
-        case .retrieveFailed(let status):
-            return "Failed to retrieve item from keychain: \(status)"
-        case .deleteFailed(let status):
-            return "Failed to delete item from keychain: \(status)"
-        case .accessDenied:
-            return "Access to keychain is denied"
+            throw KeychainError.sandboxViolation("Cannot clean up keychain test item")
         }
     }
 }

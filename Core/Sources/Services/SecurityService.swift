@@ -112,24 +112,3 @@ public final class SecurityService: SecurityServiceProtocol {
         }
     }
 }
-
-/// Errors that can occur during security operations
-public enum SecurityError: Error {
-    case accessDenied
-    case bookmarkInvalid
-    case bookmarkStale
-    case xpcServiceUnavailable
-    
-    public var errorDescription: String? {
-        switch self {
-        case .accessDenied:
-            return "Access denied to requested resource"
-        case .bookmarkInvalid:
-            return "Invalid security-scoped bookmark"
-        case .bookmarkStale:
-            return "Security-scoped bookmark is stale"
-        case .xpcServiceUnavailable:
-            return "XPC service is not available"
-        }
-    }
-}

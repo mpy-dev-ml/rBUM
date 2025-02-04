@@ -6,21 +6,27 @@ import os.log
 public extension LoggerProtocol {
     /// Default implementation for debug logging with file info
     func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        debug(message, file: file, function: function, line: line)
+        debug(message)
     }
     
     /// Default implementation for info logging with file info
     func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        info(message, file: file, function: function, line: line)
+        info(message)
     }
     
     /// Default implementation for error logging with file info
     func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        error(message, file: file, function: function, line: line)
+        error(message)
     }
 }
 
 // MARK: - Sandbox Compliance Support
+
+/// Protocol defining sandbox compliance requirements
+public protocol SandboxCompliant {
+    func startAccessing(_ url: URL) -> Bool
+    func stopAccessing(_ url: URL)
+}
 
 public extension SandboxCompliant {
     /// Default implementation for safe resource access
@@ -62,12 +68,12 @@ public typealias SecureLoggingService = SandboxedService & LoggingService
 public extension SandboxedService {
     /// Default implementation for checking bookmark validity
     func validateBookmark(_ bookmark: Data) throws -> URL {
-        try securityService.validateBookmark(bookmark)
+        try securityService.resolveBookmark(bookmark)
     }
     
     /// Default implementation for persisting bookmark
     func persistBookmark(for url: URL) throws -> Data {
-        try securityService.persistBookmark(for: url)
+        try securityService.createBookmark(for: url)
     }
 }
 
@@ -90,6 +96,29 @@ public extension LoggingService {
             logger.info("\(name) completed in \(String(format: "%.3f", duration))s")
         }
         return try await operation()
+    }
+}
+
+// MARK: - Error Types
+
+/// Errors related to sandbox operations
+public enum SandboxError: LocalizedError {
+    case accessDenied
+    case invalidPath
+    case bookmarkInvalid
+    case operationFailed(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .accessDenied:
+            return "Access denied by sandbox"
+        case .invalidPath:
+            return "Invalid file path"
+        case .bookmarkInvalid:
+            return "Invalid security bookmark"
+        case .operationFailed(let reason):
+            return "Operation failed: \(reason)"
+        }
     }
 }
 

@@ -112,7 +112,7 @@ public final class DefaultSecurityService: BaseSandboxedService, SecurityService
                 return true
             } catch {
                 logger.error("Failed to request access: \(error.localizedDescription)")
-                throw SecurityError.accessDenied(error.localizedDescription)
+                throw Core.SecurityError.accessDenied(error.localizedDescription)
             }
         }
     }
@@ -202,27 +202,6 @@ public final class DefaultSecurityService: BaseSandboxedService, SecurityService
                 logger.error("Default security service health check failed: \(error.localizedDescription)")
                 return false
             }
-        }
-    }
-}
-
-// MARK: - Security Errors
-public enum SecurityError: LocalizedError {
-    case accessDenied(String)
-    case encryptionError(String)
-    case bookmarkError(String)
-    case monitorError(String)
-    
-    public var errorDescription: String? {
-        switch self {
-        case .accessDenied(let message):
-            return "Access denied: \(message)"
-        case .encryptionError(let message):
-            return "Encryption error: \(message)"
-        case .bookmarkError(let message):
-            return "Bookmark error: \(message)"
-        case .monitorError(let message):
-            return "Monitor error: \(message)"
         }
     }
 }

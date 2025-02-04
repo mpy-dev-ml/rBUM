@@ -138,35 +138,42 @@ public protocol SecurityServiceProtocol {
     func checkAccess(to url: URL) -> Bool
 }
 
-/// Errors that can occur during security operations
-public enum SecurityError: LocalizedError {
-    case needsFullDiskAccess(String)
-    case needsAutomation(String)
-    case bookmarkCreationFailed(String)
-    case bookmarkResolutionFailed(String)
-    case staleBookmark(String)
-    case permissionDenied(String)
-    case revocationFailed(String)
-    case accessDenied(String)
+/// Default implementation of SecurityServiceProtocol
+public final class DefaultSecurityService: SecurityServiceProtocol {
+    private let bookmarkService: BookmarkServiceProtocol
+    private let logger: LoggerProtocol
     
-    public var errorDescription: String? {
-        switch self {
-        case .needsFullDiskAccess(let message):
-            return "Full Disk Access Required: \(message)"
-        case .needsAutomation(let message):
-            return "Automation Access Required: \(message)"
-        case .bookmarkCreationFailed(let message):
-            return "Failed to create security bookmark: \(message)"
-        case .bookmarkResolutionFailed(let message):
-            return "Failed to resolve security bookmark: \(message)"
-        case .staleBookmark(let path):
-            return "Security bookmark is stale for path: \(path)"
-        case .permissionDenied(let path):
-            return "Permission denied for path: \(path)"
-        case .revocationFailed(let path):
-            return "Failed to revoke permission for path: \(path)"
-        case .accessDenied(let path):
-            return "Access denied for path: \(path)"
+    public init(
+        bookmarkService: BookmarkServiceProtocol,
+        logger: LoggerProtocol
+    ) {
+        self.bookmarkService = bookmarkService
+        self.logger = logger
+    }
+    
+    public func createBookmark(for url: URL) throws -> Data {
+        try bookmarkService.createBookmark(for: url)
+    }
+    
+    public func resolveBookmark(_ bookmark: Data) throws -> URL {
+        try bookmarkService.resolveBookmark(bookmark)
+    }
+    
+    public func validateAccess(to url: URL) throws {
+        try bookmarkService.validateAccess(to: url)
+    }
+    
+    public func startAccessing(_ url: URL) -> Bool {
+        do {
+            try validateAccess(to: url)
+            return url.startAccessingSecurityScopedResource()
+        } catch {
+            logger.error("Failed to start accessing resource: \(error.localizedDescription)")
+            return false
         }
+    }
+    
+    public func stopAccessing(_ url: URL) {
+        url.stopAccessingSecurityScopedResource()
     }
 }

@@ -10,6 +10,46 @@
 		8D3E9FF62D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0012D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0022D5122C600C21FE0 /* Core.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		8D41427F2D52355F00FBF58A /* OSLogger.h in Headers */ = {isa = PBXBuildFile; fileRef = 8D4142462D52355F00FBF58A /* OSLogger.h */; };
+		8D4142802D52355F00FBF58A /* Core.h in Headers */ = {isa = PBXBuildFile; fileRef = 8D41427B2D52355F00FBF58A /* Core.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		8D4142812D52355F00FBF58A /* OSLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142472D52355F00FBF58A /* OSLogger.swift */; };
+		8D4142822D52355F00FBF58A /* ProcessError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142492D52355F00FBF58A /* ProcessError.swift */; };
+		8D4142832D52355F00FBF58A /* ProcessResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424A2D52355F00FBF58A /* ProcessResult.swift */; };
+		8D4142842D52355F00FBF58A /* ProgressTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424B2D52355F00FBF58A /* ProgressTracker.swift */; };
+		8D4142852D52355F00FBF58A /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424C2D52355F00FBF58A /* Repository.swift */; };
+		8D4142862D52355F00FBF58A /* RepositoryCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424D2D52355F00FBF58A /* RepositoryCredentials.swift */; };
+		8D4142872D52355F00FBF58A /* RepositoryStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424E2D52355F00FBF58A /* RepositoryStatus.swift */; };
+		8D4142882D52355F00FBF58A /* ResticError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41424F2D52355F00FBF58A /* ResticError.swift */; };
+		8D4142892D52355F00FBF58A /* ResticSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142502D52355F00FBF58A /* ResticSnapshot.swift */; };
+		8D41428A2D52355F00FBF58A /* SidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142512D52355F00FBF58A /* SidebarItem.swift */; };
+		8D41428B2D52355F00FBF58A /* Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142522D52355F00FBF58A /* Snapshot.swift */; };
+		8D41428D2D52355F00FBF58A /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142582D52355F00FBF58A /* KeychainService.swift */; };
+		8D41428E2D52355F00FBF58A /* LoggerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142592D52355F00FBF58A /* LoggerFactory.swift */; };
+		8D41428F2D52355F00FBF58A /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41425A2D52355F00FBF58A /* PermissionManager.swift */; };
+		8D4142902D52355F00FBF58A /* ResticXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41425B2D52355F00FBF58A /* ResticXPCService.swift */; };
+		8D4142912D52355F00FBF58A /* SandboxDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41425C2D52355F00FBF58A /* SandboxDiagnostics.swift */; };
+		8D4142922D52355F00FBF58A /* SandboxMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41425D2D52355F00FBF58A /* SandboxMonitor.swift */; };
+		8D4142942D52355F00FBF58A /* ServiceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41425F2D52355F00FBF58A /* ServiceSupport.swift */; };
+		8D4142952D52355F00FBF58A /* KeychainError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142612D52355F00FBF58A /* KeychainError.swift */; };
+		8D4142962D52355F00FBF58A /* SecurityError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142622D52355F00FBF58A /* SecurityError.swift */; };
+		8D4142972D52355F00FBF58A /* BackupServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142642D52355F00FBF58A /* BackupServiceProtocol.swift */; };
+		8D4142982D52355F00FBF58A /* DateProviderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142652D52355F00FBF58A /* DateProviderProtocol.swift */; };
+		8D4142992D52355F00FBF58A /* FileManagerProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142662D52355F00FBF58A /* FileManagerProtocol.swift */; };
+		8D41429A2D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142672D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift */; };
+		8D41429B2D52355F00FBF58A /* KeychainServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142682D52355F00FBF58A /* KeychainServiceProtocol.swift */; };
+		8D41429C2D52355F00FBF58A /* LoggerProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142692D52355F00FBF58A /* LoggerProtocol.swift */; };
+		8D41429D2D52355F00FBF58A /* NotificationCenterProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426A2D52355F00FBF58A /* NotificationCenterProtocol.swift */; };
+		8D41429E2D52355F00FBF58A /* ProtocolSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426B2D52355F00FBF58A /* ProtocolSupport.swift */; };
+		8D41429F2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426C2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift */; };
+		8D4142A02D52355F00FBF58A /* RepositoryServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426D2D52355F00FBF58A /* RepositoryServiceProtocol.swift */; };
+		8D4142A12D52355F00FBF58A /* RepositoryStorageProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426E2D52355F00FBF58A /* RepositoryStorageProtocol.swift */; };
+		8D4142A22D52355F00FBF58A /* ResticCommandServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D41426F2D52355F00FBF58A /* ResticCommandServiceProtocol.swift */; };
+		8D4142A32D52355F00FBF58A /* ResticServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142702D52355F00FBF58A /* ResticServiceProtocol.swift */; };
+		8D4142A42D52355F00FBF58A /* ResticXPCServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142712D52355F00FBF58A /* ResticXPCServiceProtocol.swift */; };
+		8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142722D52355F00FBF58A /* SecurityServiceProtocol.swift */; };
+		8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142762D52355F00FBF58A /* MockLogger.swift */; };
+		8D4142A72D52355F00FBF58A /* Core.docc in Sources */ = {isa = PBXBuildFile; fileRef = 8D41427C2D52355F00FBF58A /* Core.docc */; };
+		8D4142AB2D5236FF00FBF58A /* SecurityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142A92D5236FF00FBF58A /* SecurityService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,17 +110,48 @@
 		8D3E9DF42D51219900C21FE0 /* rBUMUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9FEC2D5122C600C21FE0 /* Core.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Core.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9FF52D5122C600C21FE0 /* CoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D4142462D52355F00FBF58A /* OSLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OSLogger.h; sourceTree = "<group>"; };
+		8D4142472D52355F00FBF58A /* OSLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSLogger.swift; sourceTree = "<group>"; };
+		8D4142492D52355F00FBF58A /* ProcessError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessError.swift; sourceTree = "<group>"; };
+		8D41424A2D52355F00FBF58A /* ProcessResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessResult.swift; sourceTree = "<group>"; };
+		8D41424B2D52355F00FBF58A /* ProgressTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressTracker.swift; sourceTree = "<group>"; };
+		8D41424C2D52355F00FBF58A /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
+		8D41424D2D52355F00FBF58A /* RepositoryCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryCredentials.swift; sourceTree = "<group>"; };
+		8D41424E2D52355F00FBF58A /* RepositoryStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryStatus.swift; sourceTree = "<group>"; };
+		8D41424F2D52355F00FBF58A /* ResticError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticError.swift; sourceTree = "<group>"; };
+		8D4142502D52355F00FBF58A /* ResticSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticSnapshot.swift; sourceTree = "<group>"; };
+		8D4142512D52355F00FBF58A /* SidebarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarItem.swift; sourceTree = "<group>"; };
+		8D4142522D52355F00FBF58A /* Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snapshot.swift; sourceTree = "<group>"; };
+		8D4142582D52355F00FBF58A /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		8D4142592D52355F00FBF58A /* LoggerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerFactory.swift; sourceTree = "<group>"; };
+		8D41425A2D52355F00FBF58A /* PermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
+		8D41425B2D52355F00FBF58A /* ResticXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticXPCService.swift; sourceTree = "<group>"; };
+		8D41425C2D52355F00FBF58A /* SandboxDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxDiagnostics.swift; sourceTree = "<group>"; };
+		8D41425D2D52355F00FBF58A /* SandboxMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxMonitor.swift; sourceTree = "<group>"; };
+		8D41425F2D52355F00FBF58A /* ServiceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSupport.swift; sourceTree = "<group>"; };
+		8D4142612D52355F00FBF58A /* KeychainError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainError.swift; sourceTree = "<group>"; };
+		8D4142622D52355F00FBF58A /* SecurityError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityError.swift; sourceTree = "<group>"; };
+		8D4142642D52355F00FBF58A /* BackupServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142652D52355F00FBF58A /* DateProviderProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateProviderProtocol.swift; sourceTree = "<group>"; };
+		8D4142662D52355F00FBF58A /* FileManagerProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManagerProtocol.swift; sourceTree = "<group>"; };
+		8D4142672D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainCredentialsManagerProtocol.swift; sourceTree = "<group>"; };
+		8D4142682D52355F00FBF58A /* KeychainServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142692D52355F00FBF58A /* LoggerProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerProtocol.swift; sourceTree = "<group>"; };
+		8D41426A2D52355F00FBF58A /* NotificationCenterProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCenterProtocol.swift; sourceTree = "<group>"; };
+		8D41426B2D52355F00FBF58A /* ProtocolSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolSupport.swift; sourceTree = "<group>"; };
+		8D41426C2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryCreationServiceProtocol.swift; sourceTree = "<group>"; };
+		8D41426D2D52355F00FBF58A /* RepositoryServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryServiceProtocol.swift; sourceTree = "<group>"; };
+		8D41426E2D52355F00FBF58A /* RepositoryStorageProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryStorageProtocol.swift; sourceTree = "<group>"; };
+		8D41426F2D52355F00FBF58A /* ResticCommandServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticCommandServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142702D52355F00FBF58A /* ResticServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142712D52355F00FBF58A /* ResticXPCServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticXPCServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142722D52355F00FBF58A /* SecurityServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityServiceProtocol.swift; sourceTree = "<group>"; };
+		8D4142762D52355F00FBF58A /* MockLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockLogger.swift; sourceTree = "<group>"; };
+		8D41427B2D52355F00FBF58A /* Core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Core.h; sourceTree = "<group>"; };
+		8D41427C2D52355F00FBF58A /* Core.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Core.docc; sourceTree = "<group>"; };
+		8D41427D2D52355F00FBF58A /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		8D4142A92D5236FF00FBF58A /* SecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		8D3EA0032D5122C600C21FE0 /* Exceptions for "Core" folder in "Core" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			publicHeaders = (
-				Core.h,
-			);
-			target = 8D3E9FEB2D5122C600C21FE0 /* Core */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8D3E9DDB2D51219800C21FE0 /* rBUM */ = {
@@ -96,14 +167,6 @@
 		8D3E9DF72D51219900C21FE0 /* rBUMUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = rBUMUITests;
-			sourceTree = "<group>";
-		};
-		8D3E9FED2D5122C600C21FE0 /* Core */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				8D3EA0032D5122C600C21FE0 /* Exceptions for "Core" folder in "Core" target */,
-			);
-			path = Core;
 			sourceTree = "<group>";
 		};
 		8D3E9FFB2D5122C600C21FE0 /* CoreTests */ = {
@@ -160,7 +223,7 @@
 				8D3E9DDB2D51219800C21FE0 /* rBUM */,
 				8D3E9DED2D51219900C21FE0 /* rBUMTests */,
 				8D3E9DF72D51219900C21FE0 /* rBUMUITests */,
-				8D3E9FED2D5122C600C21FE0 /* Core */,
+				8D41427E2D52355F00FBF58A /* Core */,
 				8D3E9FFB2D5122C600C21FE0 /* CoreTests */,
 				8D3E9DDA2D51219800C21FE0 /* Products */,
 			);
@@ -178,6 +241,174 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		8D4142452D52355F00FBF58A /* Errors */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Errors;
+			sourceTree = "<group>";
+		};
+		8D4142482D52355F00FBF58A /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142462D52355F00FBF58A /* OSLogger.h */,
+				8D4142472D52355F00FBF58A /* OSLogger.swift */,
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		8D4142532D52355F00FBF58A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142492D52355F00FBF58A /* ProcessError.swift */,
+				8D41424A2D52355F00FBF58A /* ProcessResult.swift */,
+				8D41424B2D52355F00FBF58A /* ProgressTracker.swift */,
+				8D41424C2D52355F00FBF58A /* Repository.swift */,
+				8D41424D2D52355F00FBF58A /* RepositoryCredentials.swift */,
+				8D41424E2D52355F00FBF58A /* RepositoryStatus.swift */,
+				8D41424F2D52355F00FBF58A /* ResticError.swift */,
+				8D4142502D52355F00FBF58A /* ResticSnapshot.swift */,
+				8D4142512D52355F00FBF58A /* SidebarItem.swift */,
+				8D4142522D52355F00FBF58A /* Snapshot.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8D4142542D52355F00FBF58A /* Apple */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Apple;
+			sourceTree = "<group>";
+		};
+		8D4142552D52355F00FBF58A /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142542D52355F00FBF58A /* Apple */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		8D4142562D52355F00FBF58A /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		8D4142602D52355F00FBF58A /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142582D52355F00FBF58A /* KeychainService.swift */,
+				8D4142592D52355F00FBF58A /* LoggerFactory.swift */,
+				8D41425A2D52355F00FBF58A /* PermissionManager.swift */,
+				8D41425B2D52355F00FBF58A /* ResticXPCService.swift */,
+				8D41425C2D52355F00FBF58A /* SandboxDiagnostics.swift */,
+				8D41425D2D52355F00FBF58A /* SandboxMonitor.swift */,
+				8D41425F2D52355F00FBF58A /* ServiceSupport.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		8D4142632D52355F00FBF58A /* Errors */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142612D52355F00FBF58A /* KeychainError.swift */,
+				8D4142622D52355F00FBF58A /* SecurityError.swift */,
+			);
+			path = Errors;
+			sourceTree = "<group>";
+		};
+		8D4142732D52355F00FBF58A /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142642D52355F00FBF58A /* BackupServiceProtocol.swift */,
+				8D4142652D52355F00FBF58A /* DateProviderProtocol.swift */,
+				8D4142662D52355F00FBF58A /* FileManagerProtocol.swift */,
+				8D4142672D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift */,
+				8D4142682D52355F00FBF58A /* KeychainServiceProtocol.swift */,
+				8D4142692D52355F00FBF58A /* LoggerProtocol.swift */,
+				8D41426A2D52355F00FBF58A /* NotificationCenterProtocol.swift */,
+				8D41426B2D52355F00FBF58A /* ProtocolSupport.swift */,
+				8D41426C2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift */,
+				8D41426D2D52355F00FBF58A /* RepositoryServiceProtocol.swift */,
+				8D41426E2D52355F00FBF58A /* RepositoryStorageProtocol.swift */,
+				8D41426F2D52355F00FBF58A /* ResticCommandServiceProtocol.swift */,
+				8D4142702D52355F00FBF58A /* ResticServiceProtocol.swift */,
+				8D4142712D52355F00FBF58A /* ResticXPCServiceProtocol.swift */,
+				8D4142722D52355F00FBF58A /* SecurityServiceProtocol.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		8D4142742D52355F00FBF58A /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142A92D5236FF00FBF58A /* SecurityService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		8D4142752D52355F00FBF58A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142632D52355F00FBF58A /* Errors */,
+				8D4142732D52355F00FBF58A /* Protocols */,
+				8D4142742D52355F00FBF58A /* Services */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		8D4142772D52355F00FBF58A /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142762D52355F00FBF58A /* MockLogger.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
+		8D4142782D52355F00FBF58A /* SandboxTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = SandboxTests;
+			sourceTree = "<group>";
+		};
+		8D4142792D52355F00FBF58A /* XPCTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = XPCTests;
+			sourceTree = "<group>";
+		};
+		8D41427A2D52355F00FBF58A /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142772D52355F00FBF58A /* Mocks */,
+				8D4142782D52355F00FBF58A /* SandboxTests */,
+				8D4142792D52355F00FBF58A /* XPCTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		8D41427E2D52355F00FBF58A /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				8D4142452D52355F00FBF58A /* Errors */,
+				8D4142482D52355F00FBF58A /* Logging */,
+				8D4142532D52355F00FBF58A /* Models */,
+				8D4142552D52355F00FBF58A /* Platform */,
+				8D4142562D52355F00FBF58A /* Protocols */,
+				8D4142602D52355F00FBF58A /* Services */,
+				8D4142752D52355F00FBF58A /* Sources */,
+				8D41427A2D52355F00FBF58A /* Tests */,
+				8D41427B2D52355F00FBF58A /* Core.h */,
+				8D41427C2D52355F00FBF58A /* Core.docc */,
+				8D41427D2D52355F00FBF58A /* module.modulemap */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -185,6 +416,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8D41427F2D52355F00FBF58A /* OSLogger.h in Headers */,
+				8D4142802D52355F00FBF58A /* Core.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -273,9 +506,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				8D3E9FED2D5122C600C21FE0 /* Core */,
 			);
 			name = Core;
 			packageProductDependencies = (
@@ -425,6 +655,44 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8D4142812D52355F00FBF58A /* OSLogger.swift in Sources */,
+				8D4142822D52355F00FBF58A /* ProcessError.swift in Sources */,
+				8D4142832D52355F00FBF58A /* ProcessResult.swift in Sources */,
+				8D4142842D52355F00FBF58A /* ProgressTracker.swift in Sources */,
+				8D4142852D52355F00FBF58A /* Repository.swift in Sources */,
+				8D4142862D52355F00FBF58A /* RepositoryCredentials.swift in Sources */,
+				8D4142872D52355F00FBF58A /* RepositoryStatus.swift in Sources */,
+				8D4142882D52355F00FBF58A /* ResticError.swift in Sources */,
+				8D4142892D52355F00FBF58A /* ResticSnapshot.swift in Sources */,
+				8D41428A2D52355F00FBF58A /* SidebarItem.swift in Sources */,
+				8D41428B2D52355F00FBF58A /* Snapshot.swift in Sources */,
+				8D41428D2D52355F00FBF58A /* KeychainService.swift in Sources */,
+				8D41428E2D52355F00FBF58A /* LoggerFactory.swift in Sources */,
+				8D41428F2D52355F00FBF58A /* PermissionManager.swift in Sources */,
+				8D4142902D52355F00FBF58A /* ResticXPCService.swift in Sources */,
+				8D4142912D52355F00FBF58A /* SandboxDiagnostics.swift in Sources */,
+				8D4142922D52355F00FBF58A /* SandboxMonitor.swift in Sources */,
+				8D4142942D52355F00FBF58A /* ServiceSupport.swift in Sources */,
+				8D4142952D52355F00FBF58A /* KeychainError.swift in Sources */,
+				8D4142962D52355F00FBF58A /* SecurityError.swift in Sources */,
+				8D4142972D52355F00FBF58A /* BackupServiceProtocol.swift in Sources */,
+				8D4142982D52355F00FBF58A /* DateProviderProtocol.swift in Sources */,
+				8D4142992D52355F00FBF58A /* FileManagerProtocol.swift in Sources */,
+				8D41429A2D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift in Sources */,
+				8D41429B2D52355F00FBF58A /* KeychainServiceProtocol.swift in Sources */,
+				8D41429C2D52355F00FBF58A /* LoggerProtocol.swift in Sources */,
+				8D41429D2D52355F00FBF58A /* NotificationCenterProtocol.swift in Sources */,
+				8D41429E2D52355F00FBF58A /* ProtocolSupport.swift in Sources */,
+				8D41429F2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift in Sources */,
+				8D4142A02D52355F00FBF58A /* RepositoryServiceProtocol.swift in Sources */,
+				8D4142A12D52355F00FBF58A /* RepositoryStorageProtocol.swift in Sources */,
+				8D4142A22D52355F00FBF58A /* ResticCommandServiceProtocol.swift in Sources */,
+				8D4142A32D52355F00FBF58A /* ResticServiceProtocol.swift in Sources */,
+				8D4142A42D52355F00FBF58A /* ResticXPCServiceProtocol.swift in Sources */,
+				8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */,
+				8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */,
+				8D4142A72D52355F00FBF58A /* Core.docc in Sources */,
+				8D4142AB2D5236FF00FBF58A /* SecurityService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
