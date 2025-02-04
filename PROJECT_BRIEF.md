@@ -37,6 +37,275 @@ rBUM is a macOS application for managing Restic backups with a focus on user-fri
 - Secure credential management
 - Proper permission handling
 
+## Project Structure
+
+### Core Framework
+The Core framework is organized into explicit submodules for better code organization and clarity:
+
+#### 1. Logging Module
+Location: `Core/Logging/`
+- `OSLogger.swift`: macOS-specific logger implementation using os.log
+- Handles privacy-aware logging with sandbox compliance
+- Provides debug, info, and error level logging
+- Thread-safe with async queue management
+
+#### 2. Platform Module
+Location: `Core/Platform/`
+- Platform-specific implementations
+- Apple-specific code for macOS
+- Future cross-platform support structure
+
+#### 3. Services Module
+Location: `Core/Services/`
+- `LoggerFactory.swift`: Factory for creating platform-specific loggers
+- `SecurityService.swift`: Handles security and sandbox compliance
+- `KeychainService.swift`: Manages secure credential storage
+- `DateProvider.swift`: Provides date-related functionality
+- `PermissionManager.swift`: Manages file system permissions
+- `ResticXPCService.swift`: XPC service interface
+- `SandboxDiagnostics.swift`: Sandbox compliance monitoring
+- `SandboxMonitor.swift`: Real-time sandbox status tracking
+
+#### 4. Protocols Module
+Location: `Core/Protocols/`
+- `LoggerProtocol.swift`: Defines logging interface
+- Other core protocols for platform-agnostic design
+
+#### 5. Models Module
+Location: `Core/Models/`
+- Data models and types
+- Value types for business logic
+- Transfer objects
+
+#### 6. Errors Module
+Location: `Core/Errors/`
+- Error type definitions
+- Error handling utilities
+- Error reporting structures
+
+### Main Application (rBUM)
+Location: `rBUM/`
+- SwiftUI views and view models
+- User interface components
+- Main application logic
+
+### Test Suites
+- `CoreTests/`: Unit tests for Core framework
+- `rBUMTests/`: Main application tests
+- `rBUMUITests/`: UI automation tests
+
+### XPC Service
+Location: `ResticService/`
+- Privileged helper tool
+- Secure command execution
+- Sandbox-compliant operations
+
+### Support Files
+- `Scripts/`: Build and maintenance scripts
+- `Documentation/`: Additional documentation
+- `Resources/`: Shared resources and assets
+
+## Module Dependencies
+
+### Core Dependencies
+- Foundation
+- os.log
+- Security.framework (for keychain)
+- XPC (for service communication)
+
+### App Dependencies
+- SwiftUI
+- Core.framework (local)
+- Combine
+
+### Test Dependencies
+- XCTest
+- Core.framework (local)
+- Testing framework
+
+## File Organization Conventions
+
+1. **Protocol Definitions**
+   - Always in Core/Protocols
+   - Named with Protocol suffix (e.g., LoggerProtocol)
+   - One protocol per file
+
+2. **Service Implementations**
+   - Platform-independent in Core/Services
+   - Platform-specific in Core/Platform/{PlatformName}
+   - Named with Service suffix (e.g., SecurityService)
+
+3. **Models**
+   - Core/Models for shared models
+   - rBUM/Models for app-specific models
+   - Use clear type names without redundant suffixes
+
+4. **Extensions**
+   - In the same module as the extended type
+   - Named {TypeName}+{Feature}.swift
+
+5. **View Components**
+   - In rBUM/Views
+   - Grouped by feature or flow
+   - Named with View suffix
+
+## Protocol Map
+
+### Logging Protocols
+Location: `Core/Protocols/`
+1. **LoggerProtocol**
+   - Purpose: Define platform-agnostic logging interface
+   - Implementations:
+     * `OSLogger` (macOS, Core/Logging/)
+   - Methods:
+     * `debug(_ message:file:function:line:)`
+     * `info(_ message:file:function:line:)`
+     * `error(_ message:file:function:line:)`
+   - Used By:
+     * LoggerFactory
+     * All services requiring logging
+
+### Security Protocols
+Location: `Core/Protocols/`
+1. **SecurityServiceProtocol**
+   - Purpose: Handle sandbox and security operations
+   - Implementations:
+     * `SecurityService` (macOS)
+   - Key Features:
+     * Security-scoped bookmark management
+     * Permission handling
+     * Resource access control
+   - Used By:
+     * Main application
+     * File access operations
+
+2. **SandboxCompliant**
+   - Purpose: Define sandbox compliance requirements
+   - Implementations:
+     * `SecurityService`
+     * Other file-accessing services
+   - Key Methods:
+     * `requestAccess(to:)`
+     * `persistAccess(to:)`
+     * `validateAccess(to:)`
+     * `startAccessing(_:)`
+     * `stopAccessing(_:)`
+
+### Service Protocols
+Location: `Core/Protocols/`
+1. **DateProviderProtocol**
+   - Purpose: Abstract time-related operations
+   - Implementations:
+     * `DateProvider` (Core/Services/)
+   - Used For:
+     * Timestamp generation
+     * Schedule management
+     * Time-based operations
+
+2. **KeychainServiceProtocol**
+   - Purpose: Secure credential storage
+   - Implementations:
+     * `KeychainService` (Core/Services/)
+   - Key Features:
+     * Secure storage
+     * Access control
+     * Credential management
+
+3. **ResticServiceProtocol**
+   - Purpose: Interface for Restic operations
+   - Implementations:
+     * `ResticXPCService` (Core/Services/)
+   - Features:
+     * Command execution
+     * Backup operations
+     * Repository management
+
+### File System Protocols
+Location: `Core/Protocols/`
+1. **FileAccessProtocol**
+   - Purpose: Abstract file system operations
+   - Implementations:
+     * Platform-specific file access services
+   - Key Features:
+     * File operations
+     * Directory management
+     * Permission handling
+
+2. **BookmarkManagementProtocol**
+   - Purpose: Handle security-scoped bookmarks
+   - Implementations:
+     * `SecurityService`
+   - Key Features:
+     * Bookmark creation
+     * Persistence
+     * Access management
+
+### Monitoring Protocols
+Location: `Core/Protocols/`
+1. **SandboxMonitorProtocol**
+   - Purpose: Monitor sandbox compliance
+   - Implementations:
+     * `SandboxMonitor` (Core/Services/)
+   - Features:
+     * Status tracking
+     * Violation detection
+     * Resource monitoring
+
+2. **DiagnosticsProtocol**
+   - Purpose: System diagnostics and monitoring
+   - Implementations:
+     * `SandboxDiagnostics` (Core/Services/)
+   - Features:
+     * Error tracking
+     * Performance monitoring
+     * System status
+
+### Protocol Relationships
+1. **Security Layer**
+   ```
+   SecurityServiceProtocol
+   ├── SandboxCompliant
+   ├── BookmarkManagementProtocol
+   └── FileAccessProtocol
+   ```
+
+2. **Monitoring Layer**
+   ```
+   DiagnosticsProtocol
+   └── SandboxMonitorProtocol
+   ```
+
+3. **Service Layer**
+   ```
+   ResticServiceProtocol
+   ├── SecurityServiceProtocol
+   └── LoggerProtocol
+   ```
+
+### Protocol Design Guidelines
+1. **Naming Conventions**
+   - Use Protocol suffix
+   - Clear, descriptive names
+   - Follow Swift naming guidelines
+
+2. **Implementation Requirements**
+   - Document required methods
+   - Specify optional methods
+   - Define associated types
+   - List conformance requirements
+
+3. **Documentation**
+   - Purpose and responsibility
+   - Usage examples
+   - Implementation notes
+   - Security considerations
+
+4. **Testing**
+   - Mock implementations
+   - Protocol conformance tests
+   - Edge case handling
+   - Performance considerations
+
 ## Development Status
 
 ### Completed
