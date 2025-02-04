@@ -11,16 +11,40 @@ import Foundation
 /// 5. Coordinate with XPC service for command execution
 /// 6. Never execute commands directly from the main app
 public protocol SecurityServiceProtocol {
-    /// Validate access to a URL, ensuring sandbox compliance
-    /// - Parameter url: The URL to validate access for
-    /// - Returns: true if access is valid and the security scope is established
-    /// - Throws: SecurityError if access cannot be validated or if sandbox violation occurs
-    func validateAccess(to url: URL) async throws -> Bool
+    /// Request permission to access a URL
+    /// - Parameter url: The URL to request permission for
+    /// - Returns: true if permission was granted
+    /// - Throws: SecurityError if permission request fails
+    func requestPermission(for url: URL) async throws -> Bool
+    
+    /// Create a security-scoped bookmark for a URL
+    /// - Parameter url: The URL to create a bookmark for
+    /// - Returns: Bookmark data for persistent access
+    /// - Throws: SecurityError if bookmark creation fails
+    func createBookmark(for url: URL) throws -> Data
+    
+    /// Resolve a security-scoped bookmark to a URL
+    /// - Parameter bookmark: The bookmark data to resolve
+    /// - Returns: The resolved URL
+    /// - Throws: SecurityError if bookmark resolution fails
+    func resolveBookmark(_ bookmark: Data) throws -> URL
+    
+    /// Start accessing a security-scoped resource
+    /// - Parameter url: The URL to start accessing
+    /// - Returns: true if access was successfully started
+    /// - Throws: SecurityError if access cannot be started
+    func startAccessing(_ url: URL) throws -> Bool
     
     /// Stop accessing a security-scoped resource
     /// - Parameter url: The URL to stop accessing
     /// - Throws: SecurityError if access cannot be stopped
     func stopAccessing(_ url: URL) async throws
+    
+    /// Validate access to a URL, ensuring sandbox compliance
+    /// - Parameter url: The URL to validate access for
+    /// - Returns: true if access is valid and the security scope is established
+    /// - Throws: SecurityError if access cannot be validated or if sandbox violation occurs
+    func validateAccess(to url: URL) async throws -> Bool
     
     /// Persist access to a URL by creating a security-scoped bookmark
     /// - Parameter url: The URL to persist access for

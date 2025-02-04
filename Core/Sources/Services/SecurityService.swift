@@ -1,20 +1,18 @@
 import Foundation
+import AppKit
 
 /// Service implementing security operations with sandbox compliance and XPC support
 public final class SecurityService: SecurityServiceProtocol {
     private let logger: LoggerProtocol
     private let xpcService: ResticXPCServiceProtocol
     private var activeBookmarks: [URL: Data] = [:]
-    private let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.SecurityService.bookmarks")
+    private let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.security.bookmarks", attributes: .concurrent)
     
     /// Initialize the security service
     /// - Parameters:
     ///   - logger: Logger for tracking operations
-    ///   - xpcService: XPC service for command execution
-    public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "SecurityService"),
-        xpcService: ResticXPCServiceProtocol
-    ) {
+    ///   - xpcService: XPC service for secure operations
+    public init(logger: LoggerProtocol, xpcService: ResticXPCServiceProtocol) {
         self.logger = logger
         self.xpcService = xpcService
         setupNotifications()
@@ -23,78 +21,155 @@ public final class SecurityService: SecurityServiceProtocol {
     private func setupNotifications() {
         logger.debug("Setting up security notifications")
         
-        let center = DistributedNotificationCenter.default()
-        
-        // Handle security preference changes
-        center.addObserver(forName: .init("com.apple.security.plist.change"), object: nil, queue: nil) { [weak self] _ in
-            guard let self = self else { return }
-            
-            // Sync changes to avoid race conditions
-            self.bookmarkQueue.sync {
-                _ = self.handleSecurityPreferenceChange()
-            }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationWillTerminate(_:)),
+            name: NSApplication.willTerminateNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func applicationWillTerminate(_ notification: Notification) {
+        bookmarkQueue.sync(flags: .barrier) {
+            activeBookmarks.removeAll()
         }
-        
-        logger.debug("Security notifications setup complete")
     }
     
-    private func handleSecurityPreferenceChange() -> Bool {
-        // Handle security preference change logic here
-        return true
-    }
-    
-    /// Safely access active bookmarks
     private func getActiveBookmark(for url: URL) -> Data? {
-        bookmarkQueue.sync { activeBookmarks[url] }
+        bookmarkQueue.sync {
+            activeBookmarks[url]
+        }
     }
     
-    /// Safely store active bookmark
     private func setActiveBookmark(_ bookmark: Data, for url: URL) {
-        bookmarkQueue.sync { activeBookmarks[url] = bookmark }
+        bookmarkQueue.sync(flags: .barrier) {
+            activeBookmarks[url] = bookmark
+        }
     }
     
-    /// Remove active bookmark
     private func removeActiveBookmark(for url: URL) {
         bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
     }
     
-    // MARK: - SecurityServiceProtocol
-    
-    public func validateAccess(to url: URL) async throws -> Bool {
-        logger.debug("Validating access to: \(url.path)")
+    public func requestPermission(for url: URL) async throws -> Bool {
+        self.logger.debug("Requesting permission for: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
         
-        // Check if we have an active bookmark
-        if let bookmark = getActiveBookmark(for: url) {
-            do {
-                var isStale = false
-                let resolvedURL = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
-                
-                if isStale {
-                    logger.debug("Bookmark is stale for: \(url.path)")
-                    removeActiveBookmark(for: url)
-                    return false
-                }
-                
-                if resolvedURL.startAccessingSecurityScopedResource() {
-                    logger.debug("Successfully accessed: \(url.path)")
-                    return true
-                }
-            } catch {
-                logger.error("Failed to resolve bookmark: \(error.localizedDescription)")
-                removeActiveBookmark(for: url)
-            }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = url
+        panel.message = "Please grant access to this location"
+        panel.prompt = "Grant Access"
+        
+        let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow())
+        
+        if response == .OK {
+            self.logger.debug("Permission granted for: \(url.path)",
+                            file: #file,
+                            function: #function,
+                            line: #line)
+            return true
+        } else {
+            self.logger.debug("Permission denied for: \(url.path)",
+                            file: #file,
+                            function: #function,
+                            line: #line)
+            return false
         }
+    }
+    
+    public func createBookmark(for url: URL) throws -> Data {
+        self.logger.debug("Creating bookmark for: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
         
-        return false
+        do {
+            let bookmark = try url.bookmarkData(options: .withSecurityScope,
+                                              includingResourceValuesForKeys: nil,
+                                              relativeTo: nil)
+            return bookmark
+        } catch {
+            throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
+        }
+    }
+    
+    public func resolveBookmark(_ bookmark: Data) throws -> URL {
+        self.logger.debug("Resolving bookmark", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
+        
+        var isStale = false
+        do {
+            let url = try URL(resolvingBookmarkData: bookmark,
+                            options: .withSecurityScope,
+                            relativeTo: nil,
+                            bookmarkDataIsStale: &isStale)
+            
+            if isStale {
+                self.logger.debug("Bookmark is stale", 
+                                file: #file, 
+                                function: #function, 
+                                line: #line)
+                throw SecurityError.bookmarkStale("Bookmark needs to be recreated")
+            }
+            
+            self.logger.debug("Bookmark resolved successfully", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+            return url
+            
+        } catch {
+            self.logger.error("Failed to resolve bookmark: \(error.localizedDescription)", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+            throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
+        }
+    }
+    
+    public func startAccessing(_ url: URL) throws -> Bool {
+        self.logger.debug("Starting access for: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
+        return url.startAccessingSecurityScopedResource()
     }
     
     public func stopAccessing(_ url: URL) async throws {
-        logger.debug("Stopping access to: \(url.path)")
+        self.logger.debug("Stopping access for: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
         url.stopAccessingSecurityScopedResource()
     }
     
+    public func validateAccess(to url: URL) async throws -> Bool {
+        self.logger.debug("Validating access to: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
+        
+        do {
+            let bookmark = try createBookmark(for: url)
+            let resolvedURL = try resolveBookmark(bookmark)
+            return resolvedURL.path == url.path
+        } catch {
+            return false
+        }
+    }
+    
     public func persistAccess(to url: URL) async throws -> Data {
-        logger.debug("Persisting access to: \(url.path)")
+        self.logger.debug("Persisting access to: \(url.path)", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
         
         let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
         setActiveBookmark(bookmark, for: url)
@@ -102,13 +177,19 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     public func validateXPCService() async throws -> Bool {
-        logger.debug("Validating XPC service")
+        self.logger.debug("Validating XPC service", 
+                         file: #file, 
+                         function: #function, 
+                         line: #line)
         
         do {
             return try await xpcService.validate()
         } catch {
-            logger.error("XPC service validation failed: \(error.localizedDescription)")
-            throw SecurityError.xpcServiceUnavailable
+            self.logger.error("XPC service validation failed: \(error.localizedDescription)", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+            throw SecurityError.xpcValidationFailed(error.localizedDescription)
         }
     }
 }

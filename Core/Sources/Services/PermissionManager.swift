@@ -13,16 +13,22 @@ public class PermissionManager {
     private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
     
     public init(
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "PermissionManager"),
-        securityService: SecurityServiceProtocol = SecurityService(
-            logger: LoggerFactory.createLogger(category: "SecurityService"),
-            xpcService: ResticXPCService()
-        ),
-        keychain: KeychainServiceProtocol = KeychainService()
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        keychain: KeychainServiceProtocol
     ) {
         self.logger = logger
         self.securityService = securityService
         self.keychain = keychain
+        
+        do {
+            try keychain.configureXPCSharing(accessGroup: permissionAccessGroup)
+        } catch {
+            self.logger.error("Failed to configure XPC sharing: \(error.localizedDescription)", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+        }
     }
     
     /// Request and persist permission for a URL
@@ -96,7 +102,7 @@ public class PermissionManager {
             }
             
             // Test access
-            guard securityService.startAccessing(resolvedURL) else {
+            guard try await securityService.startAccessing(resolvedURL) else {
                 logger.error("Failed to access resolved URL: \(resolvedURL.path)",
                            file: #file,
                            function: #function,
@@ -104,7 +110,7 @@ public class PermissionManager {
                 try removeBookmark(for: url)
                 return false
             }
-            securityService.stopAccessing(resolvedURL)
+            try await securityService.stopAccessing(resolvedURL)
             
             logger.info("Successfully recovered permission for: \(url.path)",
                        file: #file,

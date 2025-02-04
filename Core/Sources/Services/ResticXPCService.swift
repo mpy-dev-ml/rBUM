@@ -1,13 +1,22 @@
 import Foundation
+import XPC
 
 /// Service for managing Restic operations through XPC
 public final class ResticXPCService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable {
+    public func executeCommand(_ command: String) async throws -> ProcessResult {
+        guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
+            throw ResticError.xpcConnectionFailed
+        }
+        
+        return try await proxy.executeCommand(command, withBookmark: nil)
+    }
+    
     // MARK: - Properties
     private let xpcConnection: NSXPCConnection
     private let commandQueue: DispatchQueue
     
     public var isHealthy: Bool {
-        xpcConnection.isValid
+        xpcConnection.connection != nil
     }
     
     // MARK: - Initialization

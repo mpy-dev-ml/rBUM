@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// Service for monitoring sandbox compliance and resource access
 public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol, HealthCheckable {
@@ -16,6 +17,7 @@ public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol,
     private struct ResourceAccess {
         let startTime: Date
         let maxDuration: TimeInterval
+        var continuation: AsyncStream<SandboxAccessEvent>.Continuation?
         
         var hasExceededMaxDuration: Bool {
             Date().timeIntervalSince(startTime) > maxDuration
@@ -23,51 +25,75 @@ public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol,
     }
     
     // MARK: - Initialization
-    public init(
-        logger: LoggerProtocol,
-        securityService: SecurityServiceProtocol,
-        maxResourceAccessDuration: TimeInterval = 300 // 5 minutes default
-    ) {
+    public init(maxResourceAccessDuration: TimeInterval = 3600) {
+        self.monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandbox.monitor", attributes: .concurrent)
         self.maxResourceAccessDuration = maxResourceAccessDuration
-        self.monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandboxMonitor", attributes: .concurrent)
-        super.init(logger: logger, securityService: securityService)
-        
-        // Start periodic health check
-        startPeriodicHealthCheck()
+        super.init(logger: LoggerFactory.createLogger(category: "SandboxMonitor"))
+        setupNotifications()
     }
     
     // MARK: - SandboxMonitorProtocol Implementation
-    public func trackResourceAccess(to url: URL) {
-        monitorQueue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
-            self.activeResources[url] = ResourceAccess(
-                startTime: Date(),
-                maxDuration: self.maxResourceAccessDuration
-            )
-            self.logger.debug("Started tracking resource access to \(url.path)")
-        }
-    }
-    
-    public func stopTrackingResource(_ url: URL) {
-        monitorQueue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
-            self.activeResources.removeValue(forKey: url)
-            self.logger.debug("Stopped tracking resource access to \(url.path)")
-        }
-    }
-    
-    public func checkResourceAccess(_ url: URL) -> Bool {
-        monitorQueue.sync {
-            guard let access = activeResources[url] else {
-                return false
+    public func monitorAccess(for url: URL) -> AsyncStream<SandboxAccessEvent> {
+        AsyncStream { continuation in
+            monitorQueue.async(flags: .barrier) { [weak self] in
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+                
+                let access = ResourceAccess(
+                    startTime: Date(),
+                    maxDuration: self.maxResourceAccessDuration,
+                    continuation: continuation
+                )
+                
+                self.activeResources[url] = access
+                
+                // Initial access check
+                if url.startAccessingSecurityScopedResource() {
+                    continuation.yield(.accessGranted)
+                } else {
+                    continuation.yield(.accessDenied)
+                }
             }
-            return !access.hasExceededMaxDuration
         }
     }
     
-    public func listActiveResources() -> [URL] {
+    public func stopMonitoring(for url: URL) {
+        monitorQueue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            
+            if let access = self.activeResources[url] {
+                access.continuation?.finish()
+                url.stopAccessingSecurityScopedResource()
+                self.activeResources.removeValue(forKey: url)
+            }
+        }
+    }
+    
+    public func isMonitoring(url: URL) -> Bool {
         monitorQueue.sync {
-            Array(activeResources.keys)
+            activeResources.keys.contains(url)
+        }
+    }
+    
+    // MARK: - Private Methods
+    private func setupNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationWillTerminate(_:)),
+            name: NSApplication.willTerminateNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func applicationWillTerminate(_ notification: Notification) {
+        monitorQueue.sync(flags: .barrier) {
+            for (url, access) in activeResources {
+                access.continuation?.finish()
+                url.stopAccessingSecurityScopedResource()
+            }
+            activeResources.removeAll()
         }
     }
     
@@ -90,26 +116,14 @@ public final class SandboxMonitor: BaseSandboxedService, SandboxMonitorProtocol,
             return true
         }
     }
-    
-    // MARK: - Private Helpers
-    private func startPeriodicHealthCheck() {
-        Task {
-            while !Task.isCancelled {
-                if !await performHealthCheck() {
-                    // Clean up overextended resources
-                    monitorQueue.async(flags: .barrier) { [weak self] in
-                        guard let self = self else { return }
-                        let overextended = self.activeResources.filter { $0.value.hasExceededMaxDuration }
-                        for (url, _) in overextended {
-                            self.activeResources.removeValue(forKey: url)
-                            self.logger.warning("Automatically removed overextended resource access: \(url.path)")
-                        }
-                    }
-                }
-                try? await Task.sleep(nanoseconds: UInt64(60 * 1_000_000_000)) // Check every minute
-            }
-        }
-    }
+}
+
+// MARK: - SandboxAccessEvent Definition
+public enum SandboxAccessEvent {
+    case accessGranted
+    case accessDenied
+    case accessRevoked
+    case accessExpired
 }
 
 // MARK: - Sandbox Monitor Errors
