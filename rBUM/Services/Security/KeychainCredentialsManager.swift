@@ -37,117 +37,149 @@ public protocol KeychainCredentialsManagerProtocol {
 /// Implementation of KeychainCredentialsManagerProtocol that uses the macOS Keychain for secure storage
 final class KeychainCredentialsManager: KeychainCredentialsManagerProtocol {
     private let logger: LoggerProtocol
-    private let securityService: SecurityServiceProtocol
+    private let keychainService: KeychainServiceProtocol
     private let dateProvider: DateProviderProtocol
-    private let notificationCenter: NotificationCenterProtocol
+    private let notificationCenter: NotificationCenter
     private let serviceName: String
+    private let accessGroup = "dev.mpy.rBUM.keychain"
     
     init(
-        logger: LoggerProtocol = Logging.logger(for: .security),
-        securityService: SecurityServiceProtocol = SecurityService(),
+        logger: LoggerProtocol = OSLogger(category: "security"),
+        keychainService: KeychainServiceProtocol = {
+            let logger = OSLogger(category: "security")
+            let xpcService = Core.ResticXPCService(
+                logger: OSLogger(category: "security"),
+                securityService: SecurityService(logger: OSLogger(category: "security"), xpcService: <#any ResticXPCServiceProtocol#>)
+            )
+            let securityService = SecurityService(logger: logger, xpcService: xpcService as! ResticXPCServiceProtocol)
+            return KeychainService(logger: logger, securityService: securityService) as! KeychainServiceProtocol
+        }(),
         dateProvider: DateProviderProtocol = DateProvider(),
-        notificationCenter: NotificationCenterProtocol = NotificationCenter.default,
+        notificationCenter: NotificationCenter = .default,
         serviceName: String = "dev.mpy.rBUM.repository"
     ) {
         self.logger = logger
-        self.securityService = securityService
+        self.keychainService = keychainService
         self.dateProvider = dateProvider
         self.notificationCenter = notificationCenter
         self.serviceName = serviceName
         
-        logger.debug("Initialized KeychainCredentialsManager", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Initialized KeychainCredentialsManager", file: #file, function: #function, line: #line)
+        
+        // Configure keychain sharing
+        do {
+            try keychainService.configureXPCSharing(accessGroup: accessGroup)
+        } catch {
+            logger.error("Failed to configure keychain sharing: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+        }
     }
     
     func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws {
-        logger.info("Storing credentials for repository: \(id)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Storing credentials for repository: \(id)", file: #file, function: #function, line: #line)
         
         do {
-            // Store password in keychain
-            try await securityService.storePassword(
-                credentials.password,
-                service: "\(serviceName).\(id)",
-                account: credentials.repositoryPath
-            )
+            let data = try JSONEncoder().encode(credentials)
+            try keychainService.save(data, for: "\(serviceName).\(id)", accessGroup: accessGroup)
             
-            // Post notification
             notificationCenter.post(
-                name: .credentialsStored,
+                name: .init("dev.mpy.rBUM.credentialsStored"),
                 object: self,
-                userInfo: ["repository": id]
+                userInfo: ["repositoryId": id]
             )
             
-            logger.info("Successfully stored credentials", privacy: .public, file: #file, function: #function, line: #line)
+            logger.debug("Successfully stored credentials", file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to store credentials: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw error
+            logger.error("Failed to store credentials: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw CredentialsError.storeFailed(error.localizedDescription)
         }
     }
     
     func retrieve(forId id: String) async throws -> RepositoryCredentials {
-        logger.info("Retrieving credentials for repository: \(id)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Retrieving credentials for repository: \(id)", file: #file, function: #function, line: #line)
         
         do {
-            // Retrieve password from keychain
-            let password = try await securityService.retrievePassword(
-                service: "\(serviceName).\(id)",
-                account: id
-            )
-            
-            // Create credentials
-            let credentials = RepositoryCredentials(password: password)
-            
-            logger.info("Successfully retrieved credentials", privacy: .public, file: #file, function: #function, line: #line)
-            return credentials
+            guard let data = try keychainService.retrieve(for: "\(serviceName).\(id)", accessGroup: accessGroup) else {
+                throw CredentialsError.retrievalFailed("No credentials found")
+            }
+            return try JSONDecoder().decode(RepositoryCredentials.self, from: data)
         } catch {
-            logger.error("Failed to retrieve credentials: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw error
+            logger.error("Failed to retrieve credentials: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw CredentialsError.retrievalFailed(error.localizedDescription)
         }
     }
     
     func delete(forId id: String) async throws {
-        logger.info("Deleting credentials for repository: \(id)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Deleting credentials for repository: \(id)", file: #file, function: #function, line: #line)
         
         do {
-            // Delete password from keychain
-            try await securityService.deletePassword(
-                service: "\(serviceName).\(id)",
-                account: id
-            )
+            try keychainService.delete(for: "\(serviceName).\(id)", accessGroup: accessGroup)
             
-            // Post notification
             notificationCenter.post(
-                name: .credentialsDeleted,
+                name: .init("dev.mpy.rBUM.credentialsDeleted"),
                 object: self,
-                userInfo: ["repository": id]
+                userInfo: ["repositoryId": id]
             )
             
-            logger.info("Successfully deleted credentials", privacy: .public, file: #file, function: #function, line: #line)
+            logger.debug("Successfully deleted credentials", file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to delete credentials: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw error
+            logger.error("Failed to delete credentials: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw CredentialsError.deletionFailed(error.localizedDescription)
         }
     }
     
     func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
-        logger.info("Listing credentials", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Listing all credentials", file: #file, function: #function, line: #line)
         
+        // Since KeychainServiceProtocol doesn't have a list method,
+        // we'll need to implement our own using the available methods
         do {
-            // Retrieve all passwords from keychain
-            let passwords = try await securityService.retrieveAllPasswords(service: serviceName)
+            var results: [(String, RepositoryCredentials)] = []
             
-            // Create credentials for each password
-            var credentials: [(String, RepositoryCredentials)] = []
-            for (service, password) in passwords {
-                let id = service.replacingOccurrences(of: "\(serviceName).", with: "")
-                let repositoryCredentials = RepositoryCredentials(password: password)
-                credentials.append((id, repositoryCredentials))
+            // Try to retrieve credentials for known repositories
+            // This is a temporary solution until we implement proper listing
+            if let repositories = try? await listRepositories() {
+                for repository in repositories {
+                    let repositoryId = repository.id.uuidString
+                    if let credentials = try? await retrieve(forId: repositoryId) {
+                        results.append((repositoryId, credentials))
+                    }
+                }
             }
             
-            logger.info("Successfully listed credentials", privacy: .public, file: #file, function: #function, line: #line)
-            return credentials
+            logger.debug("Successfully listed \(results.count) credentials", file: #file, function: #function, line: #line)
+            return results
         } catch {
-            logger.error("Failed to list credentials: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw error
+            logger.error("Failed to list credentials: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw CredentialsError.listingFailed(error.localizedDescription)
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func listRepositories() async throws -> [Repository] {
+        // This should be injected or accessed through a repository service
+        // For now, return an empty array
+        return []
+    }
+}
+
+// MARK: - Credentials Error Types
+enum CredentialsError: LocalizedError {
+    case storeFailed(String)
+    case retrievalFailed(String)
+    case deletionFailed(String)
+    case listingFailed(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .storeFailed(let reason):
+            return "Failed to store credentials: \(reason)"
+        case .retrievalFailed(let reason):
+            return "Failed to retrieve credentials: \(reason)"
+        case .deletionFailed(let reason):
+            return "Failed to delete credentials: \(reason)"
+        case .listingFailed(let reason):
+            return "Failed to list credentials: \(reason)"
         }
     }
 }

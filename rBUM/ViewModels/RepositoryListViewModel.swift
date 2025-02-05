@@ -21,7 +21,7 @@ final class RepositoryListViewModel: ObservableObject {
     
     // MARK: - Private Properties
     
-    private let repositoryService: RepositoryServiceProtocol
+    private let repositoryService: Core.RepositoryServiceProtocol
     private let credentialsService: CredentialsServiceProtocol
     private let bookmarkService: BookmarkServiceProtocol
     private let securityService: SecurityServiceProtocol
@@ -31,7 +31,7 @@ final class RepositoryListViewModel: ObservableObject {
     
     convenience init() {
         self.init(
-            repositoryService: RepositoryService(),
+            repositoryService: Core.RepositoryService(),
             credentialsService: CredentialsService(),
             bookmarkService: BookmarkService(),
             securityService: SecurityService(),
@@ -40,7 +40,7 @@ final class RepositoryListViewModel: ObservableObject {
     }
     
     init(
-        repositoryService: RepositoryServiceProtocol,
+        repositoryService: Core.RepositoryServiceProtocol,
         credentialsService: CredentialsServiceProtocol,
         bookmarkService: BookmarkServiceProtocol,
         securityService: SecurityServiceProtocol,

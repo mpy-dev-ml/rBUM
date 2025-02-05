@@ -9,7 +9,7 @@ import Foundation
 import Core
 
 /// Service for managing restore operations
-public final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
+final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol

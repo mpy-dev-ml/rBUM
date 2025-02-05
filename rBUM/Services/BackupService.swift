@@ -10,66 +10,24 @@ import Core
 
 /// Service for managing backup operations
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable {
-    public func listSnapshots(in repository: Core.Repository) async throws -> [Core.ResticSnapshot] {
-        <#code#>
-    }
-    
-    public func restore(snapshot: Core.ResticSnapshot, from repository: Core.Repository, paths: [String], to target: String) async throws {
-        <#code#>
-    }
-    
-    public func isEqual(_ object: Any?) -> Bool {
-        <#code#>
-    }
-    
-    public var hash: Int
-    
-    public var superclass: AnyClass?
-    
-    public func `self`() -> Self {
-        <#code#>
-    }
-    
-    public func perform(_ aSelector: Selector!) -> Unmanaged<AnyObject>! {
-        <#code#>
-    }
-    
-    public func perform(_ aSelector: Selector!, with object: Any!) -> Unmanaged<AnyObject>! {
-        <#code#>
-    }
-    
-    public func perform(_ aSelector: Selector!, with object1: Any!, with object2: Any!) -> Unmanaged<AnyObject>! {
-        <#code#>
-    }
-    
-    public func isProxy() -> Bool {
-        <#code#>
-    }
-    
-    public func isKind(of aClass: AnyClass) -> Bool {
-        <#code#>
-    }
-    
-    public func isMember(of aClass: AnyClass) -> Bool {
-        <#code#>
-    }
-    
-    public func conforms(to aProtocol: Protocol) -> Bool {
-        <#code#>
-    }
-    
-    public func responds(to aSelector: Selector!) -> Bool {
-        <#code#>
-    }
-    
-    public var description: String
-    
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
-    private let keychainService: KeychainServiceProtocol
+    private let keychainService: KeychainService
     private let operationQueue: OperationQueue
     private var activeBackups: Set<UUID> = []
     private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.backupService", attributes: .concurrent)
+    
+    public override var hash: Int {
+        var hasher = Hasher()
+        hasher.combine(ObjectIdentifier(resticService))
+        hasher.combine(ObjectIdentifier(keychainService))
+        hasher.combine(activeBackups)
+        return hasher.finalize()
+    }
+    
+    public override var description: String {
+        return "BackupService(activeBackups: \(activeBackups.count))"
+    }
     
     public var isHealthy: Bool {
         // Check if we have any stuck backups
@@ -79,58 +37,36 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     }
     
     // MARK: - Initialization
-    public init(
-        logger: LoggerProtocol,
-        securityService: SecurityServiceProtocol,
-        resticService: ResticServiceProtocol,
-        keychainService: KeychainServiceProtocol
-    ) {
+    public init(resticService: ResticServiceProtocol, keychainService: KeychainService) {
         self.resticService = resticService
         self.keychainService = keychainService
-        
         self.operationQueue = OperationQueue()
-        self.operationQueue.name = "dev.mpy.rBUM.backupQueue"
         self.operationQueue.maxConcurrentOperationCount = 1
-        
-        super.init(logger: logger, securityService: securityService)
+        super.init(logger: <#any LoggerProtocol#>, securityService: <#any SecurityServiceProtocol#>)
     }
     
     // MARK: - BackupServiceProtocol Implementation
     public func initializeRepository(_ repository: Repository) async throws {
         try await measure("Initialize Repository") {
             try await resticService.initializeRepository(at: URL(fileURLWithPath: repository.path))
-            
-            logger.info("Repository initialized at \(repository.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
         }
     }
     
     public func createBackup(to repository: Repository, paths: [String], tags: [String]?) async throws {
-        try await measure("Create Backup") {
-            // Track backup operation
-            let operationId = UUID()
+        let backupId = UUID()
+        accessQueue.async(flags: .barrier) {
+            self.activeBackups.insert(backupId)
+        }
+        
+        defer {
             accessQueue.async(flags: .barrier) {
-                self.activeBackups.insert(operationId)
+                self.activeBackups.remove(backupId)
             }
-            
-            defer {
-                accessQueue.async(flags: .barrier) {
-                    self.activeBackups.remove(operationId)
-                }
-            }
-            
-            // Create backup
+        }
+        
+        try await measure("Create Backup") {
             for path in paths {
-                guard let url = URL(string: path) else {
-                    logger.error("Invalid path: \(path)",
-                               file: #file,
-                               function: #function,
-                               line: #line)
-                    throw BackupError.invalidPath(path)
-                }
-                
+                let url = URL(fileURLWithPath: path)
                 try await resticService.backup(
                     from: url,
                     to: URL(fileURLWithPath: repository.path)
@@ -139,18 +75,27 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         }
     }
     
-    public func listSnapshots(in repository: Repository) async throws -> [Snapshot] {
+    public func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         try await measure("List Snapshots") {
             let snapshotIds = try await resticService.listSnapshots()
             
             return snapshotIds.map { id in
-                Snapshot(
+                ResticSnapshot(
                     id: id,
                     time: Date(),
-                    repository: repository,
-                    tags: nil
+                    hostname: Host.current().localizedName ?? "Unknown",
+                    tags: nil, paths: []
                 )
             }
+        }
+    }
+    
+    public func restore(snapshot: ResticSnapshot, from repository: Repository, paths: [String], to target: String) async throws {
+        try await measure("Restore Snapshot") {
+            try await resticService.restore(
+                from: URL(fileURLWithPath: repository.path),
+                to: URL(fileURLWithPath: target)
+            )
         }
     }
     
@@ -160,12 +105,11 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
             do {
                 // Check dependencies
                 let resticHealthy = await resticService.performHealthCheck()
-                let keychainHealthy = await keychainService.performHealthCheck()
                 
                 // Check active operations
-                let operationsHealthy = isHealthy
+                let noStuckBackups = accessQueue.sync { activeBackups.isEmpty }
                 
-                return resticHealthy && keychainHealthy && operationsHealthy
+                return resticHealthy && noStuckBackups
             } catch {
                 logger.error("Health check failed: \(error.localizedDescription)",
                            file: #file,
@@ -180,17 +124,20 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
 // MARK: - Backup Errors
 public enum BackupError: LocalizedError {
     case invalidRepository
-    case invalidPath(String)
-    case backupFailed(Error)
+    case backupFailed
+    case restoreFailed
+    case snapshotListFailed
     
     public var errorDescription: String? {
         switch self {
         case .invalidRepository:
             return "Invalid repository configuration"
-        case .invalidPath(let path):
-            return "Invalid path: \(path)"
-        case .backupFailed(let error):
-            return "Backup failed: \(error.localizedDescription)"
+        case .backupFailed:
+            return "Failed to create backup"
+        case .restoreFailed:
+            return "Failed to restore from snapshot"
+        case .snapshotListFailed:
+            return "Failed to list snapshots"
         }
     }
 }

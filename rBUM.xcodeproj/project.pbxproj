@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8D36157C2D53E2810008675E /* StorageServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */; };
+		8D36157E2D53E4F40008675E /* RestoreServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */; };
 		8D3E9FF62D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0012D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0022D5122C600C21FE0 /* Core.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -151,6 +153,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageServiceProtocol.swift; sourceTree = "<group>"; };
+		8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreServiceProtocol.swift; sourceTree = "<group>"; };
 		8D3E9DD92D51219800C21FE0 /* rBUM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = rBUM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DEA2D51219900C21FE0 /* rBUMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DF42D51219900C21FE0 /* rBUMUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -417,6 +421,8 @@
 		8D4142732D52355F00FBF58A /* Protocols */ = {
 			isa = PBXGroup;
 			children = (
+				8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */,
+				8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */,
 				8DEB6ABA2D52D60900DE8CDE /* BookmarkServiceProtocol.swift */,
 				8DEB6AB82D52BDA200DE8CDE /* SandboxMonitorProtocol.swift */,
 				8DEB6AB42D52B66E00DE8CDE /* Measurable.swift */,
@@ -847,6 +853,7 @@
 				8D4142992D52355F00FBF58A /* FileManagerProtocol.swift in Sources */,
 				8D41429A2D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift in Sources */,
 				8D41429B2D52355F00FBF58A /* KeychainServiceProtocol.swift in Sources */,
+				8D36157E2D53E4F40008675E /* RestoreServiceProtocol.swift in Sources */,
 				8DEB6AA92D52938700DE8CDE /* DummyXPCService.swift in Sources */,
 				8DEB6AA32D5292CF00DE8CDE /* BaseService.swift in Sources */,
 				8D41429D2D52355F00FBF58A /* NotificationCenterProtocol.swift in Sources */,
@@ -869,6 +876,7 @@
 				8DEB6A962D528DFE00DE8CDE /* SandboxCompliant.swift in Sources */,
 				8DB70A162D53901D00F71C4B /* ResticXPCError.swift in Sources */,
 				8D3F8DA22D524700007E239E /* SecurityService.swift in Sources */,
+				8D36157C2D53E2810008675E /* StorageServiceProtocol.swift in Sources */,
 				8D3F8DA32D524700007E239E /* SandboxMonitor.swift in Sources */,
 				8DEB6AAB2D52939D00DE8CDE /* ServiceLifecycle.swift in Sources */,
 				8D3F8D8F2D5246A3007E239E /* RepositoryStatus.swift in Sources */,

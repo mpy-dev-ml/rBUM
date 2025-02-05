@@ -9,19 +9,19 @@ import Foundation
 import Core
 
 /// Protocol for managing configuration storage
-public protocol ConfigurationStorageProtocol {
+protocol ConfigurationStorageProtocol {
     /// Load the current configuration
     /// - Returns: The current configuration
-    /// - Throws: ConfigurationError if loading fails
+    /// - Throws: StorageError if loading fails
     func load() throws -> Configuration
     
     /// Save the configuration
     /// - Parameter configuration: The configuration to save
-    /// - Throws: ConfigurationError if saving fails
+    /// - Throws: StorageError if saving fails
     func save(_ configuration: Configuration) throws
     
     /// Reset configuration to default values
-    /// - Throws: ConfigurationError if reset fails
+    /// - Throws: StorageError if reset fails
     func reset() throws
 }
 
@@ -40,102 +40,133 @@ enum ConfigurationStorageError: LocalizedError, Equatable {
     }
 }
 
+/// Error types for storage service operations
+enum StorageError: LocalizedError, Equatable {
+    case fileOperationFailed(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .fileOperationFailed(let operation):
+            return "Failed to \(operation) data"
+        }
+    }
+}
+
 /// FileSystem-based implementation of ConfigurationStorageProtocol
-public final class ConfigurationStorage: ConfigurationStorageProtocol {
+final class ConfigurationStorage: ConfigurationStorageProtocol, StorageServiceProtocol {
     // MARK: - Properties
     
     private let fileManager: FileManagerProtocol
     private let logger: LoggerProtocol
+    private let securityService: SecurityServiceProtocol
+    private let dateProvider: DateProviderProtocol
+    private let notificationCenter: NotificationCenter
     private let configURL: URL
     
     // MARK: - Initialization
     
-    /// Initialises a new ConfigurationStorage instance
-    /// - Parameters:
-    ///   - fileManager: FileManager to use for file operations
-    ///   - logger: Logger for recording operations
-    /// - Throws: ConfigurationError if setup fails
-    public init(
-        fileManager: FileManagerProtocol = DefaultFileManager(),
-        logger: LoggerProtocol = Logging.logger(for: .configuration)
+    init(
+        fileManager: FileManagerProtocol = FileManager.default,
+        logger: LoggerProtocol = OSLogger(category: "configuration"),
+        securityService: SecurityServiceProtocol = SecurityService(logger: OSLogger(category: "configuration")),
+        dateProvider: DateProviderProtocol = DateProvider(),
+        notificationCenter: NotificationCenter = .default
     ) throws {
         self.fileManager = fileManager
         self.logger = logger
+        self.securityService = securityService
+        self.dateProvider = dateProvider
+        self.notificationCenter = notificationCenter
         
         // Get application support directory
-        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            logger.error("Could not access application support directory", privacy: .public, file: #file, function: #function, line: #line)
-            throw ConfigurationError.accessDenied
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logger.error("Failed to get application support directory", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to get application support directory")
         }
         
-        // Create config directory if needed
-        let configDir = appSupport.appendingPathComponent("Configuration", isDirectory: true)
-        if !fileManager.directoryExists(atPath: configDir.path) {
-            do {
-                try fileManager.createDirectory(
-                    atPath: configDir.path,
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
-            } catch {
-                logger.error("Failed to create configuration directory: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-                throw ConfigurationError.saveFailed("Could not create configuration directory")
-            }
-        }
+        // Create configuration directory
+        let configDir = appSupport.appendingPathComponent("dev.mpy.rBUM/Configuration", isDirectory: true)
+        try FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
         
+        // Set config file URL
         self.configURL = configDir.appendingPathComponent("config.json")
-        logger.debug("Configuration file path: \(configURL.path)", privacy: .public, file: #file, function: #function, line: #line)
+        
+        logger.debug("Configuration storage initialized at \(configURL.path)", file: #file, function: #function, line: #line)
     }
     
     // MARK: - ConfigurationStorageProtocol Implementation
     
-    public func load() throws -> Configuration {
-        logger.debug("Loading configuration", privacy: .public, file: #file, function: #function, line: #line)
-        
-        if !fileManager.fileExists(atPath: configURL.path) {
-            logger.info("Configuration file not found, using defaults", privacy: .public, file: #file, function: #function, line: #line)
-            return .default
-        }
+    func load() throws -> Configuration {
+        logger.debug("Loading configuration", file: #file, function: #function, line: #line)
         
         do {
             let data = try Data(contentsOf: configURL)
-            let decoder = JSONDecoder()
-            let config = try decoder.decode(Configuration.self, from: data)
-            logger.info("Successfully loaded configuration", privacy: .public, file: #file, function: #function, line: #line)
-            return config
+            return try JSONDecoder().decode(Configuration.self, from: data)
         } catch {
-            logger.error("Failed to load configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw ConfigurationError.loadFailed(error.localizedDescription)
+            logger.error("Failed to load configuration: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to load configuration")
         }
     }
     
-    public func save(_ configuration: Configuration) throws {
-        logger.debug("Saving configuration", privacy: .public, file: #file, function: #function, line: #line)
+    func save(_ configuration: Configuration) throws {
+        logger.debug("Saving configuration", file: #file, function: #function, line: #line)
         
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .prettyPrinted
-            let data = try encoder.encode(configuration)
+            let data = try JSONEncoder().encode(configuration)
             try data.write(to: configURL, options: .atomic)
-            logger.info("Successfully saved configuration", privacy: .public, file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to save configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw ConfigurationError.saveFailed(error.localizedDescription)
+            logger.error("Failed to save configuration: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to save configuration")
         }
     }
     
-    public func reset() throws {
-        logger.debug("Resetting configuration", privacy: .public, file: #file, function: #function, line: #line)
+    func reset() throws {
+        logger.debug("Resetting configuration", file: #file, function: #function, line: #line)
         
         do {
-            if fileManager.fileExists(atPath: configURL.path) {
-                try fileManager.removeItem(atPath: configURL.path)
+            if FileManager.default.fileExists(atPath: configURL.path) {
+                try FileManager.default.removeItem(at: configURL)
             }
-            try save(.default)
-            logger.info("Successfully reset configuration", privacy: .public, file: #file, function: #function, line: #line)
+            
+            logger.debug("Successfully reset configuration", file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to reset configuration: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
-            throw ConfigurationError.resetFailed(error.localizedDescription)
+            logger.error("Failed to reset configuration: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to reset configuration")
+        }
+    }
+    
+    // MARK: - StorageServiceProtocol Implementation
+    
+    func save(_ data: Data, forKey key: String) throws {
+        logger.debug("Saving data for key: \(key)", file: #file, function: #function, line: #line)
+        
+        do {
+            try data.write(to: configURL, options: .atomic)
+        } catch {
+            logger.error("Failed to save data: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to save data")
+        }
+    }
+    
+    func load(forKey key: String) throws -> Data {
+        logger.debug("Loading data for key: \(key)", file: #file, function: #function, line: #line)
+        
+        do {
+            return try Data(contentsOf: configURL)
+        } catch {
+            logger.error("Failed to load data: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to load data")
+        }
+    }
+    
+    func delete(forKey key: String) throws {
+        logger.debug("Deleting data for key: \(key)", file: #file, function: #function, line: #line)
+        
+        do {
+            try FileManager.default.removeItem(at: configURL)
+        } catch {
+            logger.error("Failed to delete data: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw StorageError.fileOperationFailed("Failed to delete data")
         }
     }
 }
