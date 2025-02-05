@@ -2,53 +2,60 @@ import Foundation
 
 /// Protocol defining the XPC interface for Restic operations
 @objc public protocol ResticXPCProtocol {
-    /// Execute a Restic command
+    /// Current interface version
+    static var interfaceVersion: Int { get }
+    
+    /// Validate interface version and security requirements
+    /// - Parameter completion: Completion handler with validation result and interface version
+    func validateInterface(completion: @escaping ([String: Any]?) -> Void)
+    
+    /// Execute a command through XPC
     /// - Parameters:
-    ///   - command: The command to execute
-    ///   - bookmark: Optional security-scoped bookmark for file access
-    /// - Returns: Result of the command execution
-    /// - Throws: SecurityError if execution fails
-    @objc func executeCommand(_ command: String, withBookmark bookmark: Data?) async throws -> ProcessResult
+    ///   - command: Command to execute
+    ///   - arguments: Command arguments
+    ///   - environment: Environment variables
+    ///   - workingDirectory: Working directory
+    ///   - bookmarks: Security-scoped bookmarks for file access
+    ///   - timeout: Timeout in seconds
+    ///   - auditSessionId: Audit session identifier for security validation
+    ///   - completion: Completion handler with result
+    func executeCommand(_ command: String,
+                       arguments: [String],
+                       environment: [String: String],
+                       workingDirectory: String,
+                       bookmarks: [String: NSData],
+                       timeout: TimeInterval,
+                       auditSessionId: au_asid_t,
+                       completion: @escaping ([String: Any]?) -> Void)
     
-    /// Initialize a Restic repository
+    /// Ping the XPC service with security validation
     /// - Parameters:
-    ///   - repository: URL of the repository to initialize
-    ///   - password: Repository password
-    /// - Throws: SecurityError if initialization fails
-    @objc func initialize(repository: URL, password: String) async throws
+    ///   - auditSessionId: Audit session identifier for security validation
+    ///   - completion: Completion handler with validation result
+    func ping(auditSessionId: au_asid_t, completion: @escaping (Bool) -> Void)
     
-    /// Backup files to a Restic repository
+    /// Validate access permissions with enhanced security
     /// - Parameters:
-    ///   - source: Source directory to backup
-    ///   - repository: Target repository URL
-    /// - Throws: SecurityError if backup fails
-    @objc func backup(source: URL, repository: URL) async throws
+    ///   - bookmarks: Security-scoped bookmarks for validation
+    ///   - auditSessionId: Audit session identifier for security validation
+    ///   - completion: Completion handler with validation result
+    func validateAccess(bookmarks: [String: NSData],
+                       auditSessionId: au_asid_t,
+                       completion: @escaping ([String: Any]?) -> Void)
+}
+
+/// Error domain and codes for ResticXPC operations
+public enum ResticXPCErrorDomain {
+    public static let name = "dev.mpy.rBUM.ResticXPC"
     
-    /// Restore files from a Restic repository
-    /// - Parameters:
-    ///   - repository: Source repository URL
-    ///   - snapshot: Snapshot ID to restore from
-    ///   - destination: Destination directory
-    /// - Throws: SecurityError if restore fails
-    @objc func restore(repository: URL, snapshot: String, destination: URL) async throws
-    
-    /// List snapshots in a repository
-    /// - Parameter repository: Repository URL
-    /// - Returns: Array of snapshots
-    /// - Throws: SecurityError if listing fails
-    @objc func listSnapshots(repository: URL) async throws -> NSArray
-    
-    /// Get the current connection state
-    /// - Returns: true if the connection is active and ready
-    /// - Throws: SecurityError if state check fails
-    @objc func getConnectionState() async throws -> Bool
-    
-    /// Validate permissions and access
-    /// - Returns: true if all permissions are valid
-    /// - Throws: SecurityError if validation fails
-    @objc func validatePermissions() async throws -> Bool
-    
-    /// Health check ping
-    /// - Throws: If the service is not responding
-    @objc func ping() async throws
+    public enum Code: Int {
+        case interfaceVersionMismatch = 1000
+        case securityValidationFailed = 1001
+        case auditSessionInvalid = 1002
+        case bookmarkValidationFailed = 1003
+        case serviceUnavailable = 1004
+        case commandExecutionFailed = 1005
+        case timeoutExceeded = 1006
+        case accessDenied = 1007
+    }
 }

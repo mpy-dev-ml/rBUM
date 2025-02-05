@@ -18,10 +18,10 @@
     <dict>
         <key>ServiceType</key>
         <string>Application</string>
+        <key>RunLoopType</key>
+        <string>NSRunLoop</string>
         <key>JoinExistingSession</key>
         <true/>
     </dict>
-    <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2025 MPY. All rights reserved.</string>
 </dict>
 </plist>

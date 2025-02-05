@@ -10,6 +10,60 @@ import Core
 
 /// Service for managing backup operations
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable {
+    public func listSnapshots(in repository: Core.Repository) async throws -> [Core.ResticSnapshot] {
+        <#code#>
+    }
+    
+    public func restore(snapshot: Core.ResticSnapshot, from repository: Core.Repository, paths: [String], to target: String) async throws {
+        <#code#>
+    }
+    
+    public func isEqual(_ object: Any?) -> Bool {
+        <#code#>
+    }
+    
+    public var hash: Int
+    
+    public var superclass: AnyClass?
+    
+    public func `self`() -> Self {
+        <#code#>
+    }
+    
+    public func perform(_ aSelector: Selector!) -> Unmanaged<AnyObject>! {
+        <#code#>
+    }
+    
+    public func perform(_ aSelector: Selector!, with object: Any!) -> Unmanaged<AnyObject>! {
+        <#code#>
+    }
+    
+    public func perform(_ aSelector: Selector!, with object1: Any!, with object2: Any!) -> Unmanaged<AnyObject>! {
+        <#code#>
+    }
+    
+    public func isProxy() -> Bool {
+        <#code#>
+    }
+    
+    public func isKind(of aClass: AnyClass) -> Bool {
+        <#code#>
+    }
+    
+    public func isMember(of aClass: AnyClass) -> Bool {
+        <#code#>
+    }
+    
+    public func conforms(to aProtocol: Protocol) -> Bool {
+        <#code#>
+    }
+    
+    public func responds(to aSelector: Selector!) -> Bool {
+        <#code#>
+    }
+    
+    public var description: String
+    
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol

@@ -5,28 +5,21 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-
-//
-//  HealthCheckable.swift
-//  Core
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
-/// Protocol for services that can report their health status
+/// Protocol for services that need health check capabilities
 public protocol HealthCheckable {
-    /// Check if the service is healthy and functioning properly
-    /// - Returns: true if the service is healthy, false otherwise
-    func isHealthy() -> Bool
+    /// Check if the service is healthy
+    var isHealthy: Bool { get }
+    
+    /// Perform a health check
+    /// - Returns: true if healthy, false otherwise
+    func performHealthCheck() async -> Bool
 }
 
-/// Default implementation for health checking
-public extension HealthCheckable where Self: LoggingService {
-    func isHealthy() -> Bool {
-        // Default implementation assumes the service is healthy
-        // Override this in concrete implementations to provide specific health checks
-        return true
+/// Default implementation
+public extension HealthCheckable {
+    func performHealthCheck() async -> Bool {
+        true // Default implementation returns true
     }
 }

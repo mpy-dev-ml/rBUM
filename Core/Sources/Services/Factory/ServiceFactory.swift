@@ -5,14 +5,6 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-
-//
-//  ServiceFactory.swift
-//  Core
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// Factory protocol for creating services
@@ -24,45 +16,31 @@ public protocol ServiceFactory {
 }
 
 /// Default implementation of ServiceFactory
-public class DefaultServiceFactory: ServiceFactory {
+public final class DefaultServiceFactory: ServiceFactory {
     public static let shared = DefaultServiceFactory()
     
     private init() {}
     
     public func createLogger(category: String) -> LoggerProtocol {
-        LoggerFactory.createLogger(category: category)
+        OSLogger(category: category)
     }
     
     public func createSecurityService() -> SecurityServiceProtocol {
-        // Create a standalone security service first
-        let securityService = SecurityService(
-            logger: createLogger(category: "SecurityService"),
-            xpcService: createResticXPCService()
-        )
-        return securityService
-    }
-    
-    private func createResticXPCService() -> ResticXPCServiceProtocol {
-        ResticXPCService(
-            logger: createLogger(category: "ResticXPCService"),
-            securityService: SecurityService(
-                logger: createLogger(category: "SecurityService"),
-                xpcService: DummyXPCService(logger: createLogger(category: "DummyXPCService"))
-            )
-        ) as! ResticXPCServiceProtocol
+        let logger = createLogger(category: "Security")
+        let dummyXPC = DummyXPCService(logger: logger)
+        return SecurityService(logger: logger, xpcService: dummyXPC)
     }
     
     public func createKeychainService() -> KeychainServiceProtocol {
-        KeychainService(
-            logger: createLogger(category: "KeychainService"),
-            securityService: createSecurityService()
-        )
+        let logger = createLogger(category: "Keychain")
+        let security = createSecurityService()
+        // Explicitly specify we want KeychainService's init
+        return KeychainService.init(logger: logger, securityService: security)
     }
     
     public func createResticService() -> ResticServiceProtocol {
-        ResticXPCService(
-            logger: createLogger(category: "ResticService"),
-            securityService: createSecurityService()
-        )
+        let logger = createLogger(category: "Restic")
+        // Use ResticCommandService instead of ResticXPCService
+        return ResticCommandService(logger: logger)
     }
 }

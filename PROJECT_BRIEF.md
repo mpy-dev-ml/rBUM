@@ -36,74 +36,91 @@ rBUM is a macOS application for managing Restic backups with a focus on user-fri
 - Keychain integration
 - Secure credential management
 - Proper permission handling
+- Audit session management
 
 ## Project Structure
 
-### Core Framework
-The Core framework is organized into explicit submodules for better code organization and clarity:
+### Core Components (`/Core/`)
+- **Protocols/**: Core protocol definitions
+  - Platform-agnostic interfaces
+  - Service contracts
+  - Type definitions
+- **Models/**: Data models and types
+  - Domain entities
+  - Value types
+  - Data transfer objects
+- **Services/**: Core services implementation
+  - Business logic
+  - Service implementations
+  - Utility services
+- **Platform/**: Platform-specific abstractions
+  - OS-specific interfaces
+  - System integrations
+  - Platform adapters
 
-#### 1. Logging Module
-Location: `Core/Logging/`
-- `OSLogger.swift`: macOS-specific logger implementation using os.log
-- Handles privacy-aware logging with sandbox compliance
-- Provides debug, info, and error level logging
-- Thread-safe with async queue management
+### Service Layer (`/ResticService/`)
+- **XPC Service Implementation**
+  - Inherits from Core.BaseService for common functionality
+  - Implements ResticXPCProtocol for secure IPC
+  - Command execution with timeout handling
+  - Process lifecycle management with proper cleanup
+  - Comprehensive error handling and logging
+  - Security boundary implementation
+  - Audit session verification
+- **Security Features**
+  - Client validation through code signing
+  - Audit session token validation
+  - Security-scoped bookmark validation
+  - Resource access control with proper cleanup
+  - Timeout handling for long-running operations
+  - Error domain with specific error types
+- **Integration with Core**
+  - Uses Core.LoggerProtocol for consistent logging
+  - Leverages BaseService functionality
+  - Implements Core-defined protocols
+  - Maintains consistent error handling patterns
 
-#### 2. Platform Module
-Location: `Core/Platform/`
-- Platform-specific implementations
-- Apple-specific code for macOS
-- Future cross-platform support structure
+### XPC Architecture
+- **Protocol Layer** (`ResticXPCProtocol`)
+  - Interface version validation
+  - Command execution interface
+  - Security validation methods
+  - Resource access verification
+- **Service Implementation** (`ResticService`)
+  - Asynchronous command execution
+  - Security validation pipeline
+  - Resource cleanup guarantees
+  - Error propagation to client
+- **Connection Management**
+  - XPC listener configuration
+  - Connection validation
+  - Interface export
+  - Security context maintenance
 
-#### 3. Services Module
-Location: `Core/Services/`
-- `LoggerFactory.swift`: Factory for creating platform-specific loggers
-- `SecurityService.swift`: Handles security and sandbox compliance
-- `KeychainService.swift`: Manages secure credential storage
-- `DateProvider.swift`: Provides date-related functionality
-- `PermissionManager.swift`: Manages file system permissions
-- `ResticXPCService.swift`: XPC service interface
-- `SandboxDiagnostics.swift`: Sandbox compliance monitoring
-- `SandboxMonitor.swift`: Real-time sandbox status tracking
+### Main Application (`/rBUM/`)
+- **Models/**: Application-specific models
+- **ViewModels/**: SwiftUI view models
+- **Views/**: SwiftUI view components
+- **Services/**: Application services
+- **Configuration/**: App configuration
+- **Utilities/**: Helper utilities
 
-#### 4. Protocols Module
-Location: `Core/Protocols/`
-- `LoggerProtocol.swift`: Defines logging interface
-- Other core protocols for platform-agnostic design
+### Testing Infrastructure
+- **CoreTests/**: Core module tests
+- **rBUMTests/**
+  - Model tests
+  - Service layer tests
+  - ViewModel tests
+  - Mock data
+  - Test utilities
+- **rBUMUITests/**: UI automation tests
 
-#### 5. Models Module
-Location: `Core/Models/`
-- Data models and types
-- Value types for business logic
-- Transfer objects
-
-#### 6. Errors Module
-Location: `Core/Errors/`
-- Error type definitions
-- Error handling utilities
-- Error reporting structures
-
-### Main Application (rBUM)
-Location: `rBUM/`
-- SwiftUI views and view models
-- User interface components
-- Main application logic
-
-### Test Suites
-- `CoreTests/`: Unit tests for Core framework
-- `rBUMTests/`: Main application tests
-- `rBUMUITests/`: UI automation tests
-
-### XPC Service
-Location: `ResticService/`
-- Privileged helper tool
-- Secure command execution
-- Sandbox-compliant operations
-
-### Support Files
-- `Scripts/`: Build and maintenance scripts
-- `Documentation/`: Additional documentation
-- `Resources/`: Shared resources and assets
+### Support and Configuration
+- **Scripts/**: Development and maintenance scripts
+- **Project Configuration**
+  - `rBUM.xcodeproj/`: Xcode project settings
+  - `rBUM.entitlements`: App capabilities
+  - `.gitignore`: Version control settings
 
 ## Module Dependencies
 
@@ -112,6 +129,16 @@ Location: `ResticService/`
 - os.log
 - Security.framework (for keychain)
 - XPC (for service communication)
+
+### XPC Service Dependencies
+- **Core.framework**
+  - BaseService
+  - LoggerProtocol
+  - Error handling
+- **System Frameworks**
+  - Foundation
+  - Security
+  - XPC
 
 ### App Dependencies
 - SwiftUI
@@ -175,9 +202,14 @@ Location: `Core/Protocols/`
      * Security-scoped bookmark management
      * Permission handling
      * Resource access control
+     * Audit session management
    - Used By:
      * Main application
+     * XPC services
      * File access operations
+   - Key Methods:
+     * `currentAuditSessionIdentifier() throws -> audit_token_t`
+     * Other existing methods...
 
 2. **SandboxCompliant**
    - Purpose: Define sandbox compliance requirements
@@ -571,7 +603,7 @@ rBUM uses an XPC service to securely execute the Restic command-line tool whilst
 
 ### Implementation Details
 
-#### 1. XPC Service Configuration
+#### XPC Service Configuration
 ```xml
 <!-- ResticService.entitlements -->
 <key>com.apple.security.app-sandbox</key>
@@ -582,13 +614,13 @@ rBUM uses an XPC service to securely execute the Restic command-line tool whilst
 </array>
 ```
 
-#### 2. Command Execution Flow
+#### Command Execution Flow
 1. Main app validates access to repository
 2. XPC service executes Restic command
 3. Output captured and returned to main app
 4. Resources cleaned up automatically
 
-#### 3. Error Recovery
+#### Error Recovery
 1. XPC connection monitoring
 2. Automatic reconnection on failure
 3. Resource access verification
@@ -830,6 +862,24 @@ defer {
    - macOS security guidelines
    - Privacy regulations
    - Security best practices
+
+## Security Model
+
+### XPC Security
+1. **Audit Session Management**
+   - Purpose: Ensure secure XPC communication
+   - Implementation:
+     * Audit token validation
+     * Session context verification
+     * Security boundary enforcement
+   - Key Features:
+     * Process authentication
+     * User session validation
+     * Audit trail maintenance
+   - Error Handling:
+     * Token acquisition failures
+     * Session mismatch detection
+     * Detailed error logging
 
 ## Build and Deployment
 - Xcode-based development

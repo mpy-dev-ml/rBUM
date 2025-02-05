@@ -1,151 +1,300 @@
-//
-//  ResticXPCService.swift
-//  Core
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
-import AppKit
-import XPC
+import Security
 
 /// Service for managing Restic operations through XPC
-public final class ResticXPCService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable {
+public final class ResticXPCService: BaseSandboxedService, Measurable {
     // MARK: - Properties
-    private let xpcConnection: NSXPCConnection
-    private var isConnected: Bool = false
+    private let connection: NSXPCConnection
+    private let queue: DispatchQueue
+    public private(set) var isHealthy: Bool
+    private var activeBookmarks: [String: NSData] = [:]
+    private let defaultTimeout: TimeInterval = 30.0
+    private let maxRetries = 3
+    private let interfaceVersion = 1
     
     // MARK: - Initialization
     public override init(logger: LoggerProtocol, securityService: SecurityServiceProtocol) {
-        self.xpcConnection = NSXPCConnection(serviceName: "dev.mpy.rBUM.ResticService")
-        xpcConnection.remoteObjectInterface = NSXPCInterface(with: ResticXPCProtocol.self)
+        self.queue = DispatchQueue(label: "dev.mpy.rBUM.resticxpc", qos: .userInitiated)
+        self.isHealthy = false // Default to false until connection is established
+        
+        // Configure XPC connection with enhanced security
+        self.connection = NSXPCConnection(serviceName: "dev.mpy.rBUM.ResticService")
+        self.connection.remoteObjectInterface = NSXPCInterface(with: ResticXPCProtocol.self)
+        self.connection.auditSessionIdentifier = au_session_self()
+        
         super.init(logger: logger, securityService: securityService)
-        setupXPCConnection()
+        
+        // Set up enhanced connection handlers
+        setupConnectionHandlers()
+        
+        // Start the connection
+        self.connection.resume()
+        
+        // Validate interface version and security
+        validateInterface()
     }
     
     deinit {
-        xpcConnection.invalidate()
+        cleanupResources()
+        connection.invalidationHandler = nil
+        connection.interruptionHandler = nil
+        connection.invalidate()
     }
     
-    // MARK: - ResticServiceProtocol Implementation
-    public func executeCommand(_ command: String) async throws -> ProcessResult {
-        try await ensureValidConnection()
-        guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
-            throw ResticError.xpcConnectionFailed
+    // MARK: - Public Methods
+    public func executeCommand(_ command: String,
+                             arguments: [String],
+                             environment: [String: String],
+                             workingDirectory: String,
+                             bookmarks: [String: NSData]? = nil,
+                             retryCount: Int = 0) async throws -> ProcessResult {
+        do {
+            return try await executeCommandWithTimeout(command,
+                                                    arguments: arguments,
+                                                    environment: environment,
+                                                    workingDirectory: workingDirectory,
+                                                    bookmarks: bookmarks,
+                                                    timeout: defaultTimeout)
+        } catch {
+            if retryCount < maxRetries {
+                logger.warning("Command execution failed, retrying (\(retryCount + 1)/\(maxRetries))",
+                             file: #file,
+                             function: #function,
+                             line: #line)
+                return try await executeCommand(command,
+                                             arguments: arguments,
+                                             environment: environment,
+                                             workingDirectory: workingDirectory,
+                                             bookmarks: bookmarks,
+                                             retryCount: retryCount + 1)
+            }
+            throw error
         }
-        return try await proxy.executeCommand(command, withBookmark: nil)
     }
     
-    public func initializeRepository(_ url: URL, password: String) async throws {
-        try await ensureValidConnection()
-        guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
-            throw ResticError.xpcConnectionFailed
-        }
-        _ = try await proxy.executeCommand("init", withBookmark: nil)
-    }
-    
-    public func listSnapshots(for repository: URL) async throws -> [ResticSnapshot] {
-        try await ensureValidConnection()
-        guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
-            throw ResticError.xpcConnectionFailed
-        }
-        return try await withSafeAccess(to: repository) {
-            let snapshots = try await proxy.listSnapshots(repository: repository)
-            return snapshots.compactMap { $0 as? ResticSnapshot }
-        }
-    }
-    
-    // MARK: - HealthCheckable Implementation
-    public func isHealthy() -> Bool {
-        isConnected
-    }
-    
-    // MARK: - Private Methods
-    private func setupXPCConnection() {
-        // Configure error handler before resuming
-        xpcConnection.resume()
-        isConnected = true
-        
-        // Verify connection is healthy
-        Task {
-            do {
-                guard let proxy = xpcConnection.remoteObjectProxy as? ResticXPCProtocol else {
-                    throw ResticError.xpcConnectionFailed
+    private func executeCommandWithTimeout(_ command: String,
+                                        arguments: [String],
+                                        environment: [String: String],
+                                        workingDirectory: String,
+                                        bookmarks: [String: NSData]?,
+                                        timeout: TimeInterval) async throws -> ProcessResult {
+        try await withCheckedThrowingContinuation { continuation in
+            guard let service = connection.remoteObjectProxy as? ResticXPCProtocol else {
+                continuation.resume(throwing: ResticXPCError.serviceUnavailable)
+                return
+            }
+            
+            // Start accessing security-scoped resources
+            if let bookmarks = bookmarks {
+                do {
+                    try startAccessingResources(bookmarks)
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
                 }
-                try await proxy.ping()
-                logger.info("XPC connection established successfully",
-                          file: #file,
-                          function: #function,
-                          line: #line)
-            } catch {
-                logger.error("Failed to verify XPC connection: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
-                isConnected = false
+            }
+            
+            // Set up timeout
+            let timeoutWork = DispatchWorkItem {
+                self.stopAccessingResources()
+                continuation.resume(throwing: ResticXPCError.timeout)
+            }
+            
+            queue.asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+            
+            service.executeCommand(command,
+                                arguments: arguments,
+                                environment: environment,
+                                workingDirectory: workingDirectory,
+                                bookmarks: bookmarks ?? [:],
+                                timeout: timeout) { [weak self] result in
+                timeoutWork.cancel()
+                
+                // Stop accessing security-scoped resources
+                self?.stopAccessingResources()
+                
+                if let resultDict = result {
+                    // Extract values from dictionary
+                    guard let exitCode = resultDict["exitCode"] as? Int32,
+                          let output = resultDict["output"] as? String,
+                          let error = resultDict["error"] as? String else {
+                        continuation.resume(throwing: ResticXPCError.executionFailed("Invalid result format"))
+                        return
+                    }
+                    
+                    let processResult = ProcessResult(exitCode: exitCode,
+                                                    output: output,
+                                                    error: error)
+                    continuation.resume(returning: processResult)
+                } else {
+                    continuation.resume(throwing: ResticXPCError.executionFailed("No result received"))
+                }
             }
         }
     }
     
+    // MARK: - Resource Management
+    private func startAccessingResources(_ bookmarks: [String: NSData]) throws {
+        for (path, bookmark) in bookmarks {
+            var isStale = false
+            guard let url = try? URL(resolvingBookmarkData: bookmark as Data,
+                                  options: .withSecurityScope,
+                                  relativeTo: nil,
+                                  bookmarkDataIsStale: &isStale) else {
+                throw ResticXPCError.invalidBookmark(path: path)
+            }
+            
+            if isStale {
+                throw ResticXPCError.staleBookmark(path: path)
+            }
+            
+            guard url.startAccessingSecurityScopedResource() else {
+                throw ResticXPCError.accessDenied(path: path)
+            }
+            
+            activeBookmarks[path] = bookmark
+        }
+    }
+    
+    private func stopAccessingResources() {
+        for (path, bookmark) in activeBookmarks {
+            do {
+                var isStale = false
+                if let url = try? URL(resolvingBookmarkData: bookmark as Data,
+                                    options: .withSecurityScope,
+                                    relativeTo: nil,
+                                    bookmarkDataIsStale: &isStale) {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            } catch {
+                logger.error("Failed to stop accessing resource: \(path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
+            }
+        }
+        activeBookmarks.removeAll()
+    }
+    
+    private func cleanupResources() {
+        stopAccessingResources()
+    }
+    
+    // MARK: - HealthCheckable Implementation
+    public func performHealthCheck() async -> Bool {
+        await measure("ResticXPC Health Check") {
+            do {
+                let result = try await executeCommand("/bin/echo",
+                                                    arguments: ["test"],
+                                                    environment: [:],
+                                                    workingDirectory: NSHomeDirectory())
+                let healthy = result.exitCode == 0
+                isHealthy = healthy
+                return healthy
+            } catch {
+                logger.error("Health check failed: \(error.localizedDescription)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
+                isHealthy = false
+                return false
+            }
+        }
+    }
+    
+    // MARK: - Private Methods
+    private func setupConnectionHandlers() {
+        connection.invalidationHandler = { [weak self] in
+            self?.handleInvalidation()
+        }
+        
+        connection.interruptionHandler = { [weak self] in
+            self?.handleInterruption()
+        }
+        
+        // Add error handler
+        connection.errorHandler = { [weak self] error in
+            self?.handleError(error)
+        }
+    }
+    
+    private func validateInterface() {
+        guard let service = connection.remoteObjectProxy as? ResticXPCProtocol else {
+            handleError(ResticXPCError.serviceUnavailable)
+            return
+        }
+        
+        service.validateInterface { [weak self] result in
+            guard let self = self,
+                  let result = result,
+                  let version = result["version"] as? Int,
+                  version == self.interfaceVersion else {
+                self?.handleError(ResticXPCError.interfaceVersionMismatch)
+                return
+            }
+            
+            self.isHealthy = true
+        }
+    }
+    
+    private func handleError(_ error: Error) {
+        isHealthy = false
+        logger.error("XPC service error: \(error.localizedDescription)")
+        // Implement recovery strategy based on error type
+        if case ResticXPCError.interfaceVersionMismatch = error {
+            // Handle version mismatch
+            connection.invalidate()
+        }
+    }
+    
     private func handleInvalidation() {
-        isConnected = false
-        logger.error("XPC connection was invalidated",
+        logger.error("XPC connection invalidated",
                     file: #file,
                     function: #function,
                     line: #line)
+        cleanupResources()
+        isHealthy = false
     }
     
     private func handleInterruption() {
-        isConnected = false
-        logger.warning("XPC connection was interrupted",
-                      file: #file,
-                      function: #function,
-                      line: #line)
-    }
-    
-    private func ensureValidConnection() async throws {
-        guard isConnected else {
-            throw ResticError.xpcConnectionFailed
-        }
-    }
-    
-    private func withSafeAccess<T>(to url: URL, operation: () async throws -> T) async throws -> T {
-        guard startAccessing(url) else {
-            throw ResticError.resourceAccessDenied
-        }
-        defer { stopAccessing(url) }
-        return try await operation()
-    }
-    
-    private func measure<T>(_ operation: String, block: () async throws -> T) async rethrows -> T {
-        let start = Date()
-        let result = try await block()
-        let duration = Date().timeIntervalSince(start)
-        logger.info("\(operation) completed in \(String(format: "%.2f", duration))s",
-                   file: #file,
-                   function: #function,
-                   line: #line)
-        return result
+        logger.error("XPC connection interrupted",
+                    file: #file,
+                    function: #function,
+                    line: #line)
+        cleanupResources()
+        isHealthy = false
     }
 }
 
-// MARK: - Restic Errors
-public enum ResticError: LocalizedError {
-    case xpcConnectionFailed
-    case resourceAccessDenied
-    case initializationFailed
-    case snapshotListingFailed
+// MARK: - ResticXPC Errors
+public enum ResticXPCError: LocalizedError {
+    case serviceUnavailable
+    case connectionFailed
+    case executionFailed(String)
+    case invalidBookmark(path: String)
+    case staleBookmark(path: String)
+    case accessDenied(path: String)
+    case timeout
+    case interfaceVersionMismatch
     
     public var errorDescription: String? {
         switch self {
-        case .xpcConnectionFailed:
+        case .serviceUnavailable:
+            return "Restic XPC service is unavailable"
+        case .connectionFailed:
             return "Failed to establish XPC connection"
-        case .resourceAccessDenied:
-            return "Access to the requested resource was denied"
-        case .initializationFailed:
-            return "Failed to initialize Restic repository"
-        case .snapshotListingFailed:
-            return "Failed to list Restic snapshots"
+        case .executionFailed(let reason):
+            return "Command execution failed: \(reason)"
+        case .invalidBookmark(let path):
+            return "Invalid security-scoped bookmark for path: \(path)"
+        case .staleBookmark(let path):
+            return "Stale security-scoped bookmark for path: \(path)"
+        case .accessDenied(let path):
+            return "Access denied for path: \(path)"
+        case .timeout:
+            return "Operation timed out"
+        case .interfaceVersionMismatch:
+            return "Interface version mismatch"
         }
     }
 }

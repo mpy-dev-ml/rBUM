@@ -11,6 +11,12 @@ import os.log
 #if os(macOS)
 /// OSLogger implementation of LoggerProtocol using os.Logger
 public final class OSLogger: LoggerProtocol, HealthCheckable {
+    public var isHealthy: Bool
+    
+    public func performHealthCheck() async -> Bool {
+        <#code#>
+    }
+    
     // MARK: - Properties
     private let logger: os.Logger
     private let subsystem: String

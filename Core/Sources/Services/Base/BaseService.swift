@@ -9,11 +9,12 @@ import Foundation
 import os.log
 
 /// Base class providing common service functionality
-public class BaseService: LoggingService {
+public class BaseService: NSObject, LoggingService {
     public let logger: LoggerProtocol
     
     public init(logger: LoggerProtocol) {
         self.logger = logger
+        super.init()
     }
     
     /// Execute an operation with retry logic
@@ -30,16 +31,34 @@ public class BaseService: LoggingService {
                 return try await action()
             } catch {
                 lastError = error
-                logger.error("Attempt \(attempt) of \(operation) failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.warning("Attempt \(attempt)/\(attempts) failed for operation '\(operation)': \(error.localizedDescription)",
+                             file: #file,
+                             function: #function,
+                             line: #line)
+                
                 if attempt < attempts {
                     try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             }
         }
         
-        throw lastError ?? ServiceError.operationFailed
+        throw ServiceError.retryFailed(operation: operation, underlyingError: lastError)
+    }
+}
+
+public enum ServiceError: LocalizedError {
+    case retryFailed(operation: String, underlyingError: Error?)
+    case operationFailed
+    
+    public var errorDescription: String? {
+        switch self {
+        case .retryFailed(let operation, let error):
+            if let error = error {
+                return "Operation '\(operation)' failed after multiple attempts: \(error.localizedDescription)"
+            }
+            return "Operation '\(operation)' failed after multiple attempts"
+        case .operationFailed:
+            return "Operation failed"
+        }
     }
 }
