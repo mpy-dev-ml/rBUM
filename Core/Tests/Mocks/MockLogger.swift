@@ -7,7 +7,6 @@
 
 import Foundation
 import os.log
-@testable import Core
 
 /// Mock logger for testing
 class MockLogger: LoggerProtocol {

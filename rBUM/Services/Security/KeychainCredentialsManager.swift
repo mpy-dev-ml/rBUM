@@ -49,7 +49,7 @@ final class KeychainCredentialsManager: KeychainCredentialsManagerProtocol {
             let logger = OSLogger(category: "security")
             let xpcService = Core.ResticXPCService(
                 logger: OSLogger(category: "security"),
-                securityService: SecurityService(logger: OSLogger(category: "security"), xpcService: <#any ResticXPCServiceProtocol#>)
+                securityService: SecurityService(logger: OSLogger(category: "security"), xpcService: ResticXPCService())
             )
             let securityService = SecurityService(logger: logger, xpcService: xpcService as! ResticXPCServiceProtocol)
             return KeychainService(logger: logger, securityService: securityService) as! KeychainServiceProtocol

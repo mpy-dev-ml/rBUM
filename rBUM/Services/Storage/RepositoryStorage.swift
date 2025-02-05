@@ -49,9 +49,9 @@ final class RepositoryStorage: Core.StorageServiceProtocol {
     // MARK: - Initialization
     
     init(
-        fileManager: FileManagerProtocol = FileManager.default,
+        fileManager: FileManagerProtocol = FileManager.default as! FileManagerProtocol,
         logger: LoggerProtocol = OSLogger(category: "storage"),
-        securityService: SecurityServiceProtocol = SecurityService(),
+        securityService: SecurityServiceProtocol = SecurityService(logger: <#any LoggerProtocol#>, xpcService: <#any ResticXPCServiceProtocol#>),
         dateProvider: DateProviderProtocol = DateProvider(),
         notificationCenter: NotificationCenter = .default
     ) throws {

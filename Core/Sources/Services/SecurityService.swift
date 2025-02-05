@@ -206,4 +206,41 @@ public final class SecurityService: SecurityServiceProtocol {
         }
         return isValid
     }
+    
+    // MARK: - XPC Validation
+    public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
+        logger.debug("Validating XPC connection",
+                    file: #file,
+                    function: #function,
+                    line: #line)
+        
+        // Verify connection state
+        guard connection.invalidationHandler != nil else {
+            logger.error("XPC connection is invalidated",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
+        }
+        
+        // Verify interface configuration
+        guard connection.remoteObjectInterface != nil else {
+            logger.error("XPC connection has no remote object interface",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw SecurityError.xpcValidationFailed("XPC connection has no remote object interface")
+        }
+        
+        // Verify audit session identifier
+        guard connection.auditSessionIdentifier != 0 else {
+            logger.error("XPC connection has invalid audit session",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw SecurityError.xpcValidationFailed("XPC connection has invalid audit session")
+        }
+        
+        return true
+    }
 }

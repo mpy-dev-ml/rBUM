@@ -162,8 +162,8 @@ final class RepositoryListViewModel: ObservableObject {
     }
 }
 
-/// Errors that can occur during repository operations
-enum RepositoryError: LocalizedError {
+/// Errors that can occur during repository UI operations
+enum RepositoryUIError: LocalizedError {
     case accessDenied(String)
     case bookmarkInvalid(String)
     case repositoryNotFound(String)

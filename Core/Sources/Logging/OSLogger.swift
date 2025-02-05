@@ -30,13 +30,8 @@ public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
         // Logger health check:
         // 1. Verify we can write to system log
         // 2. Verify subsystem and category are valid
-        do {
-            logger.debug("Health check: \(self.subsystem).\(self.category)")
-            return true
-        } catch {
-            isHealthy = false
-            return false
-        }
+        logger.debug("Health check: \(self.subsystem).\(self.category)")
+        return true
     }
     
     // MARK: - LoggerProtocol Implementation

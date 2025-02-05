@@ -16,8 +16,16 @@ rBUM/
 │   │   │   └── ServiceError.swift
 │   │   ├── Logging/             # Logging infrastructure
 │   │   ├── Models/              # Core data models
-│   │   ├── Platform/            # Platform-specific code
-│   │   └── Protocols/           # Core protocols
+│   │   ├── Protocols/           # Core protocols
+│   │   │   ├── KeychainServiceProtocol.swift
+│   │   │   ├── SecurityServiceProtocol.swift
+│   │   │   └── ResticXPCServiceProtocol.swift
+│   │   └── Services/            # Core services
+│   │       ├── KeychainService.swift
+│   │       ├── SecurityService.swift
+│   │       ├── ResticXPCService.swift
+│   │       └── Mock/            # Mock services
+│   │           └── DummyXPCService.swift
 │   └── Tests/                    # Core framework tests
 │       ├── Mocks/               # Test mocks
 │       ├── SandboxTests/        # Sandbox compliance tests
@@ -25,71 +33,52 @@ rBUM/
 ├── CoreTests/                     # Additional core tests
 │   ├── Mocks/                   # Mock implementations
 │   ├── Models/                  # Model tests
-│   ├── Platform/                # Platform tests
 │   ├── Protocols/               # Protocol tests
 │   ├── Services/                # Service tests
 │   └── XPCTests/               # XPC integration tests
-├── ResticService/                # XPC service
-│   ├── ResticService.swift      # Main service implementation
-│   ├── ResticServiceProtocol.swift
-│   └── main.swift               # Service entry point
-├── Scripts/                      # Utility scripts
-│   └── install_xpc_service.sh   # XPC service installer
-└── rBUM/                        # Main application
-    ├── ContentView.swift        # Root view
-    ├── Models/                  # App-specific models
-    └── Info.plist               # App configuration
+├── rBUM/                         # Main application
+│   ├── Services/
+│   │   ├── Security/           # Security services
+│   │   │   └── KeychainCredentialsManager.swift
+│   │   └── Storage/            # Storage services
+│   ├── ViewModels/              # View models
+│   └── Views/                   # SwiftUI views
+└── rBUMTests/                    # Main app tests
+    └── Services/                # Service tests
 ```
-
-### Core Components
-- `/Core/`: Core functionality and protocols
-  - Protocols/: Core protocol definitions
-  - Models/: Data models and types
-  - Services/: Core services implementation
-  - Platform/: Platform-specific abstractions
-
-### Service Layer
-- `/ResticService/`: XPC service for Restic operations
-  - Inherits from Core.BaseService
-  - Implements ResticXPCProtocol
-  - Secure command execution with timeout handling
-  - Process lifecycle management
-  - Security validation pipeline:
-    * Client code signing verification
-    * Audit session validation
-    * Security-scoped bookmark handling
-  - Comprehensive error handling and logging
-
-### Main Application
-- `/rBUM/`: Main application source
-  - Models/: Application-specific models
-  - ViewModels/: SwiftUI view models
-  - Views/: SwiftUI view components
-  - Services/: Application services
-  - Configuration/: App configuration
-  - Utilities/: Helper utilities
-
-### Testing
-- `/CoreTests/`: Core module tests
-- `/rBUMTests/`: Main app unit tests
-  - Models/: Model tests
-  - Services/: Service layer tests
-  - ViewModels/: ViewModel tests
-  - TestData/: Mock data
-  - Utilities/: Test utilities
-- `/rBUMUITests/`: UI automation tests
-
-### Project Configuration
-- `rBUM.xcodeproj/`: Xcode project configuration
-- `rBUM.entitlements`: App sandbox and capabilities
-- `.gitignore`: Git ignore patterns
-
-### Support
-- `/Scripts/`: Development and maintenance scripts
 
 ## Architecture
 
-The project follows a clean, modular architecture:
+### Security Architecture
+
+The project implements a robust security architecture with the following components:
+
+1. **KeychainCredentialsManager**
+   - Manages secure storage of repository credentials
+   - Uses KeychainService for sandbox-compliant operations
+   - Handles XPC service integration for secure access
+
+2. **KeychainService**
+   - Implements secure keychain operations
+   - Manages access groups for XPC sharing
+   - Ensures sandbox compliance
+
+3. **SecurityService**
+   - Handles security-scoped bookmarks
+   - Manages secure operations through XPC
+   - Validates service access and permissions
+
+4. **ResticXPCService**
+   - Executes privileged operations
+   - Manages secure inter-process communication
+   - Handles process lifecycle and permissions
+
+The security architecture ensures:
+- Proper sandbox compliance
+- Secure credential management
+- Clear separation of concerns
+- Protocol-oriented design
+- Testability through mocks
 
 ### Core Module
 - Platform-agnostic interfaces and models

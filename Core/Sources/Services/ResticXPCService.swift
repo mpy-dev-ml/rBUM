@@ -158,15 +158,13 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     
     private func stopAccessingResources() {
         for (path, bookmark) in activeBookmarks {
-            do {
-                var isStale = false
-                if let url = try? URL(resolvingBookmarkData: bookmark as Data,
-                                    options: .withSecurityScope,
-                                    relativeTo: nil,
-                                    bookmarkDataIsStale: &isStale) {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            } catch {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: bookmark as Data,
+                                options: .withSecurityScope,
+                                relativeTo: nil,
+                                bookmarkDataIsStale: &isStale) {
+                url.stopAccessingSecurityScopedResource()
+            } else {
                 logger.error("Failed to stop accessing resource: \(path)",
                            file: #file,
                            function: #function,
@@ -181,42 +179,50 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     }
     
     // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async -> Bool {
-        await measure("ResticXPC Health Check") {
-            do {
-                let result = try await executeCommand("/bin/echo",
-                                                    arguments: ["test"],
-                                                    environment: [:],
-                                                    workingDirectory: NSHomeDirectory())
-                let healthy = result.exitCode == 0
-                isHealthy = healthy
-                return healthy
-            } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
-                isHealthy = false
-                return false
-            }
+    public func performHealthCheck() async throws -> Bool {
+        logger.debug("Performing health check", file: #file, function: #function, line: #line)
+        
+        // Validate XPC connection
+        try await securityService.validateXPCConnection(connection)
+        
+        // Check if connection is valid (NSXPCConnection doesn't have isValid, 
+        // but we can check if it's not invalidated)
+        if connection.invalidationHandler == nil {
+            throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
         }
+        
+        return true
     }
     
     // MARK: - ResticServiceProtocol Implementation
     public func initializeRepository(at url: URL) async throws {
-        try await executeCommand("restic", 
-                               arguments: ["init", "--repo", url.path],
-                               environment: [:],
-                               workingDirectory: "/",
-                               bookmarks: nil)
+        logger.info("Initializing repository at \(url.path)", file: #file, function: #function, line: #line)
+        
+        // Initialize repository
+        _ = try await executeCommand("init",
+                                arguments: [],
+                                environment: [:],
+                                workingDirectory: url.path,
+                                bookmarks: nil,
+                                retryCount: 3)
     }
     
     public func backup(from source: URL, to destination: URL) async throws {
-        try await executeCommand("restic",
-                               arguments: ["backup", "--repo", destination.path, source.path],
-                               environment: [:],
-                               workingDirectory: "/",
-                               bookmarks: nil)
+        logger.info("Backing up \(source.path) to \(destination.path)", 
+                   file: #file, 
+                   function: #function, 
+                   line: #line)
+        
+        let result = try await executeCommand("backup",
+                                         arguments: [source.path],
+                                         environment: [:],
+                                         workingDirectory: destination.path,
+                                         bookmarks: nil,
+                                         retryCount: 3)
+        
+        if !result.succeeded {
+            throw ProcessError.executionFailed("Backup command failed with exit code: \(result.exitCode)")
+        }
     }
     
     public func listSnapshots() async throws -> [String] {
@@ -231,11 +237,21 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     }
     
     public func restore(from source: URL, to destination: URL) async throws {
-        try await executeCommand("restic",
-                               arguments: ["restore", "latest", "--target", destination.path, "--repo", source.path],
-                               environment: [:],
-                               workingDirectory: "/",
-                               bookmarks: nil)
+        logger.info("Restoring from \(source.path) to \(destination.path)", 
+                   file: #file, 
+                   function: #function, 
+                   line: #line)
+        
+        let result = try await executeCommand("restore",
+                                         arguments: ["latest", "--target", destination.path],
+                                         environment: [:],
+                                         workingDirectory: source.path,
+                                         bookmarks: nil,
+                                         retryCount: 3)
+        
+        if !result.succeeded {
+            throw ProcessError.executionFailed("Restore command failed with exit code: \(result.exitCode)")
+        }
     }
     
     // MARK: - Private Methods
@@ -257,15 +273,10 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
         }
         
         Task {
-            do {
-                let isAvailable = try await service.ping()
-                if isAvailable {
-                    self.isHealthy = true
-                } else {
-                    handleError(ResticXPCError.serviceUnavailable)
-                }
-            } catch {
-                handleError(ResticXPCError.connectionFailed)
+            if await service.ping() {
+                self.isHealthy = true
+            } else {
+                handleError(ResticXPCError.serviceUnavailable)
             }
         }
     }

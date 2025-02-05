@@ -9,19 +9,30 @@ import Foundation
 import Core
 
 /// Service for managing restore operations
+@globalActor actor RestoreActor {
+    static let shared = RestoreActor()
+}
+
+@RestoreActor
 final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
+    func restore(snapshot: Core.ResticSnapshot, from repository: Core.Repository, paths: [String], to target: String) async throws {
+        <#code#>
+    }
+    
+    func listSnapshots(in repository: Core.Repository) async throws -> [Core.ResticSnapshot] {
+        <#code#>
+    }
+    
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol
     private let operationQueue: OperationQueue
     private var activeRestores: Set<UUID> = []
-    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.restoreService", attributes: .concurrent)
     
-    public var isHealthy: Bool {
-        // Check if we have any stuck restores
-        accessQueue.sync {
-            activeRestores.isEmpty
-        }
+    nonisolated public var isHealthy: Bool {
+        Task { @RestoreActor in
+            await activeRestores.isEmpty
+        }.value ?? false
     }
     
     // MARK: - Initialization
@@ -46,14 +57,10 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
         try await measure("Restore Files") {
             // Track restore operation
             let operationId = UUID()
-            accessQueue.async(flags: .barrier) {
-                self.activeRestores.insert(operationId)
-            }
+            activeRestores.insert(operationId)
             
             defer {
-                accessQueue.async(flags: .barrier) {
-                    self.activeRestores.remove(operationId)
-                }
+                activeRestores.remove(operationId)
             }
             
             // Verify permissions
@@ -85,24 +92,14 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
     
     // MARK: - HealthCheckable Implementation
     public func performHealthCheck() async -> Bool {
-        await measure("Restore Service Health Check") {
-            do {
-                // Check dependencies
-                let resticHealthy = await resticService.performHealthCheck()
-                let keychainHealthy = await keychainService.performHealthCheck()
-                
-                // Check active operations
-                let operationsHealthy = isHealthy
-                
-                return resticHealthy && keychainHealthy && operationsHealthy
-            } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
-                return false
-            }
+        // Check all dependencies are healthy
+        guard await resticService.performHealthCheck(),
+              await keychainService.performHealthCheck() else {
+            return false
         }
+        
+        // Check no stuck restores
+        return activeRestores.isEmpty
     }
 }
 

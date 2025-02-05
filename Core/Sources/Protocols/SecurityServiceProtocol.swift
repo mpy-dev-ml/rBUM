@@ -49,8 +49,14 @@ public protocol SecurityServiceProtocol {
     /// Persist access to a URL by creating a security-scoped bookmark
     /// - Parameter url: The URL to persist access for
     /// - Returns: The bookmark data that can be used to restore access
-    /// - Throws: SecurityError if bookmark cannot be created
+    /// - Throws: SecurityError if access cannot be persisted
     func persistAccess(to url: URL) async throws -> Data
+    
+    /// Validate XPC connection security
+    /// - Parameter connection: The XPC connection to validate
+    /// - Returns: true if connection is secure and valid
+    /// - Throws: SecurityError if validation fails or security requirements are not met
+    func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool
     
     /// Validate the XPC service connection
     /// - Returns: true if the XPC service is available and has necessary permissions

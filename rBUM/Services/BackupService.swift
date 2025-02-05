@@ -9,31 +9,64 @@ import Foundation
 import Core
 
 /// Service for managing backup operations
-public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable {
+
+public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable, @unchecked Sendable {
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainService
     private let operationQueue: OperationQueue
-    private var activeBackups: Set<UUID> = []
-    private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.backupService", attributes: .concurrent)
+    private actor BackupState {
+        var activeBackups: Set<UUID> = []
+        private(set) var cachedHealthStatus: Bool = true
+        
+        func insert(_ id: UUID) {
+            activeBackups.insert(id)
+            cachedHealthStatus = activeBackups.isEmpty
+        }
+        
+        func remove(_ id: UUID) {
+            activeBackups.remove(id)
+            cachedHealthStatus = activeBackups.isEmpty
+        }
+        
+        var isEmpty: Bool {
+            activeBackups.isEmpty
+        }
+        
+        func updateCachedHealth(_ value: Bool) {
+            cachedHealthStatus = value
+        }
+    }
+    private let backupState = BackupState()
     
-    public override var hash: Int {
+    @objc public override var hash: Int {
         var hasher = Hasher()
         hasher.combine(ObjectIdentifier(resticService))
         hasher.combine(ObjectIdentifier(keychainService))
-        hasher.combine(activeBackups)
         return hasher.finalize()
     }
     
-    public override var description: String {
-        return "BackupService(activeBackups: \(activeBackups.count))"
+    @objc public override var description: String {
+        "BackupService"
     }
     
-    public var isHealthy: Bool {
-        // Check if we have any stuck backups
-        accessQueue.sync {
-            activeBackups.isEmpty
+    @objc public var isHealthy: Bool {
+        get {
+            // Return the cached value synchronously
+            Task {
+                await updateHealthStatus()
+            }
+            // Return the synchronous cached value
+            Task {
+                await backupState.cachedHealthStatus
+            }.value ?? true // Default to true if task fails
         }
+    }
+    
+    public func updateHealthStatus() async {
+        let status = await backupState.isEmpty && 
+                    (try? await resticService.performHealthCheck()) ?? false
+        await backupState.updateCachedHealth(status)
     }
     
     // MARK: - Initialization
@@ -42,7 +75,19 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         self.keychainService = keychainService
         self.operationQueue = OperationQueue()
         self.operationQueue.maxConcurrentOperationCount = 1
-        super.init(logger: <#any LoggerProtocol#>, securityService: <#any SecurityServiceProtocol#>)
+        
+        let logger = OSLogger(category: "backup")
+        
+        // Create a temporary security service for bootstrapping
+        let tempSecurityService = SecurityService(logger: logger, xpcService: MockResticXPCService())
+        
+        // Now create the real XPC service with the temporary security service
+        let xpcService = ResticXPCService(logger: logger, securityService: tempSecurityService)
+        
+        // Finally create the real security service with the real XPC service
+        let securityService = SecurityService(logger: logger, xpcService: xpcService as! ResticXPCServiceProtocol)
+        
+        super.init(logger: logger, securityService: securityService)
     }
     
     // MARK: - BackupServiceProtocol Implementation
@@ -54,13 +99,11 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     
     public func createBackup(to repository: Repository, paths: [String], tags: [String]?) async throws {
         let backupId = UUID()
-        accessQueue.async(flags: .barrier) {
-            self.activeBackups.insert(backupId)
-        }
+        await backupState.insert(backupId)
         
         defer {
-            accessQueue.async(flags: .barrier) {
-                self.activeBackups.remove(backupId)
+            Task {
+                await backupState.remove(backupId)
             }
         }
         
@@ -104,10 +147,10 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         await measure("Backup Service Health Check") {
             do {
                 // Check dependencies
-                let resticHealthy = await resticService.performHealthCheck()
+                let resticHealthy = try await resticService.performHealthCheck()
                 
                 // Check active operations
-                let noStuckBackups = accessQueue.sync { activeBackups.isEmpty }
+                let noStuckBackups = await backupState.isEmpty
                 
                 return resticHealthy && noStuckBackups
             } catch {

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		8D36157C2D53E2810008675E /* StorageServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */; };
 		8D36157E2D53E4F40008675E /* RestoreServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */; };
+		8D3615802D53F9510008675E /* MockResticXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157F2D53F9510008675E /* MockResticXPCService.swift */; };
 		8D3E9FF62D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0012D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0022D5122C600C21FE0 /* Core.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -50,7 +51,6 @@
 		8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142722D52355F00FBF58A /* SecurityServiceProtocol.swift */; };
 		8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142762D52355F00FBF58A /* MockLogger.swift */; };
 		8D4142A72D52355F00FBF58A /* Core.docc in Sources */ = {isa = PBXBuildFile; fileRef = 8D41427C2D52355F00FBF58A /* Core.docc */; };
-		8D4142AB2D5236FF00FBF58A /* SecurityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142A92D5236FF00FBF58A /* SecurityService.swift */; };
 		8DB709F42D5366C800F71C4B /* ResticXPCServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB709F32D5366C800F71C4B /* ResticXPCServiceTests.swift */; };
 		8DB70A052D53884000F71C4B /* ResticService.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = 8DB709F92D53884000F71C4B /* ResticService.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DB70A0C2D5388D500F71C4B /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
@@ -155,6 +155,7 @@
 /* Begin PBXFileReference section */
 		8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageServiceProtocol.swift; sourceTree = "<group>"; };
 		8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreServiceProtocol.swift; sourceTree = "<group>"; };
+		8D36157F2D53F9510008675E /* MockResticXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockResticXPCService.swift; sourceTree = "<group>"; };
 		8D3E9DD92D51219800C21FE0 /* rBUM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = rBUM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DEA2D51219900C21FE0 /* rBUMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DF42D51219900C21FE0 /* rBUMUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -477,6 +478,7 @@
 		8D4142772D52355F00FBF58A /* Mocks */ = {
 			isa = PBXGroup;
 			children = (
+				8D36157F2D53F9510008675E /* MockResticXPCService.swift */,
 				8D4142762D52355F00FBF58A /* MockLogger.swift */,
 			);
 			path = Mocks;
@@ -893,13 +895,13 @@
 				8DEB6A982D528E2800DE8CDE /* LoggingService.swift in Sources */,
 				8DEB6AB12D52AA6C00DE8CDE /* SandboxedService.swift in Sources */,
 				8DB709F42D5366C800F71C4B /* ResticXPCServiceTests.swift in Sources */,
+				8D3615802D53F9510008675E /* MockResticXPCService.swift in Sources */,
 				8D4142A42D52355F00FBF58A /* ResticXPCServiceProtocol.swift in Sources */,
 				8DEB6A942D528C5B00DE8CDE /* LoggerProtocol.swift in Sources */,
 				8DEB6ABF2D52D8F000DE8CDE /* KeychainCredentials.swift in Sources */,
 				8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */,
 				8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */,
 				8D4142A72D52355F00FBF58A /* Core.docc in Sources */,
-				8D4142AB2D5236FF00FBF58A /* SecurityService.swift in Sources */,
 				8DEB6AB92D52BDA200DE8CDE /* SandboxMonitorProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

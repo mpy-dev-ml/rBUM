@@ -10,6 +10,14 @@ import Foundation
 
 // MARK: - Mock Implementations
 final class MockSecurityService: SecurityServiceProtocol {
+    func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
+        validateXPCCalled = true
+        if shouldSucceed {
+            return true
+        }
+        throw SecurityError.xpcValidationFailed("Mock XPC validation failed")
+    }
+    
     var requestPermissionCalled = false
     var createBookmarkCalled = false
     var resolveBookmarkCalled = false
