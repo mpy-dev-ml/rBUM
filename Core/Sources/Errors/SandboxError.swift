@@ -1,13 +1,5 @@
 //
 //  SandboxError.swift
-//  rBUM
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
-
-//
-//  SandboxError.swift
 //  Core
 //
 //  Created by Matthew Yeager on 04/02/2025.

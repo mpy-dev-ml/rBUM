@@ -11,7 +11,7 @@ import Foundation
 @objc public protocol ResticXPCServiceProtocol: HealthCheckable {
     /// Ping the service to check availability
     /// - Returns: true if service is available
-    func ping() async -> Bool?
+    func ping() async -> Bool
     
     /// Initialize a new repository
     /// - Parameters:

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Errors that can occur during security operations
-public enum SecurityError: LocalizedError {
+public enum SecurityError: LocalizedError, Equatable {
     case permissionDenied(String)
     case bookmarkCreationFailed(String)
     case bookmarkResolutionFailed(String)

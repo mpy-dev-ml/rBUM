@@ -10,28 +10,33 @@ import os.log
 
 #if os(macOS)
 /// OSLogger implementation of LoggerProtocol using os.Logger
-public final class OSLogger: LoggerProtocol, HealthCheckable {
-    public var isHealthy: Bool
-    
-    public func performHealthCheck() async -> Bool {
-        <#code#>
-    }
-    
+public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
     // MARK: - Properties
     private let logger: os.Logger
     private let subsystem: String
     private let category: String
+    public private(set) var isHealthy: Bool = true
     
     // MARK: - Initialization
     public init(subsystem: String = "dev.mpy.rBUM", category: String) {
         self.subsystem = subsystem
         self.category = category
         self.logger = os.Logger(subsystem: subsystem, category: category)
+        super.init()
     }
     
     // MARK: - HealthCheckable Implementation
-    public func isHealthy() -> Bool {
-        true // Logger is typically always healthy unless system-level issues
+    @objc public func performHealthCheck() async -> Bool {
+        // Logger health check:
+        // 1. Verify we can write to system log
+        // 2. Verify subsystem and category are valid
+        do {
+            logger.debug("Health check: \(self.subsystem).\(self.category)")
+            return true
+        } catch {
+            isHealthy = false
+            return false
+        }
     }
     
     // MARK: - LoggerProtocol Implementation

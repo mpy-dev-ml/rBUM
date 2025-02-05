@@ -2,23 +2,23 @@ import Foundation
 
 /// Errors that can occur during keychain operations
 public enum KeychainError: LocalizedError {
-    case saveFailed
-    case retrievalFailed
-    case deleteFailed
-    case updateFailed
+    case saveFailed(status: OSStatus)
+    case retrievalFailed(status: OSStatus)
+    case deleteFailed(status: OSStatus)
+    case updateFailed(status: OSStatus)
     case accessValidationFailed
     case xpcConfigurationFailed
     
     public var errorDescription: String? {
         switch self {
-        case .saveFailed:
-            return "Failed to save item to keychain"
-        case .retrievalFailed:
-            return "Failed to retrieve item from keychain"
-        case .deleteFailed:
-            return "Failed to delete item from keychain"
-        case .updateFailed:
-            return "Failed to update existing keychain item"
+        case .saveFailed(let status):
+            return "Failed to save item to keychain: \(status)"
+        case .retrievalFailed(let status):
+            return "Failed to retrieve item from keychain: \(status)"
+        case .deleteFailed(let status):
+            return "Failed to delete item from keychain: \(status)"
+        case .updateFailed(let status):
+            return "Failed to update existing keychain item: \(status)"
         case .accessValidationFailed:
             return "Failed to validate keychain access"
         case .xpcConfigurationFailed:

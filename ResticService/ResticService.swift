@@ -8,6 +8,7 @@
 import Foundation
 import Core
 import os.log
+import Security
 
 // MARK: - Restic XPC Error Domain
 enum ResticXPCErrorDomain {
@@ -23,7 +24,7 @@ enum ResticXPCErrorDomain {
 }
 
 // MARK: - Restic Service Implementation
-class ResticService: BaseService, ResticXPCProtocol {
+final class ResticService: BaseService, ResticXPCProtocol {
     // MARK: - Properties
     private let queue: DispatchQueue
     private let allowedBundleIdentifier = "dev.mpy.rBUM"
@@ -32,8 +33,10 @@ class ResticService: BaseService, ResticXPCProtocol {
     static var interfaceVersion: Int { 1 }
     
     // MARK: - Initialization
-    override init(logger: LoggerProtocol = Logger(category: "ResticService")) {
-        self.queue = DispatchQueue(label: "dev.mpy.rBUM.ResticService.queue", qos: .userInitiated)
+    init() {
+        let queue = DispatchQueue(label: "dev.mpy.rBUM.resticservice", qos: .userInitiated)
+        let logger = OSLogger(category: "ResticService")
+        self.queue = queue
         super.init(logger: logger)
     }
     
@@ -49,9 +52,30 @@ class ResticService: BaseService, ResticXPCProtocol {
         
         // Validate client's code signing
         let requirement = "anchor apple generic and identifier \"\(allowedBundleIdentifier)\""
-        guard let connection = NSXPCConnection.current(),
-              SecCodeCheckValidityWithErrors(connection.endpoint.hostAuditToken,
-                                           [], requirement as CFString, nil) == errSecSuccess else {
+        guard let connection = NSXPCConnection.current() else {
+            logger.error("No XPC connection available",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw makeError(.securityValidationFailed)
+        }
+        
+        let pid = connection.processIdentifier
+        
+        // Create the security requirement
+        var requirementRef: SecRequirement?
+        var status = SecRequirementCreateWithString(requirement as CFString, [], &requirementRef)
+        guard status == errSecSuccess, let requirement = requirementRef else {
+            logger.error("Failed to create security requirement",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw makeError(.securityValidationFailed)
+        }
+        
+        // Validate the client's code
+        guard let codeRef = SecCodeCreateWithAuditToken(pid),
+              SecCodeCheckValidityWithErrors(codeRef, [], requirement, nil) == errSecSuccess else {
             logger.error("Client validation failed",
                         file: #file,
                         function: #function,
@@ -175,6 +199,14 @@ class ResticService: BaseService, ResticXPCProtocol {
         }
     }
     
+    // MARK: - Security Helpers
+    private func SecCodeCreateWithAuditToken(_ pid: pid_t) -> SecCode? {
+        var code: SecCode?
+        let attributes = [kSecGuestAttributePid: pid] as CFDictionary
+        let status = SecCodeCopyGuestWithAttributes(nil, attributes, [], &code)
+        return status == errSecSuccess ? code : nil
+    }
+    
     // MARK: - Helper Methods
     private func validateBookmarks(_ bookmarks: [String: NSData]) throws {
         for (_, bookmark) in bookmarks {
@@ -212,20 +244,3 @@ class ResticService: BaseService, ResticXPCProtocol {
         ]
     }
 }
-
-// MARK: - Main Entry Point for the XPC Service
-class ServiceDelegate: NSObject, NSXPCListenerDelegate {
-    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
-        newConnection.exportedInterface = NSXPCInterface(with: ResticXPCProtocol.self)
-        let exportedObject = ResticService()
-        newConnection.exportedObject = exportedObject
-        newConnection.resume()
-        return true
-    }
-}
-
-// Start the XPC service
-let delegate = ServiceDelegate()
-let listener = NSXPCListener.service()
-listener.delegate = delegate
-listener.resume()

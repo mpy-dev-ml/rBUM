@@ -35,12 +35,12 @@ public final class DefaultServiceFactory: ServiceFactory {
         let logger = createLogger(category: "Keychain")
         let security = createSecurityService()
         // Explicitly specify we want KeychainService's init
-        return KeychainService.init(logger: logger, securityService: security)
+        return KeychainService.init(logger: logger, securityService: security) as! KeychainServiceProtocol
     }
     
     public func createResticService() -> ResticServiceProtocol {
         let logger = createLogger(category: "Restic")
-        // Use ResticCommandService instead of ResticXPCService
-        return ResticCommandService(logger: logger)
+        let security = createSecurityService()
+        return ResticXPCService(logger: logger, securityService: security) as ResticServiceProtocol
     }
 }

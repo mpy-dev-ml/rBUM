@@ -37,14 +37,26 @@ extension SandboxMonitor: SandboxMonitorProtocol {
         monitorQueue.sync(flags: .barrier) {
             guard !activeResources.contains(url) else { return true }
             
-            if startAccessing(url) {
-                activeResources.insert(url)
-                delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
-                return true
-            } else {
-                delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
-                return false
+            Task {
+                do {
+                    if try await startAccessing(url) {
+                        activeResources.insert(url)
+                        delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
+                        return true
+                    } else {
+                        delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                        return false
+                    }
+                } catch {
+                    logger.error("Failed to start monitoring: \(error.localizedDescription)",
+                               file: #file,
+                               function: #function,
+                               line: #line)
+                    delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                    return false
+                }
             }
+            return false
         }
     }
     
@@ -88,12 +100,23 @@ private extension SandboxMonitor {
         monitorQueue.async { [weak self] in
             guard let self = self else { return }
             
-            for url in self.activeResources {
-                if self.startAccessing(url) {
-                    self.delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
-                } else {
-                    self.activeResources.remove(url)
-                    self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+            Task {
+                for url in self.activeResources {
+                    do {
+                        if try await self.startAccessing(url) {
+                            self.delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
+                        } else {
+                            self.activeResources.remove(url)
+                            self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                        }
+                    } catch {
+                        self.logger.error("Failed to access resource: \(error.localizedDescription)",
+                                        file: #file,
+                                        function: #function,
+                                        line: #line)
+                        self.activeResources.remove(url)
+                        self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                    }
                 }
             }
         }

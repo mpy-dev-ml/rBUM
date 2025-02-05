@@ -58,9 +58,10 @@ public final class SecurityService: SecurityServiceProtocol {
     }
     
     private func removeActiveBookmark(for url: URL) {
-        bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
+        _ = bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
     }
     
+    @MainActor
     public func requestPermission(for url: URL) async throws -> Bool {
         self.logger.debug("Requesting permission for: \(url.path)",
                          file: #file,
@@ -75,7 +76,10 @@ public final class SecurityService: SecurityServiceProtocol {
         panel.message = "Please grant access to this location"
         panel.prompt = "Grant Access"
         
-        let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow())
+        let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow(contentRect: .zero,
+                                                                                   styleMask: .borderless,
+                                                                                   backing: .buffered,
+                                                                                   defer: false))
         
         if response == .OK {
             self.logger.debug("Permission granted for: \(url.path)",
@@ -192,14 +196,14 @@ public final class SecurityService: SecurityServiceProtocol {
                          function: #function,
                          line: #line)
         
-        do {
-            return try await xpcService.validatePermissions()
-        } catch {
-            self.logger.error("XPC service validation failed: \(error.localizedDescription)",
+        let isValid = try await xpcService.ping()
+        if !isValid {
+            self.logger.error("XPC service validation failed",
                             file: #file,
                             function: #function,
                             line: #line)
-            throw SecurityError.xpcValidationFailed(error.localizedDescription)
+            throw SecurityError.xpcValidationFailed("Service ping returned false")
         }
+        return isValid
     }
 }

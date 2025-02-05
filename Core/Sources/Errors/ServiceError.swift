@@ -5,23 +5,19 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-
-//
-//  ServiceError.swift
-//  Core
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// Errors that can occur during service operations
 public enum ServiceError: LocalizedError {
+    // General service errors
     case operationFailed
     case notInitialized
     case alreadyInitialized
     case invalidState(String)
     case dependencyError(String)
+    
+    // Retry-related errors
+    case retryFailed(operation: String, underlyingError: Error?)
     
     public var errorDescription: String? {
         switch self {
@@ -35,6 +31,11 @@ public enum ServiceError: LocalizedError {
             return "Invalid service state: \(state)"
         case .dependencyError(let dependency):
             return "Dependency error: \(dependency)"
+        case .retryFailed(let operation, let error):
+            if let error = error {
+                return "Operation '\(operation)' failed after multiple attempts: \(error.localizedDescription)"
+            }
+            return "Operation '\(operation)' failed after multiple attempts"
         }
     }
 }

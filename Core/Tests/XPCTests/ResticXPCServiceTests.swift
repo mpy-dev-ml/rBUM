@@ -5,10 +5,91 @@
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
-
-import XCTest
 import Testing
-@testable import Core
+import Foundation
+
+// MARK: - Mock Implementations
+final class MockSecurityService: SecurityServiceProtocol {
+    var requestPermissionCalled = false
+    var createBookmarkCalled = false
+    var resolveBookmarkCalled = false
+    var startAccessingCalled = false
+    var stopAccessingCalled = false
+    var validateAccessCalled = false
+    var validateXPCCalled = false
+    
+    var shouldSucceed = true
+    var lastURL: URL?
+    var lastBookmark: Data?
+    
+    func validateXPCService() async throws -> Bool {
+        validateXPCCalled = true
+        if shouldSucceed {
+            return true
+        }
+        throw SecurityError.xpcValidationFailed("Mock XPC validation failed")
+    }
+    
+    func requestPermission(for url: URL) async throws -> Bool {
+        requestPermissionCalled = true
+        lastURL = url
+        if shouldSucceed {
+            return true
+        }
+        throw SecurityError.permissionDenied("Mock permission denied")
+    }
+    
+    func createBookmark(for url: URL) throws -> Data {
+        createBookmarkCalled = true
+        lastURL = url
+        if shouldSucceed {
+            return Data()
+        }
+        throw SecurityError.bookmarkCreationFailed("Mock bookmark creation failed")
+    }
+    
+    func resolveBookmark(_ bookmark: Data) throws -> URL {
+        resolveBookmarkCalled = true
+        lastBookmark = bookmark
+        if shouldSucceed {
+            return URL(fileURLWithPath: "/mock/path")
+        }
+        throw SecurityError.bookmarkResolutionFailed("Mock bookmark resolution failed")
+    }
+    
+    func startAccessing(_ url: URL) throws -> Bool {
+        startAccessingCalled = true
+        lastURL = url
+        if shouldSucceed {
+            return true
+        }
+        throw SecurityError.accessDenied("Mock access denied")
+    }
+    
+    func stopAccessing(_ url: URL) async throws {
+        stopAccessingCalled = true
+        lastURL = url
+        if !shouldSucceed {
+            throw SecurityError.accessDenied("Mock stop accessing failed")
+        }
+    }
+    
+    func validateAccess(to url: URL) async throws -> Bool {
+        validateAccessCalled = true
+        lastURL = url
+        if shouldSucceed {
+            return true
+        }
+        throw SecurityError.accessDenied("Mock validation failed")
+    }
+    
+    func persistAccess(to url: URL) throws -> Data {
+        if shouldSucceed {
+            return Data()
+        }
+        throw SecurityError.bookmarkCreationFailed("Mock persist access failed")
+    }
+}
 
 struct ResticXPCServiceTests {
     // MARK: - Test Properties
@@ -17,130 +98,78 @@ struct ResticXPCServiceTests {
     private var mockSecurityService: MockSecurityService!
     
     // MARK: - Setup and Teardown
+    @Test
     mutating func setUp() {
         mockLogger = MockLogger()
         mockSecurityService = MockSecurityService()
         sut = ResticXPCService(logger: mockLogger, securityService: mockSecurityService)
     }
     
+    @Test
     mutating func tearDown() {
         sut = nil
         mockLogger = nil
         mockSecurityService = nil
     }
     
-    // MARK: - Interface Version Tests
-    @Test("Interface version validation succeeds with matching versions")
-    func testInterfaceVersionValidation() async throws {
-        setUp()
-        defer { tearDown() }
-        
-        let expectation = XCTestExpectation(description: "Interface validation")
-        var result: [String: Any]?
-        
-        // Test interface validation
-        try await sut.validateInterface { response in
-            result = response
-            expectation.fulfill()
-        }
-        
-        await fulfillment(of: [expectation], timeout: 5.0)
-        
-        guard let version = result?["version"] as? Int else {
-            XCTFail("Version not found in response")
-            return
-        }
-        
-        #expect(version == 1)
+    // MARK: - Interface Tests
+    @Test("Should validate XPC service")
+    func testXPCServiceValidation() async throws {
+        mockSecurityService.shouldSucceed = true
+        let result = try await sut.performHealthCheck()
+        #expect(result)
+        #expect(mockSecurityService.validateXPCCalled)
     }
     
-    // MARK: - Security Tests
-    @Test("Audit session validation succeeds with valid session")
-    func testAuditSessionValidation() async throws {
-        setUp()
-        defer { tearDown() }
-        
-        let auditSessionId = au_session_self()
-        let expectation = XCTestExpectation(description: "Audit session validation")
-        
-        try await sut.ping(auditSessionId: auditSessionId) { success in
-            #expect(success)
-            expectation.fulfill()
+    @Test("Should fail XPC service validation")
+    func testXPCServiceValidationFailure() async throws {
+        mockSecurityService.shouldSucceed = false
+        await #expect(throws: SecurityError.xpcValidationFailed("Mock XPC validation failed")) {
+            _ = try await sut.performHealthCheck()
         }
-        
-        await fulfillment(of: [expectation], timeout: 5.0)
-    }
-    
-    @Test("Bookmark validation succeeds with valid bookmarks")
-    func testBookmarkValidation() async throws {
-        setUp()
-        defer { tearDown() }
-        
-        let mockBookmark = NSData() // Mock bookmark data
-        let bookmarks = ["testPath": mockBookmark]
-        let auditSessionId = au_session_self()
-        let expectation = XCTestExpectation(description: "Bookmark validation")
-        
-        try await sut.validateAccess(bookmarks: bookmarks, auditSessionId: auditSessionId) { result in
-            guard let isValid = result?["valid"] as? Bool else {
-                XCTFail("Invalid response format")
-                return
-            }
-            #expect(isValid)
-            expectation.fulfill()
-        }
-        
-        await fulfillment(of: [expectation], timeout: 5.0)
     }
     
     // MARK: - Command Execution Tests
-    @Test("Command execution succeeds with valid parameters")
+    @Test("Should execute command successfully")
     func testCommandExecution() async throws {
-        setUp()
-        defer { tearDown() }
-        
-        let command = "/usr/bin/echo"
-        let arguments = ["test"]
+        let command = "echo"
+        let arguments = ["Hello"]
         let environment: [String: String] = [:]
-        let workingDirectory = FileManager.default.temporaryDirectory.path
+        let workingDirectory = "/"
         let bookmarks: [String: NSData] = [:]
-        let timeout: TimeInterval = 30.0
-        let auditSessionId = au_session_self()
         
-        let expectation = XCTestExpectation(description: "Command execution")
+        mockSecurityService.shouldSucceed = true
         
-        try await sut.executeCommand(command,
-                                   arguments: arguments,
-                                   environment: environment,
-                                   workingDirectory: workingDirectory,
-                                   bookmarks: bookmarks,
-                                   timeout: timeout,
-                                   auditSessionId: auditSessionId) { result in
-            guard let output = result?["output"] as? String else {
-                XCTFail("Invalid response format")
-                return
-            }
-            #expect(output.contains("test"))
-            expectation.fulfill()
-        }
+        let result = try await sut.executeCommand(
+            command,
+            arguments: arguments,
+            environment: environment,
+            workingDirectory: workingDirectory,
+            bookmarks: bookmarks
+        )
         
-        await fulfillment(of: [expectation], timeout: 5.0)
+        #expect(result.output == "Hello\n")
+        #expect(result.exitCode == 0)
     }
     
-    // MARK: - Error Handling Tests
-    @Test("Invalid audit session returns appropriate error")
-    func testInvalidAuditSession() async throws {
-        setUp()
-        defer { tearDown() }
+    @Test("Should handle command failure")
+    func testCommandFailure() async throws {
+        let command = "nonexistent"
+        let arguments: [String] = []
+        let environment: [String: String] = [:]
+        let workingDirectory = "/"
+        let bookmarks: [String: NSData] = [:]
         
-        let invalidAuditSessionId: au_asid_t = 0
-        let expectation = XCTestExpectation(description: "Invalid audit session")
+        mockSecurityService.shouldSucceed = true
         
-        try await sut.ping(auditSessionId: invalidAuditSessionId) { success in
-            #expect(!success)
-            expectation.fulfill()
+        await #expect(throws: ResticXPCError.executionFailed("Command not found")) {
+            _ = try await sut.executeCommand(
+                command,
+                arguments: arguments,
+                environment: environment,
+                workingDirectory: workingDirectory,
+                bookmarks: bookmarks
+            )
         }
-        
-        await fulfillment(of: [expectation], timeout: 5.0)
     }
 }

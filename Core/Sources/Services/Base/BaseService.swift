@@ -9,7 +9,7 @@ import Foundation
 import os.log
 
 /// Base class providing common service functionality
-public class BaseService: NSObject, LoggingService {
+open class BaseService: NSObject, LoggingService {
     public let logger: LoggerProtocol
     
     public init(logger: LoggerProtocol) {
@@ -43,22 +43,5 @@ public class BaseService: NSObject, LoggingService {
         }
         
         throw ServiceError.retryFailed(operation: operation, underlyingError: lastError)
-    }
-}
-
-public enum ServiceError: LocalizedError {
-    case retryFailed(operation: String, underlyingError: Error?)
-    case operationFailed
-    
-    public var errorDescription: String? {
-        switch self {
-        case .retryFailed(let operation, let error):
-            if let error = error {
-                return "Operation '\(operation)' failed after multiple attempts: \(error.localizedDescription)"
-            }
-            return "Operation '\(operation)' failed after multiple attempts"
-        case .operationFailed:
-            return "Operation failed"
-        }
     }
 }

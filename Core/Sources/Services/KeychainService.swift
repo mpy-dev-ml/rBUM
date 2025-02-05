@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 /// Service for managing secure storage in the Keychain
-public final class KeychainService: BaseSandboxedService, LoggingService {
+public final class KeychainService: BaseSandboxedService, Measurable {
     // MARK: - Properties
     private let queue: DispatchQueue
     public private(set) var isHealthy: Bool
@@ -45,13 +45,13 @@ public final class KeychainService: BaseSandboxedService, LoggingService {
             
             guard status == errSecSuccess else {
                 if status == errSecItemNotFound {
-                    return nil
+                    return Data()
                 }
                 throw KeychainError.retrievalFailed(status: status)
             }
             
             guard let data = result as? Data else {
-                throw KeychainError.unexpectedData
+                throw KeychainError.retrievalFailed(status: errSecDecode)
             }
             
             return data
@@ -64,54 +64,47 @@ public final class KeychainService: BaseSandboxedService, LoggingService {
             let status = SecItemDelete(query as CFDictionary)
             
             guard status == errSecSuccess || status == errSecItemNotFound else {
-                throw KeychainError.deletionFailed(status: status)
+                throw KeychainError.deleteFailed(status: status)
             }
         }
     }
     
-    // MARK: - XPC Configuration
-    public func configureXPCSharing(accessGroup: String) throws {
-        // Implementation for XPC sharing configuration
-        logger.info("Configuring XPC sharing for access group: \(accessGroup)")
-        // Add your implementation here
-    }
-    
-    public func validateXPCAccess(accessGroup: String) throws -> Bool {
-        // Implementation for XPC access validation
-        logger.info("Validating XPC access for group: \(accessGroup)")
-        // Add your implementation here
-        return true
-    }
-    
-    // MARK: - HealthCheckable Implementation
+    // MARK: - Health Check
     public func performHealthCheck() async -> Bool {
-        await measure("Keychain Health Check") {
-            do {
-                // Try to save and retrieve a test value
-                let testKey = "health.check.\(UUID().uuidString)"
-                let testData = "test".data(using: .utf8)!
-                
-                try save(testData, for: testKey)
-                let retrieved = try retrieve(for: testKey)
-                try delete(for: testKey)
-                
-                let healthy = retrieved == testData
-                isHealthy = healthy
-                return healthy
-            } catch {
-                logger.error("Health check failed: \(error.localizedDescription)")
-                isHealthy = false
-                return false
-            }
+        logger.info("Performing keychain health check",
+                   file: #file,
+                   function: #function,
+                   line: #line)
+        
+        do {
+            let testKey = "health_check"
+            let testData = "test".data(using: .utf8)!
+            
+            try save(testData, for: testKey)
+            try delete(for: testKey)
+            
+            logger.info("Keychain health check passed",
+                       file: #file,
+                       function: #function,
+                       line: #line)
+            return true
+        } catch {
+            logger.error("Keychain health check failed: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            return false
         }
     }
     
-    // MARK: - Private Helpers
+    // MARK: - Private Methods
     private func baseQuery(for key: String, accessGroup: String?) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "dev.mpy.rBUM",
             kSecAttrAccount as String: key,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrSynchronizable as String: false
         ]
         
         if let accessGroup = accessGroup {
@@ -119,29 +112,5 @@ public final class KeychainService: BaseSandboxedService, LoggingService {
         }
         
         return query
-    }
-}
-
-// MARK: - Keychain Errors
-public enum KeychainError: LocalizedError {
-    case saveFailed(status: OSStatus)
-    case updateFailed(status: OSStatus)
-    case retrievalFailed(status: OSStatus)
-    case deletionFailed(status: OSStatus)
-    case unexpectedData
-    
-    public var errorDescription: String? {
-        switch self {
-        case .saveFailed(let status):
-            return "Failed to save to keychain: \(status)"
-        case .updateFailed(let status):
-            return "Failed to update keychain item: \(status)"
-        case .retrievalFailed(let status):
-            return "Failed to retrieve from keychain: \(status)"
-        case .deletionFailed(let status):
-            return "Failed to delete from keychain: \(status)"
-        case .unexpectedData:
-            return "Unexpected data format in keychain"
-        }
     }
 }

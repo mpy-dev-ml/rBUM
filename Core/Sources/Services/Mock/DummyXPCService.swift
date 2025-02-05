@@ -20,10 +20,10 @@ internal final class DummyXPCService: NSObject, ResticXPCServiceProtocol {
     }
     
     // MARK: - ResticXPCServiceProtocol Implementation
-    func ping() async -> Bool? {
+    func ping() async -> Bool {
         logger.warning("Dummy XPC service called - this should not happen in production",
                       file: #file, function: #function, line: #line)
-        return nil
+        return false
     }
     
     func initializeRepository(at url: URL, username: String, password: String) async throws {
@@ -52,6 +52,6 @@ internal final class DummyXPCService: NSObject, ResticXPCServiceProtocol {
     
     // MARK: - HealthCheckable Implementation
     func performHealthCheck() async -> Bool {
-        false
+        return false
     }
 }

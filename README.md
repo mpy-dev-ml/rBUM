@@ -4,6 +4,43 @@ A macOS application for managing restic backups with a clean, modular architectu
 
 ## Project Structure
 
+```
+rBUM/
+├── Core/                           # Core framework
+│   ├── Core.docc/                 # Documentation catalog
+│   ├── Sources/
+│   │   ├── Errors/               # Error type definitions
+│   │   │   ├── KeychainError.swift
+│   │   │   ├── SandboxError.swift
+│   │   │   ├── SecurityError.swift
+│   │   │   └── ServiceError.swift
+│   │   ├── Logging/             # Logging infrastructure
+│   │   ├── Models/              # Core data models
+│   │   ├── Platform/            # Platform-specific code
+│   │   └── Protocols/           # Core protocols
+│   └── Tests/                    # Core framework tests
+│       ├── Mocks/               # Test mocks
+│       ├── SandboxTests/        # Sandbox compliance tests
+│       └── XPCTests/            # XPC service tests
+├── CoreTests/                     # Additional core tests
+│   ├── Mocks/                   # Mock implementations
+│   ├── Models/                  # Model tests
+│   ├── Platform/                # Platform tests
+│   ├── Protocols/               # Protocol tests
+│   ├── Services/                # Service tests
+│   └── XPCTests/               # XPC integration tests
+├── ResticService/                # XPC service
+│   ├── ResticService.swift      # Main service implementation
+│   ├── ResticServiceProtocol.swift
+│   └── main.swift               # Service entry point
+├── Scripts/                      # Utility scripts
+│   └── install_xpc_service.sh   # XPC service installer
+└── rBUM/                        # Main application
+    ├── ContentView.swift        # Root view
+    ├── Models/                  # App-specific models
+    └── Info.plist               # App configuration
+```
+
 ### Core Components
 - `/Core/`: Core functionality and protocols
   - Protocols/: Core protocol definitions

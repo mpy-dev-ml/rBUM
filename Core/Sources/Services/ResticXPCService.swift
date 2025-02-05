@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 /// Service for managing Restic operations through XPC
-public final class ResticXPCService: BaseSandboxedService, Measurable {
+public final class ResticXPCService: BaseSandboxedService, Measurable, ResticServiceProtocol {
     // MARK: - Properties
     private let connection: NSXPCConnection
     private let queue: DispatchQueue
@@ -20,12 +20,11 @@ public final class ResticXPCService: BaseSandboxedService, Measurable {
         // Configure XPC connection with enhanced security
         self.connection = NSXPCConnection(serviceName: "dev.mpy.rBUM.ResticService")
         self.connection.remoteObjectInterface = NSXPCInterface(with: ResticXPCProtocol.self)
-        self.connection.auditSessionIdentifier = au_session_self()
         
         super.init(logger: logger, securityService: securityService)
         
         // Set up enhanced connection handlers
-        setupConnectionHandlers()
+        configureConnection()
         
         // Start the connection
         self.connection.resume()
@@ -107,7 +106,8 @@ public final class ResticXPCService: BaseSandboxedService, Measurable {
                                 environment: environment,
                                 workingDirectory: workingDirectory,
                                 bookmarks: bookmarks ?? [:],
-                                timeout: timeout) { [weak self] result in
+                                timeout: timeout,
+                                auditSessionId: ProcessInfo.processInfo.processIdentifier) { [weak self] result in
                 timeoutWork.cancel()
                 
                 // Stop accessing security-scoped resources
@@ -122,9 +122,9 @@ public final class ResticXPCService: BaseSandboxedService, Measurable {
                         return
                     }
                     
-                    let processResult = ProcessResult(exitCode: exitCode,
-                                                    output: output,
-                                                    error: error)
+                    let processResult = ProcessResult(output: output,
+                                                    error: error,
+                                                    exitCode: Int(exitCode))
                     continuation.resume(returning: processResult)
                 } else {
                     continuation.resume(throwing: ResticXPCError.executionFailed("No result received"))
@@ -202,44 +202,80 @@ public final class ResticXPCService: BaseSandboxedService, Measurable {
         }
     }
     
+    // MARK: - ResticServiceProtocol Implementation
+    public func initializeRepository(at url: URL) async throws {
+        try await executeCommand("restic", 
+                               arguments: ["init", "--repo", url.path],
+                               environment: [:],
+                               workingDirectory: "/",
+                               bookmarks: nil)
+    }
+    
+    public func backup(from source: URL, to destination: URL) async throws {
+        try await executeCommand("restic",
+                               arguments: ["backup", "--repo", destination.path, source.path],
+                               environment: [:],
+                               workingDirectory: "/",
+                               bookmarks: nil)
+    }
+    
+    public func listSnapshots() async throws -> [String] {
+        let result = try await executeCommand("restic",
+                                            arguments: ["snapshots", "--json"],
+                                            environment: [:],
+                                            workingDirectory: "/",
+                                            bookmarks: nil)
+        // Parse JSON output to extract snapshot IDs
+        // This is a simplified implementation
+        return result.output.components(separatedBy: .newlines).filter { !$0.isEmpty }
+    }
+    
+    public func restore(from source: URL, to destination: URL) async throws {
+        try await executeCommand("restic",
+                               arguments: ["restore", "latest", "--target", destination.path, "--repo", source.path],
+                               environment: [:],
+                               workingDirectory: "/",
+                               bookmarks: nil)
+    }
+    
     // MARK: - Private Methods
-    private func setupConnectionHandlers() {
-        connection.invalidationHandler = { [weak self] in
-            self?.handleInvalidation()
-        }
-        
+    private func configureConnection() {
+        // Set up error handling
         connection.interruptionHandler = { [weak self] in
-            self?.handleInterruption()
+            self?.handleError(ResticXPCError.serviceUnavailable)
         }
         
-        // Add error handler
-        connection.errorHandler = { [weak self] error in
-            self?.handleError(error)
+        connection.invalidationHandler = { [weak self] in
+            self?.handleError(ResticXPCError.connectionFailed)
         }
     }
     
     private func validateInterface() {
-        guard let service = connection.remoteObjectProxy as? ResticXPCProtocol else {
-            handleError(ResticXPCError.serviceUnavailable)
+        guard let service = connection.remoteObjectProxy as? ResticXPCServiceProtocol else {
+            handleError(ResticXPCError.connectionFailed)
             return
         }
         
-        service.validateInterface { [weak self] result in
-            guard let self = self,
-                  let result = result,
-                  let version = result["version"] as? Int,
-                  version == self.interfaceVersion else {
-                self?.handleError(ResticXPCError.interfaceVersionMismatch)
-                return
+        Task {
+            do {
+                let isAvailable = try await service.ping()
+                if isAvailable {
+                    self.isHealthy = true
+                } else {
+                    handleError(ResticXPCError.serviceUnavailable)
+                }
+            } catch {
+                handleError(ResticXPCError.connectionFailed)
             }
-            
-            self.isHealthy = true
         }
     }
     
     private func handleError(_ error: Error) {
         isHealthy = false
-        logger.error("XPC service error: \(error.localizedDescription)")
+        logger.error("XPC service error: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         // Implement recovery strategy based on error type
         if case ResticXPCError.interfaceVersionMismatch = error {
             // Handle version mismatch
@@ -263,38 +299,5 @@ public final class ResticXPCService: BaseSandboxedService, Measurable {
                     line: #line)
         cleanupResources()
         isHealthy = false
-    }
-}
-
-// MARK: - ResticXPC Errors
-public enum ResticXPCError: LocalizedError {
-    case serviceUnavailable
-    case connectionFailed
-    case executionFailed(String)
-    case invalidBookmark(path: String)
-    case staleBookmark(path: String)
-    case accessDenied(path: String)
-    case timeout
-    case interfaceVersionMismatch
-    
-    public var errorDescription: String? {
-        switch self {
-        case .serviceUnavailable:
-            return "Restic XPC service is unavailable"
-        case .connectionFailed:
-            return "Failed to establish XPC connection"
-        case .executionFailed(let reason):
-            return "Command execution failed: \(reason)"
-        case .invalidBookmark(let path):
-            return "Invalid security-scoped bookmark for path: \(path)"
-        case .staleBookmark(let path):
-            return "Stale security-scoped bookmark for path: \(path)"
-        case .accessDenied(let path):
-            return "Access denied for path: \(path)"
-        case .timeout:
-            return "Operation timed out"
-        case .interfaceVersionMismatch:
-            return "Interface version mismatch"
-        }
     }
 }

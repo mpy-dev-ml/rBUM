@@ -3,6 +3,122 @@
 ## Project Overview
 rBUM is a macOS application for managing Restic backups with a focus on user-friendly interface and robust security. The application is built using SwiftUI and follows modern Apple development practices.
 
+## Directory Structure
+
+```
+rBUM/
+├── Core/                           # Core framework
+│   ├── Core.docc/                 # Documentation catalog
+│   ├── Sources/
+│   │   ├── Errors/               # Error definitions
+│   │   │   ├── KeychainError.swift
+│   │   │   ├── SandboxError.swift
+│   │   │   ├── SecurityError.swift
+│   │   │   └── ServiceError.swift
+│   │   ├── Logging/             # Logging system
+│   │   │   ├── LoggerProtocol.swift
+│   │   │   ├── OSLogger.h
+│   │   │   └── OSLogger.swift
+│   │   ├── Models/              # Core data models
+│   │   │   ├── KeychainCredentials.swift
+│   │   │   ├── ProcessResult.swift
+│   │   │   ├── Repository.swift
+│   │   │   ├── ResticSnapshot.swift
+│   │   │   └── Other models...
+│   │   └── Protocols/           # Service interfaces
+│   │       ├── BackupServiceProtocol.swift
+│   │       ├── SecurityServiceProtocol.swift
+│   │       ├── ResticXPCProtocol.swift
+│   │       └── Other protocols...
+│   └── Tests/                    # Framework tests
+│       ├── Mocks/
+│       ├── SandboxTests/
+│       └── XPCTests/
+├── CoreTests/                     # Integration tests
+│   ├── Models/
+│   ├── Services/
+│   └── XPCTests/
+├── ResticService/                # XPC service
+│   ├── ResticService.swift
+│   ├── ResticServiceProtocol.swift
+│   └── main.swift
+└── rBUM/                        # Main application
+    ├── ContentView.swift
+    └── Models/
+```
+
+## Implementation Details
+
+### Core Framework (`/Core/`)
+
+#### 1. Error Handling
+- Comprehensive error types for different domains
+- Localized error descriptions
+- Proper error propagation
+- British English error messages
+
+#### 2. Logging System
+- `LoggerProtocol` for consistent logging interface
+- `OSLogger` implementation using `os_log`
+- Privacy-aware logging levels
+- Structured logging format
+
+#### 3. Models
+- Value types for data representation
+- Codable conformance for serialization
+- Clear validation rules
+- Thread-safe implementations
+
+#### 4. Protocols
+- Clear interface definitions
+- Protocol-oriented design
+- Dependency injection support
+- Testable abstractions
+
+### XPC Service (`/ResticService/`)
+
+#### 1. Security Implementation
+```swift
+// Security validation pipeline
+public final class ResticService: BaseSandboxedService {
+    private let connection: NSXPCConnection
+    private let queue: DispatchQueue
+    
+    // Security features
+    - Audit session validation
+    - Interface version checking
+    - Command execution sandboxing
+    - Resource cleanup
+    - Error handling
+}
+```
+
+#### 2. Command Execution
+- Asynchronous operation handling
+- Proper resource cleanup
+- Timeout management
+- Error propagation
+
+#### 3. Security Features
+- Client validation
+- Audit session verification
+- Bookmark validation
+- Resource access control
+
+### Testing Infrastructure
+
+#### 1. Mock Objects
+- `MockLogger` for testing logging
+- `MockSecurityService` for security testing
+- Clear test state tracking
+- Configurable mock behaviors
+
+#### 2. Test Categories
+- Unit tests for core components
+- Integration tests for services
+- XPC communication tests
+- Sandbox compliance tests
+
 ## Core Architecture
 - Protocol-based design for platform independence
 - Core module containing platform-agnostic components

@@ -52,6 +52,9 @@
 		8DB709F42D5366C800F71C4B /* ResticXPCServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB709F32D5366C800F71C4B /* ResticXPCServiceTests.swift */; };
 		8DB70A052D53884000F71C4B /* ResticService.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = 8DB709F92D53884000F71C4B /* ResticService.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DB70A0C2D5388D500F71C4B /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
+		8DB70A122D538A6A00F71C4B /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DB70A112D538A6A00F71C4B /* XCTest.framework */; };
+		8DB70A142D538B8800F71C4B /* Testing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DB70A132D538B8800F71C4B /* Testing.framework */; };
+		8DB70A162D53901D00F71C4B /* ResticXPCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB70A152D53901500F71C4B /* ResticXPCError.swift */; };
 		8DEB6A942D528C5B00DE8CDE /* LoggerProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6A932D528C5000DE8CDE /* LoggerProtocol.swift */; };
 		8DEB6A962D528DFE00DE8CDE /* SandboxCompliant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6A952D528DF800DE8CDE /* SandboxCompliant.swift */; };
 		8DEB6A982D528E2800DE8CDE /* LoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6A972D528E1F00DE8CDE /* LoggingService.swift */; };
@@ -195,6 +198,9 @@
 		8D4142A92D5236FF00FBF58A /* SecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityService.swift; sourceTree = "<group>"; };
 		8DB709F32D5366C800F71C4B /* ResticXPCServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticXPCServiceTests.swift; sourceTree = "<group>"; };
 		8DB709F92D53884000F71C4B /* ResticService.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = ResticService.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+		8DB70A112D538A6A00F71C4B /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		8DB70A132D538B8800F71C4B /* Testing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Testing.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/Testing.framework; sourceTree = DEVELOPER_DIR; };
+		8DB70A152D53901500F71C4B /* ResticXPCError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticXPCError.swift; sourceTree = "<group>"; };
 		8DEB6A932D528C5000DE8CDE /* LoggerProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerProtocol.swift; sourceTree = "<group>"; };
 		8DEB6A952D528DF800DE8CDE /* SandboxCompliant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxCompliant.swift; sourceTree = "<group>"; };
 		8DEB6A972D528E1F00DE8CDE /* LoggingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggingService.swift; sourceTree = "<group>"; };
@@ -281,6 +287,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8DB70A142D538B8800F71C4B /* Testing.framework in Frameworks */,
+				8DB70A122D538A6A00F71C4B /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,6 +405,7 @@
 		8D4142632D52355F00FBF58A /* Errors */ = {
 			isa = PBXGroup;
 			children = (
+				8DB70A152D53901500F71C4B /* ResticXPCError.swift */,
 				8DEB6AAC2D5293C800DE8CDE /* ServiceError.swift */,
 				8DEB6A9B2D528F7500DE8CDE /* SandboxError.swift */,
 				8D4142612D52355F00FBF58A /* KeychainError.swift */,
@@ -508,6 +517,8 @@
 		8DB70A0B2D5388D500F71C4B /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				8DB70A132D538B8800F71C4B /* Testing.framework */,
+				8DB70A112D538A6A00F71C4B /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -856,6 +867,7 @@
 				8D3F8DA02D524700007E239E /* PermissionManager.swift in Sources */,
 				8D3F8DA12D524700007E239E /* ResticXPCService.swift in Sources */,
 				8DEB6A962D528DFE00DE8CDE /* SandboxCompliant.swift in Sources */,
+				8DB70A162D53901D00F71C4B /* ResticXPCError.swift in Sources */,
 				8D3F8DA22D524700007E239E /* SecurityService.swift in Sources */,
 				8D3F8DA32D524700007E239E /* SandboxMonitor.swift in Sources */,
 				8DEB6AAB2D52939D00DE8CDE /* ServiceLifecycle.swift in Sources */,
@@ -1306,6 +1318,7 @@
 				INFOPLIST_FILE = ResticService/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ResticService;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mpy.ResticService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1328,6 +1341,7 @@
 				INFOPLIST_FILE = ResticService/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ResticService;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mpy.ResticService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
