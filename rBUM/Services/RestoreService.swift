@@ -15,24 +15,21 @@ import Core
 
 @RestoreActor
 final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
-    func restore(snapshot: Core.ResticSnapshot, from repository: Core.Repository, paths: [String], to target: String) async throws {
-        <#code#>
-    }
-    
-    func listSnapshots(in repository: Core.Repository) async throws -> [Core.ResticSnapshot] {
-        <#code#>
-    }
-    
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol
     private let operationQueue: OperationQueue
     private var activeRestores: Set<UUID> = []
+    private var _isHealthy: Bool = true
     
-    nonisolated public var isHealthy: Bool {
-        Task { @RestoreActor in
-            await activeRestores.isEmpty
-        }.value ?? false
+    @objc public var isHealthy: Bool {
+        get { _isHealthy }
+    }
+    
+    public func updateHealthStatus() async {
+        let noActiveRestores = await activeRestores.isEmpty
+        let resticHealthy = (try? await resticService.performHealthCheck()) ?? false
+        _isHealthy = noActiveRestores && resticHealthy
     }
     
     // MARK: - Initialization
@@ -53,7 +50,7 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
     }
     
     // MARK: - RestoreServiceProtocol Implementation
-    public func restore(from source: URL, to destination: URL) async throws {
+    public func restore(snapshot: ResticSnapshot, from repository: Repository, paths: [String], to target: String) async throws {
         try await measure("Restore Files") {
             // Track restore operation
             let operationId = UUID()
@@ -64,23 +61,34 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
             }
             
             // Verify permissions
-            guard try await verifyPermissions(for: destination) else {
+            guard try await verifyPermissions(for: URL(fileURLWithPath: target)) else {
                 throw RestoreError.insufficientPermissions
             }
             
             // Execute restore
-            try await resticService.restore(from: source, to: destination)
+            try await resticService.restore(
+                from: URL(fileURLWithPath: repository.path),
+                to: URL(fileURLWithPath: target)
+            )
             
-            logger.info("Restore completed from \(source.path) to \(destination.path)",
+            logger.info("Restore completed for snapshot \(snapshot.id) to \(target)",
                        file: #file,
                        function: #function,
                        line: #line)
         }
     }
     
-    public func listSnapshots() async throws -> [String] {
+    public func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         try await measure("List Snapshots") {
-            return try await resticService.listSnapshots()
+            let snapshotIds = try await resticService.listSnapshots()
+            return snapshotIds.map { id in
+                ResticSnapshot(
+                    id: id,
+                    time: Date(),
+                    hostname: ProcessInfo.processInfo.hostName,
+                    paths: [repository.path]
+                )
+            }
         }
     }
     
@@ -91,15 +99,11 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
     }
     
     // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async -> Bool {
-        // Check all dependencies are healthy
-        guard await resticService.performHealthCheck(),
-              await keychainService.performHealthCheck() else {
-            return false
+    public func performHealthCheck() async throws -> Bool {
+        await measure("Restore Service Health Check") {
+            await updateHealthStatus()
+            return isHealthy
         }
-        
-        // Check no stuck restores
-        return activeRestores.isEmpty
     }
 }
 

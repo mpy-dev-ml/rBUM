@@ -400,13 +400,6 @@
 			path = Platform;
 			sourceTree = "<group>";
 		};
-		8D4142562D52355F00FBF58A /* Protocols */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Protocols;
-			sourceTree = "<group>";
-		};
 		8D4142632D52355F00FBF58A /* Errors */ = {
 			isa = PBXGroup;
 			children = (
@@ -484,13 +477,6 @@
 			path = Mocks;
 			sourceTree = "<group>";
 		};
-		8D4142782D52355F00FBF58A /* SandboxTests */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = SandboxTests;
-			sourceTree = "<group>";
-		};
 		8D4142792D52355F00FBF58A /* XPCTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -503,7 +489,6 @@
 			isa = PBXGroup;
 			children = (
 				8D4142772D52355F00FBF58A /* Mocks */,
-				8D4142782D52355F00FBF58A /* SandboxTests */,
 				8D4142792D52355F00FBF58A /* XPCTests */,
 			);
 			path = Tests;
@@ -512,7 +497,6 @@
 		8D41427E2D52355F00FBF58A /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				8D4142562D52355F00FBF58A /* Protocols */,
 				8D41427A2D52355F00FBF58A /* Tests */,
 				8D41427B2D52355F00FBF58A /* Core.h */,
 				8D41427C2D52355F00FBF58A /* Core.docc */,

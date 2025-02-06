@@ -9,32 +9,32 @@ import Foundation
 import Core
 
 /// Service for managing backup operations
-
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable, @unchecked Sendable {
     // MARK: - Properties
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainService
     private let operationQueue: OperationQueue
+    
     private actor BackupState {
         var activeBackups: Set<UUID> = []
-        private(set) var cachedHealthStatus: Bool = true
+        var cachedHealthStatus: Bool = true
         
         func insert(_ id: UUID) {
             activeBackups.insert(id)
-            cachedHealthStatus = activeBackups.isEmpty
+            updateCachedHealth()
         }
         
         func remove(_ id: UUID) {
             activeBackups.remove(id)
-            cachedHealthStatus = activeBackups.isEmpty
+            updateCachedHealth()
         }
         
         var isEmpty: Bool {
             activeBackups.isEmpty
         }
         
-        func updateCachedHealth(_ value: Bool) {
-            cachedHealthStatus = value
+        private func updateCachedHealth() {
+            cachedHealthStatus = activeBackups.isEmpty
         }
     }
     private let backupState = BackupState()
@@ -50,23 +50,12 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         "BackupService"
     }
     
-    @objc public var isHealthy: Bool {
-        get {
-            // Return the cached value synchronously
-            Task {
-                await updateHealthStatus()
-            }
-            // Return the synchronous cached value
-            Task {
-                await backupState.cachedHealthStatus
-            }.value ?? true // Default to true if task fails
-        }
-    }
+    @objc public private(set) var isHealthy: Bool = true
     
     public func updateHealthStatus() async {
-        let status = await backupState.isEmpty && 
-                    (try? await resticService.performHealthCheck()) ?? false
-        await backupState.updateCachedHealth(status)
+        let isEmpty = await backupState.isEmpty
+        let resticHealthy = (try? await resticService.performHealthCheck()) ?? false
+        isHealthy = isEmpty && resticHealthy
     }
     
     // MARK: - Initialization
@@ -99,22 +88,27 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     
     public func createBackup(to repository: Repository, paths: [String], tags: [String]?) async throws {
         let backupId = UUID()
-        await backupState.insert(backupId)
-        
-        defer {
-            Task {
-                await backupState.remove(backupId)
-            }
-        }
         
         try await measure("Create Backup") {
-            for path in paths {
-                let url = URL(fileURLWithPath: path)
-                try await resticService.backup(
-                    from: url,
-                    to: URL(fileURLWithPath: repository.path)
-                )
+            // Track backup operation
+            await backupState.insert(backupId)
+            
+            defer {
+                Task {
+                    await backupState.remove(backupId)
+                }
             }
+            
+            // Create URLs
+            let urls = paths.map { URL(fileURLWithPath: $0) }
+            let repoURL = URL(fileURLWithPath: repository.path)
+            
+            // Execute backup
+            for url in urls {
+                try await resticService.backup(from: url, to: repoURL)
+            }
+            
+            logger.info("Backup completed to \(repository.path)", file: #file, function: #function, line: #line)
         }
     }
     
@@ -143,23 +137,10 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     }
     
     // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async -> Bool {
+    public func performHealthCheck() async throws -> Bool {
         await measure("Backup Service Health Check") {
-            do {
-                // Check dependencies
-                let resticHealthy = try await resticService.performHealthCheck()
-                
-                // Check active operations
-                let noStuckBackups = await backupState.isEmpty
-                
-                return resticHealthy && noStuckBackups
-            } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
-                return false
-            }
+            await updateHealthStatus()
+            return isHealthy
         }
     }
 }

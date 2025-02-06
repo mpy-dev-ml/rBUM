@@ -66,9 +66,28 @@ final class ConfigurationStorage: ConfigurationStorageProtocol, StorageServicePr
     // MARK: - Initialization
     
     init(
-        fileManager: FileManagerProtocol = FileManager.default,
+        fileManager: FileManagerProtocol = FileManager.default as! FileManagerProtocol,
         logger: LoggerProtocol = OSLogger(category: "configuration"),
-        securityService: SecurityServiceProtocol = SecurityService(logger: OSLogger(category: "configuration")),
+        securityService: SecurityServiceProtocol = {
+            let logger = OSLogger(category: "security")
+            // Step 1: Create temporary security service with mock XPC
+            let tempSecurityService = SecurityService(
+                logger: logger,
+                xpcService: MockResticXPCService()
+            )
+            
+            // Step 2: Create real XPC service using temporary security service
+            let xpcService = ResticXPCService(
+                logger: logger,
+                securityService: tempSecurityService
+            )
+            
+            // Step 3: Create final security service with real XPC service
+            return SecurityService(
+                logger: logger,
+                xpcService: xpcService as! ResticXPCServiceProtocol
+            )
+        }(),
         dateProvider: DateProviderProtocol = DateProvider(),
         notificationCenter: NotificationCenter = .default
     ) throws {

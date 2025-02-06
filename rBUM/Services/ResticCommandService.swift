@@ -143,17 +143,15 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         await measure("Restic Command Service Health Check") {
             do {
                 // Check XPC service
-                guard let xpcHealthy = await xpcService.ping(), xpcHealthy else {
+                let xpcHealthy = await xpcService.ping()
+                guard xpcHealthy else {
                     return false
                 }
-                
-                // Check keychain service
-                let keychainHealthy = await keychainService.performHealthCheck()
                 
                 // Check active operations
                 let operationsHealthy = isHealthy
                 
-                return xpcHealthy && keychainHealthy && operationsHealthy
+                return xpcHealthy && operationsHealthy
             } catch {
                 logger.error("Health check failed: \(error.localizedDescription)",
                            file: #file,

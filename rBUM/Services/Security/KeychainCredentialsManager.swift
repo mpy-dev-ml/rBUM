@@ -37,7 +37,7 @@ public protocol KeychainCredentialsManagerProtocol {
 /// Implementation of KeychainCredentialsManagerProtocol that uses the macOS Keychain for secure storage
 final class KeychainCredentialsManager: KeychainCredentialsManagerProtocol {
     private let logger: LoggerProtocol
-    private let keychainService: KeychainServiceProtocol
+    private let keychainService: Core.KeychainServiceProtocol
     private let dateProvider: DateProviderProtocol
     private let notificationCenter: NotificationCenter
     private let serviceName: String
@@ -45,14 +45,32 @@ final class KeychainCredentialsManager: KeychainCredentialsManagerProtocol {
     
     init(
         logger: LoggerProtocol = OSLogger(category: "security"),
-        keychainService: KeychainServiceProtocol = {
+        keychainService: Core.KeychainServiceProtocol = {
             let logger = OSLogger(category: "security")
-            let xpcService = Core.ResticXPCService(
-                logger: OSLogger(category: "security"),
-                securityService: SecurityService(logger: OSLogger(category: "security"), xpcService: ResticXPCService())
+            // Step 1: Create temporary security service with mock XPC
+            let tempSecurityService = Core.SecurityService(
+                logger: logger,
+                xpcService: MockResticXPCService()
             )
-            let securityService = SecurityService(logger: logger, xpcService: xpcService as! ResticXPCServiceProtocol)
-            return KeychainService(logger: logger, securityService: securityService) as! KeychainServiceProtocol
+            
+            // Step 2: Create real XPC service using temporary security service
+            let xpcService = Core.ResticXPCService(
+                logger: logger,
+                securityService: tempSecurityService
+            )
+            
+            // Step 3: Create final security service with real XPC service
+            let securityService = Core.SecurityService(
+                logger: logger,
+                xpcService: xpcService as! Core.ResticXPCServiceProtocol
+            )
+            
+            // Step 4: Create keychain service with security service
+            let keychainService = Core.KeychainService(
+                logger: logger,
+                securityService: securityService
+            )
+            return keychainService as! Core.KeychainServiceProtocol
         }(),
         dateProvider: DateProviderProtocol = DateProvider(),
         notificationCenter: NotificationCenter = .default,
