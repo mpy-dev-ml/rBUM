@@ -1,0 +1,53 @@
+file,line,character,severity,type,reason,rule_id
+/Users/mpy/CascadeProjects/rBUM/rBUM/ViewModels/RepositoryListViewModel.swift,83,,Warning,Line Length,Line should be 150 characters or less; currently it has 155 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Views/RepositoryCreationView.swift,47,46,Warning,Unused Closure Parameter,Unused parameter in a closure should be replaced with _,unused_closure_parameter
+/Users/mpy/CascadeProjects/rBUM/rBUM/Views/BackupView.swift,146,5,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 6,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/rBUM/Views/BackupView.swift,124,,Warning,Line Length,Line should be 150 characters or less; currently it has 190 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Views/BackupView.swift,146,,Warning,Line Length,Line should be 150 characters or less; currently it has 153 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/rBUMApp.swift,21,8,Error,Type Name,Type name 'rBUMApp' should start with an uppercase character,type_name
+/Users/mpy/CascadeProjects/rBUM/rBUM/ContentView.swift,207,5,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 6,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/rBUM/Services/Security/Keychain.swift,61,,Warning,Line Length,Line should be 150 characters or less; currently it has 176 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Services/Security/Keychain.swift,81,,Warning,Line Length,Line should be 150 characters or less; currently it has 180 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Services/Security/Keychain.swift,97,,Warning,Line Length,Line should be 150 characters or less; currently it has 178 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Services/Security/Keychain.swift,117,,Warning,Line Length,Line should be 150 characters or less; currently it has 181 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/rBUM/Services/RestoreService.swift,32,9,Warning,Implicit Getter,Computed read-only properties should avoid using the get keyword,implicit_getter
+/Users/mpy/CascadeProjects/rBUM/Core/Tests/Mocks/MockResticXPCService.swift,52,18,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 6,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/Core/Tests/Mocks/MockResticXPCService.swift,14,,Warning,Vertical Whitespace,Limit vertical whitespace to a single empty line; currently 2,vertical_whitespace
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/BookmarkError.swift,48,,Warning,Line Length,Line should be 150 characters or less; currently it has 166 characters,line_length
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/BookmarkError.swift,72,,Warning,Trailing Newline,Files should have a single trailing newline,trailing_newline
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/SandboxError.swift,44,,Warning,Trailing Newline,Files should have a single trailing newline,trailing_newline
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,70,36,Warning,Identifier Name,Variable name 'l' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,70,61,Warning,Identifier Name,Variable name 'r' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,72,36,Warning,Identifier Name,Variable name 'l' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,72,61,Warning,Identifier Name,Variable name 'r' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,74,34,Warning,Identifier Name,Variable name 'l' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,74,57,Warning,Identifier Name,Variable name 'r' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,76,33,Warning,Identifier Name,Variable name 'l' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Errors/ResticXPCError.swift,76,55,Warning,Identifier Name,Variable name 'r' should be between 2 and 50 characters long,identifier_name
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/ResticXPCProtocol.swift,32,5,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 8,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/StorageServiceProtocol.swift,14,,Warning,Vertical Whitespace,Limit vertical whitespace to a single empty line; currently 2,vertical_whitespace
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/SandboxMonitorProtocol.swift,41,45,Warning,Protocol Property Accessors Order,Protocol property accessors must be in the following order: get set,protocol_property_accessors_order
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/RestoreServiceProtocol.swift,67,,Warning,Trailing Newline,Files should have a single trailing newline,trailing_newline
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/RestoreServiceProtocol.swift,14,,Warning,Vertical Whitespace,Limit vertical whitespace to a single empty line; currently 2,vertical_whitespace
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/BookmarkServiceProtocol.swift,14,,Warning,Vertical Whitespace,Limit vertical whitespace to a single empty line; currently 2,vertical_whitespace
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Protocols/SandboxedService.swift,14,,Warning,Vertical Whitespace,Limit vertical whitespace to a single empty line; currently 2,vertical_whitespace
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentBookmarkService.swift,48,32,Warning,Non-optional String -> Data Conversion,Prefer non-optional `Data(_:)` initializer when converting `String` to `Data`,non_optional_string_data_conversion
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentBookmarkService.swift,115,23,Warning,Unused Optional Binding,Prefer `!= nil` over `let _ =`,unused_optional_binding
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentXPCService.swift,35,65,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentXPCService.swift,50,50,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentXPCService.swift,50,119,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentXPCService.swift,66,12,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 8,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentConfiguration.swift,52,,Warning,Trailing Newline,Files should have a single trailing newline,trailing_newline
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/KeychainService.swift,91,28,Warning,Non-optional String -> Data Conversion,Prefer non-optional `Data(_:)` initializer when converting `String` to `Data`,non_optional_string_data_conversion
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/ResticXPCService.swift,84,13,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 6,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentSecurityService.swift,93,28,Warning,Non-optional String -> Data Conversion,Prefer non-optional `Data(_:)` initializer when converting `String` to `Data`,non_optional_string_data_conversion
+/Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Development/DevelopmentSecurityService.swift,170,28,Warning,Non-optional String -> Data Conversion,Prefer non-optional `Data(_:)` initializer when converting `String` to `Data`,non_optional_string_data_conversion
+/Users/mpy/CascadeProjects/rBUM/ResticService/ServiceDelegate.swift,33,,Warning,Trailing Newline,Files should have a single trailing newline,trailing_newline
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,34,91,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,34,147,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,34,239,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,62,49,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,62,118,Warning,Colon Spacing,Colons should be next to the identifier when specifying a type and next to the key in dictionary literals,colon
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,34,11,Warning,Function Parameter Count,Function should have 5 parameters or less: it currently has 8,function_parameter_count
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,150,18,Error,Identifier Name,Function name 'SecCodeCreateWithAuditToken(_:)' should start with a lowercase character,identifier_name
+/Users/mpy/CascadeProjects/rBUM/ResticService/ResticService.swift,34,,Error,Line Length,Line should be 200 characters or less; currently it has 258 characters,line_length

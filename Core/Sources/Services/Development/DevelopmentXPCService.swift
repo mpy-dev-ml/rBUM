@@ -32,7 +32,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     }
     
     // MARK: - ResticXPCProtocol Implementation
-    public func validateInterface(completion: @escaping ([String : Any]?) -> Void) {
+    public func validateInterface(completion: @escaping ([String: Any]?) -> Void) {
         if configuration.shouldSimulateConnectionFailures {
             logger.error(
                 "Simulating interface validation failure",
@@ -47,7 +47,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         completion(["version": Self.interfaceVersion])
     }
     
-    public func validateAccess(bookmarks: [String : NSData], auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+    public func validateAccess(bookmarks: [String: NSData], auditSessionId: au_asid_t, completion: @escaping ([String: Any]?) -> Void) {
         logger.debug(
             "Validating access for bookmarks: \(bookmarks.keys.joined(separator: ", "))",
             file: #file,

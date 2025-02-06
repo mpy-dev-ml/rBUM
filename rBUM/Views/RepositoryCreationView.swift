@@ -44,7 +44,7 @@ struct RepositoryCreationView: View {
             } message: {
                 successMessage
             }
-            .onChange(of: viewModel.state) { oldState, newState in
+            .onChange(of: viewModel.state) { _, newState in
                 if case .success = newState {
                     showSuccess = true
                 }

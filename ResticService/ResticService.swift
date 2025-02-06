@@ -31,7 +31,7 @@ enum ResticXPCErrorDomain {
 
 // MARK: - Restic Service Implementation
 @objc final class ResticService: BaseService, ResticXPCProtocol {
-    @objc func executeCommand(_ command: String, arguments: [String], environment: [String : String], workingDirectory: String, bookmarks: [String : NSData], timeout: TimeInterval, auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+    @objc func executeCommand(_ command: String, arguments: [String], environment: [String: String], workingDirectory: String, bookmarks: [String: NSData], timeout: TimeInterval, auditSessionId: au_asid_t, completion: @escaping ([String: Any]?) -> Void) {
         queue.async {
             do {
                 try self.validateClient()
@@ -59,7 +59,7 @@ enum ResticXPCErrorDomain {
         }
     }
     
-    @objc func validateAccess(bookmarks: [String : NSData], auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+    @objc func validateAccess(bookmarks: [String: NSData], auditSessionId: au_asid_t, completion: @escaping ([String: Any]?) -> Void) {
         queue.async {
             do {
                 try self.validateClient()
