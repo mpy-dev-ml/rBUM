@@ -31,36 +31,34 @@ struct rBUMApp: App {
         let fileManager: FileManagerProtocol = DefaultFileManager()
         let dateProvider: DateProviderProtocol = DateProvider()
         let notificationCenter = NotificationCenter.default
-        let xpcService = ResticXPCService(logger: logger)
         
         // Initialize security-related services
-        let sandboxMonitor = SandboxMonitor(logger: logger)
-        
-        let bookmarkService = BookmarkService(
-            logger: logger,
-            securityService: DefaultSecurityService(
-                logger: logger,
-                bookmarkService: BookmarkService(logger: logger, securityService: DefaultSecurityService(logger: logger, bookmarkService: BookmarkService(logger: logger), keychainService: KeychainService(logger: logger), sandboxMonitor: sandboxMonitor)),
-                keychainService: KeychainService(logger: logger, securityService: DefaultSecurityService(logger: logger, bookmarkService: BookmarkService(logger: logger), keychainService: KeychainService(logger: logger), sandboxMonitor: sandboxMonitor)),
-                sandboxMonitor: sandboxMonitor
-            )
-        )
+        let sandboxMonitor = SandboxMonitor(logger: logger, securityService: <#any SecurityServiceProtocol#>)
         
         let keychainService = KeychainService(
             logger: logger,
-            securityService: DefaultSecurityService(
-                logger: logger,
-                bookmarkService: bookmarkService,
-                keychainService: keychainService,
-                sandboxMonitor: sandboxMonitor
-            )
+            securityService: nil  // Will be set after SecurityService is created
+        )
+        
+        let bookmarkService = BookmarkService(
+            logger: logger,
+            securityService: nil, keychainService: <#any KeychainServiceProtocol#>  // Will be set after SecurityService is created
         )
         
         let securityService = DefaultSecurityService(
-            logger: logger,
+            logger: logger, securityService: <#any SecurityServiceProtocol#>,
             bookmarkService: bookmarkService,
             keychainService: keychainService,
             sandboxMonitor: sandboxMonitor
+        )
+        
+        // Set the security service reference in dependent services
+        keychainService.securityService = securityService
+        bookmarkService.securityService = securityService
+        
+        let xpcService = ResticXPCService(
+            logger: logger,
+            securityService: securityService
         )
         
         // Initialize repository services
@@ -80,16 +78,17 @@ struct rBUMApp: App {
         
         self.resticService = ResticCommandService(
             logger: logger,
-            xpcService: xpcService,
+            securityService: securityService,
+            xpcService: xpcService as! ResticXPCServiceProtocol,
             keychainService: keychainService
-        )
+        ) as! any ResticCommandServiceProtocol
         
         self.repositoryCreationService = DefaultRepositoryCreationService(
             logger: logger,
             securityService: securityService,
             bookmarkService: bookmarkService,
             keychainService: keychainService
-        )
+        ) as! any RepositoryCreationServiceProtocol
         
         logger.debug("App initialized",
                     file: #file,
