@@ -1,5 +1,9 @@
 # rBUM (Restic Backup Manager)
 
+![CI](https://github.com/mpy-dev-ml/rBUM/workflows/CI/badge.svg)
+[![codecov](https://codecov.io/gh/mpy-dev-ml/rBUM/branch/main/graph/badge.svg)](https://codecov.io/gh/mpy-dev-ml/rBUM)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A macOS application for managing restic backups with a clean, modular architecture.
 
 ## Project Structure

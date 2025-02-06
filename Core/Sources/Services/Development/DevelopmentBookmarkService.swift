@@ -10,7 +10,8 @@ import Foundation
 
 /// Development mock implementation of BookmarkServiceProtocol
 /// Provides simulated bookmark behaviour for development
-public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
+@available(macOS 13.0, *)
+public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @unchecked Sendable {
     // MARK: - Properties
     private let logger: LoggerProtocol
     private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentBookmark", attributes: .concurrent)
@@ -19,7 +20,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     private let configuration: DevelopmentConfiguration
     
     // MARK: - Initialization
-    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
+    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .init()) {
         self.logger = logger
         self.configuration = configuration
         
@@ -40,7 +41,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
                 function: #function,
                 line: #line
             )
-            throw BookmarkError.creationFailed
+            throw BookmarkError.creationFailed(url)
         }
         
         return queue.sync {
@@ -58,13 +59,22 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     
     public func resolveBookmark(_ bookmark: Data) throws -> URL {
         if configuration.shouldSimulateBookmarkFailures {
+            let urlString = bookmarks.first(where: { $0.value == bookmark })
+                .map { $0.key.path }
+                ?? "unknown"
+                
             logger.error(
-                "Simulating bookmark resolution failure",
+                "Simulating bookmark resolution failure for URL: \(urlString)",
                 file: #file,
                 function: #function,
                 line: #line
             )
-            throw BookmarkError.resolutionFailed
+            
+            if let url = bookmarks.first(where: { $0.value == bookmark })?.key {
+                throw BookmarkError.resolutionFailed(url)
+            }
+            // If we can't find the URL, use a default error
+            throw BookmarkError.resolutionFailed(URL(fileURLWithPath: "/"))
         }
         
         return queue.sync {
@@ -75,47 +85,51 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
                     function: #function,
                     line: #line
                 )
-                return url
+                return try! url.checkResourceIsReachable() ? url : URL(fileURLWithPath: "/")
             }
-            
+            return URL(fileURLWithPath: "/")
+        }
+    }
+    
+    private func validateBookmarkSync(_ bookmark: Data) throws -> Bool {
+        if configuration.shouldSimulateBookmarkFailures {
+            let urlString = bookmarks.first(where: { $0.value == bookmark })
+                .map { $0.key.path }
+                ?? "unknown"
+                
             logger.error(
-                "Failed to resolve bookmark",
+                "Simulating bookmark validation failure for URL: \(urlString)",
                 file: #file,
                 function: #function,
                 line: #line
             )
-            throw BookmarkError.resolutionFailed
+            
+            if let url = bookmarks.first(where: { $0.value == bookmark })?.key {
+                throw BookmarkError.invalidBookmark(url)
+            }
+            throw BookmarkError.invalidBookmark(URL(fileURLWithPath: "/"))
+        }
+        
+        return queue.sync {
+            // Check if bookmark exists and get corresponding URL
+            guard let _ = bookmarks.first(where: { $0.value == bookmark })?.key else {
+                return false
+            }
+            
+            // Simulate failures if configured
+            if configuration.shouldSimulateBookmarkFailures {
+                return false
+            }
+            
+            return true
         }
     }
     
     public func validateBookmark(_ bookmark: Data) throws -> Bool {
-        if configuration.shouldSimulateBookmarkFailures {
-            logger.error(
-                "Simulating bookmark validation failure",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw BookmarkError.validationFailed
-        }
-        
-        return queue.sync {
-            if let url = bookmarks.first(where: { $0.value == bookmark })?.key {
-                // Simulate staleness based on configuration
-                let isStale = Double.random(in: 0...100) < configuration.stalenessPercentage
-                logger.info(
-                    "Validated bookmark for URL: \(url.path), isValid: \(!isStale)",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                return !isStale
-            }
-            return false
-        }
+        return try validateBookmarkSync(bookmark)
     }
     
-    public func startAccessing(_ url: URL) throws -> Bool {
+    private func startAccessingSync(_ url: URL) throws -> Bool {
         if configuration.shouldSimulateAccessFailures {
             logger.error(
                 "Simulating access failure for URL: \(url.path)",
@@ -123,7 +137,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
                 function: #function,
                 line: #line
             )
-            throw BookmarkError.accessDenied
+            throw BookmarkError.accessDenied(url)
         }
         
         return queue.sync {
@@ -136,6 +150,10 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
             )
             return true
         }
+    }
+    
+    public func startAccessing(_ url: URL) throws -> Bool {
+        return try startAccessingSync(url)
     }
     
     public func stopAccessing(_ url: URL) async throws {

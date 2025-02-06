@@ -30,19 +30,31 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
     }
     
     // MARK: - HealthCheckable Implementation
-    @objc public func performHealthCheck() async -> Bool {
+    @objc public func performHealthCheck() async throws -> Bool {
+        logger.warning(
+            "Circuit breaker XPC service health check called - this should not happen in production",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         return false
     }
     
-    @objc public func updateHealthStatus() {
+    @objc public func updateHealthStatus() async {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
             function: #function,
             line: #line
         )
-        Task {
-            isHealthy = await performHealthCheck()
+        do {
+            isHealthy = try await performHealthCheck()
+        } catch {
+            logger.error("Health check failed: \(error.localizedDescription)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
+            isHealthy = false
         }
     }
     

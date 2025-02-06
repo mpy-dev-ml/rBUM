@@ -14,6 +14,7 @@
 import Foundation
 import SwiftUI
 import Core
+import os.log
 
 @MainActor
 final class RepositoryDetailViewModel: ObservableObject {
@@ -43,20 +44,20 @@ final class RepositoryDetailViewModel: ObservableObject {
     @Published var error: Error?
     
     private let repositoryService: RepositoryServiceProtocol
-    private let logger: LoggerProtocol
+    private let logger: Logger
     
     // MARK: - Initialization
     
     init(
         repository: Repository,
-        repositoryService: RepositoryServiceProtocol = DefaultRepositoryService(),
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "RepositoryDetail")
+        repositoryService: RepositoryServiceProtocol,
+        logger: Logger = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "repository-detail")
     ) {
         self.repository = repository
         self.repositoryService = repositoryService
         self.logger = logger
         
-        logger.debug("Viewing repository details", privacy: .public)
+        logger.debug("Viewing repository details")
     }
     
     // MARK: - Repository Operations
@@ -66,29 +67,21 @@ final class RepositoryDetailViewModel: ObservableObject {
         isLoading = true
         
         do {
-            logger.debug("Refreshing repository", metadata: [
-                "id": .string(repository.id)
-            ])
+            logger.debug("Refreshing repository \(repository.id, privacy: .public)")
             
             // Check repository status
-            let status = try await repositoryService.checkRepository(repository, credentials: repository.credentials)
+            let status = try await repositoryService.checkRepository(repository)
             repository.status = status
             
             // Load snapshots if repository is ready
             if status == .ready {
-                snapshots = try await repositoryService.listSnapshots(in: repository, credentials: repository.credentials)
+                snapshots = try await repositoryService.listSnapshots(repository)
             }
             
-            logger.info("Refresh successful", metadata: [
-                "id": .string(repository.id),
-                "status": .string("\(status)"),
-                "snapshots": .string("\(snapshots.count)")
-            ])
+            logger.info("Refresh successful: \(status) with \(snapshots.count) snapshots")
             
         } catch {
-            logger.error("Refresh failed", metadata: [
-                "error": .string(error.localizedDescription)
-            ])
+            logger.error("Refresh failed: \(error.localizedDescription)")
             self.error = error
         }
         
@@ -100,30 +93,20 @@ final class RepositoryDetailViewModel: ObservableObject {
         isLoading = true
         
         do {
-            logger.debug("Creating snapshot", metadata: [
-                "id": .string(repository.id),
-                "paths": .string("\(paths.count) paths"),
-                "tags": .string("\(tags.count) tags")
-            ])
+            logger.debug("Creating snapshot with \(paths.count) paths and \(tags.count) tags")
             
             let snapshot = try await repositoryService.createSnapshot(
-                in: repository,
-                credentials: repository.credentials,
+                repository,
                 paths: paths,
                 tags: tags
             )
             
             snapshots.append(snapshot)
             
-            logger.info("Snapshot created", metadata: [
-                "id": .string(repository.id),
-                "snapshot": .string(snapshot.id)
-            ])
+            logger.info("Created snapshot \(snapshot.id)")
             
         } catch {
-            logger.error("Failed to create snapshot", metadata: [
-                "error": .string(error.localizedDescription)
-            ])
+            logger.error("Failed to create snapshot: \(error.localizedDescription)")
             self.error = error
         }
         
@@ -135,23 +118,15 @@ final class RepositoryDetailViewModel: ObservableObject {
         isLoading = true
         
         do {
-            logger.debug("Deleting snapshot", metadata: [
-                "id": .string(repository.id),
-                "snapshot": .string(snapshot.id)
-            ])
+            logger.debug("Deleting snapshot \(snapshot.id)")
             
-            try await repositoryService.deleteSnapshot(snapshot, from: repository, credentials: repository.credentials)
+            try await repositoryService.deleteSnapshot(snapshot, from: repository)
             snapshots.removeAll { $0.id == snapshot.id }
             
-            logger.info("Snapshot deleted", metadata: [
-                "id": .string(repository.id),
-                "snapshot": .string(snapshot.id)
-            ])
+            logger.info("Deleted snapshot \(snapshot.id)")
             
         } catch {
-            logger.error("Failed to delete snapshot", metadata: [
-                "error": .string(error.localizedDescription)
-            ])
+            logger.error("Failed to delete snapshot: \(error.localizedDescription)")
             self.error = error
         }
         
@@ -163,23 +138,18 @@ final class RepositoryDetailViewModel: ObservableObject {
         isLoading = true
         
         do {
-            logger.debug("Restoring snapshot", metadata: [
-                "id": .string(repository.id),
-                "snapshot": .string(snapshot.id),
-                "path": .string(path.path)
-            ])
+            logger.debug("Restoring snapshot \(snapshot.id) to \(path.path)")
             
-            try await repositoryService.restoreSnapshot(snapshot, from: repository, credentials: repository.credentials, to: path)
+            try await repositoryService.restoreSnapshot(
+                snapshot,
+                to: path,
+                from: repository
+            )
             
-            logger.info("Snapshot restored", metadata: [
-                "id": .string(repository.id),
-                "snapshot": .string(snapshot.id)
-            ])
+            logger.info("Restored snapshot \(snapshot.id)")
             
         } catch {
-            logger.error("Failed to restore snapshot", metadata: [
-                "error": .string(error.localizedDescription)
-            ])
+            logger.error("Failed to restore snapshot: \(error.localizedDescription)")
             self.error = error
         }
         

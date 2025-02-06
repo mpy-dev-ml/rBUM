@@ -61,7 +61,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
             }
 
             // Show open panel to request access
-            let panel = NSOpenPanel()
+            let panel = await NSOpenPanel()
             panel.canChooseFiles = true
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false

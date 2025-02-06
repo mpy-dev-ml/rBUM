@@ -247,6 +247,15 @@ public final class SecurityService: SecurityServiceProtocol {
             throw SecurityError.xpcValidationFailed("XPC connection has invalid audit session")
         }
         
+        // Ensure connection is still valid
+        if connection.invalidationHandler == nil {
+            self.logger.error("XPC connection is invalidated",
+                            file: #file,
+                            function: #function,
+                            line: #line)
+            throw SecurityError.xpcValidationFailed("Connection is invalidated")
+        }
+        
         return true
     }
 }

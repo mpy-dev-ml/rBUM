@@ -18,21 +18,33 @@ public struct DevelopmentConfiguration {
     public var shouldSimulateAccessFailures: Bool
     /// Whether to simulate connection failures
     public var shouldSimulateConnectionFailures: Bool
+    /// Whether to simulate command timeout failures
+    public var shouldSimulateTimeoutFailures: Bool
+    /// Whether to simulate command execution failures
+    public var shouldSimulateCommandFailures: Bool
     /// Artificial delay for async operations (seconds)
     public var artificialDelay: TimeInterval
+    /// Simulated command execution time (seconds)
+    public var commandExecutionTime: TimeInterval
     
     public init(
         shouldSimulatePermissionFailures: Bool = false,
         shouldSimulateBookmarkFailures: Bool = false,
         shouldSimulateAccessFailures: Bool = false,
         shouldSimulateConnectionFailures: Bool = false,
-        artificialDelay: TimeInterval = 0
+        shouldSimulateTimeoutFailures: Bool = false,
+        shouldSimulateCommandFailures: Bool = false,
+        artificialDelay: TimeInterval = 0,
+        commandExecutionTime: TimeInterval = 0
     ) {
         self.shouldSimulatePermissionFailures = shouldSimulatePermissionFailures
         self.shouldSimulateBookmarkFailures = shouldSimulateBookmarkFailures
         self.shouldSimulateAccessFailures = shouldSimulateAccessFailures
         self.shouldSimulateConnectionFailures = shouldSimulateConnectionFailures
+        self.shouldSimulateTimeoutFailures = shouldSimulateTimeoutFailures
+        self.shouldSimulateCommandFailures = shouldSimulateCommandFailures
         self.artificialDelay = artificialDelay
+        self.commandExecutionTime = commandExecutionTime
     }
     
     /// Default configuration with no simulated failures and no delay

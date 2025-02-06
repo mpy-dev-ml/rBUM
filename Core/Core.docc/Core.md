@@ -1,17 +1,41 @@
 # ``Core``
 
-<!--@START_MENU_TOKEN@-->Summary<!--@END_MENU_TOKEN@-->
+The Core framework provides the foundational services and protocols for the rBUM (Restic Backup Manager) application.
 
 ## Overview
 
-<!--@START_MENU_TOKEN@-->Text<!--@END_MENU_TOKEN@-->
+Core provides essential functionality for managing restic backups, including:
+- Secure credential management through Keychain
+- Sandbox-compliant file operations
+- XPC service communication
+- Error handling and logging
 
 ## Topics
 
-### <!--@START_MENU_TOKEN@-->Group<!--@END_MENU_TOKEN@-->
+### Essentials
+- <doc:GettingStarted>
+- <doc:Security>
 
-- <!--@START_MENU_TOKEN@-->``Symbol``<!--@END_MENU_TOKEN@-->
+### Services
+- ``RepositoryServiceProtocol``
+- ``KeychainCredentialsManagerProtocol``
+- ``SecurityServiceProtocol``
+- ``BookmarkServiceProtocol``
+
+### Models
+- ``Repository``
+- ``Snapshot``
+- ``BackupProgress``
+
+### Error Handling
+- ``ServiceError``
+- ``SecurityError``
+- ``KeychainError``
+- ``SandboxError``
+
+### XPC Communication
+- ``ResticXPCServiceProtocol``
+- ``XPCConnection``
 
 First created: 6 February 2025
 Last updated: 6 February 2025
-

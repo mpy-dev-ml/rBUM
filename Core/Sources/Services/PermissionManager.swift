@@ -10,18 +10,59 @@
 //
 import Foundation
 
-/// Manages permission persistence and recovery strategies for sandbox compliance
+/// A service that manages permission persistence and recovery for sandbox-compliant file access.
+///
+/// The `PermissionManager` provides a robust system for:
+/// - Persisting security-scoped bookmarks
+/// - Recovering file access permissions
+/// - Sharing permissions with XPC services
+/// - Managing permission lifecycle
+///
+/// ## Overview
+///
+/// Use `PermissionManager` to maintain persistent access to files and directories
+/// selected by the user, even after app restart:
+///
+/// ```swift
+/// let manager = PermissionManager(
+///     logger: logger,
+///     securityService: SecurityService(),
+///     keychain: KeychainService()
+/// )
+///
+/// // Store permission
+/// try await manager.persistPermission(for: fileURL)
+///
+/// // Recover permission later
+/// let hasAccess = try await manager.recoverPermission(for: fileURL)
+/// ```
+///
+/// ## Topics
+///
+/// ### Permission Management
+/// - ``persistPermission(for:)``
+/// - ``recoverPermission(for:)``
+/// - ``revokePermission(for:)``
+///
+/// ### Error Handling
+/// - ``PermissionError``
 public class PermissionManager {
     private let logger: LoggerProtocol
     private let securityService: SecurityServiceProtocol
     private let keychain: KeychainServiceProtocol
     
-    /// Prefix for keychain permission entries
+    /// Prefix used for keychain permission entries to avoid naming conflicts
     private let keychainPrefix = "dev.mpy.rBUM.permission."
     
-    /// Access group for sharing permissions with XPC service
+    /// Access group identifier for sharing permissions with the XPC service
     private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
     
+    /// Creates a new permission manager instance.
+    ///
+    /// - Parameters:
+    ///   - logger: The logging service for debugging and diagnostics
+    ///   - securityService: The service handling security-scoped bookmarks
+    ///   - keychain: The service for securely storing permission data
     public init(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
@@ -90,7 +131,7 @@ public class PermissionManager {
         
         do {
             // Check for existing bookmark
-            guard let bookmark = try retrieveBookmark(for: url) else {
+            guard let bookmark = try loadBookmark(for: url) else {
                 logger.debug("No stored bookmark found for: \(url.path)",
                            file: #file,
                            function: #function,
@@ -99,7 +140,7 @@ public class PermissionManager {
             }
             
             // Attempt to resolve bookmark
-            let resolvedURL = try await securityService.resolveBookmark(bookmark)
+            let resolvedURL = try securityService.resolveBookmark(bookmark)
             
             // Verify resolved URL matches original
             guard resolvedURL.path == url.path else {
@@ -112,7 +153,8 @@ public class PermissionManager {
             }
             
             // Test access
-            guard try await securityService.startAccessing(resolvedURL) else {
+            let canAccess = try await securityService.startAccessing(resolvedURL)
+            guard canAccess else {
                 logger.error("Failed to access resolved URL: \(resolvedURL.path)",
                            file: #file,
                            function: #function,
@@ -146,11 +188,20 @@ public class PermissionManager {
     /// - Returns: true if permission exists and is valid
     public func hasValidPermission(for url: URL) async throws -> Bool {
         do {
-            guard let bookmark = try retrieveBookmark(for: url) else {
+            guard let bookmark = try loadBookmark(for: url) else {
                 return false
             }
             
-            let resolvedURL = try await securityService.resolveBookmark(bookmark)
+            let resolvedURL = try securityService.resolveBookmark(bookmark)
+            let canAccess = try await securityService.startAccessing(resolvedURL)
+            if !canAccess {
+                logger.error("Failed to access resolved URL: \(resolvedURL.path)",
+                           file: #file,
+                           function: #function,
+                           line: #line)
+                try removeBookmark(for: url)
+                return false
+            }
             return resolvedURL.path == url.path
             
         } catch {
@@ -189,22 +240,46 @@ public class PermissionManager {
     // MARK: - Private Methods
     
     private func persistBookmark(_ bookmark: Data, for url: URL) throws {
-        let key = keychainKey(for: url)
-        try keychain.save(bookmark, for: key, accessGroup: permissionAccessGroup)
+        logger.debug("Persisting bookmark for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
+        
+        do {
+            try keychain.save(bookmark, for: url.path, accessGroup: permissionAccessGroup)
+        } catch {
+            logger.error("Failed to persist bookmark: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw PermissionError.persistenceFailed(error.localizedDescription)
+        }
     }
     
-    private func retrieveBookmark(for url: URL) throws -> Data? {
-        let key = keychainKey(for: url)
-        return try keychain.retrieve(for: key, accessGroup: permissionAccessGroup)
+    private func loadBookmark(for url: URL) throws -> Data? {
+        logger.debug("Loading bookmark for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
+        
+        return try keychain.retrieve(for: url.path, accessGroup: permissionAccessGroup)
     }
     
     private func removeBookmark(for url: URL) throws {
-        let key = keychainKey(for: url)
-        try keychain.delete(for: key, accessGroup: permissionAccessGroup)
-    }
-    
-    private func keychainKey(for url: URL) -> String {
-        return keychainPrefix + url.path.replacingOccurrences(of: "/", with: "_")
+        logger.debug("Removing bookmark for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line)
+        
+        do {
+            try keychain.delete(for: url.path, accessGroup: permissionAccessGroup)
+        } catch {
+            logger.error("Failed to remove bookmark: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+            throw PermissionError.revocationFailed(error.localizedDescription)
+        }
     }
 }
 

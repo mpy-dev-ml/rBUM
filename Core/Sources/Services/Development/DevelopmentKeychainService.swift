@@ -79,7 +79,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             throw KeychainError.retrievalFailed(status: errSecNoAccessForItem)
         }
         
-        return try queue.sync {
+        return queue.sync {
             guard let data = storage[key] else {
                 logger.info(
                     "No data found for key: \(key)",
@@ -136,12 +136,12 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
     public func configureXPCSharing(accessGroup: String) throws {
         if configuration.shouldSimulateAccessFailures {
             logger.error(
-                "Simulating XPC sharing configuration failure for group: \(accessGroup)",
+                "Simulating XPC configuration failure for group: \(accessGroup)",
                 file: #file,
                 function: #function,
                 line: #line
             )
-            throw KeychainError.xpcConfigurationFailed(status: errSecNoAccessForItem)
+            throw KeychainError.xpcConfigurationFailed
         }
         
         queue.sync(flags: .barrier) {
@@ -163,7 +163,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 function: #function,
                 line: #line
             )
-            throw KeychainError.xpcValidationFailed(status: errSecNoAccessForItem)
+            throw KeychainError.accessValidationFailed
         }
         
         return queue.sync {

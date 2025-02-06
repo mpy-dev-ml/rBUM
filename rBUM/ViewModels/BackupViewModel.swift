@@ -14,6 +14,7 @@
 import Foundation
 import SwiftUI
 import Core
+import os.log
 
 /// BackupViewModel manages the state and operations for creating and managing backups.
 /// It handles:
@@ -57,7 +58,7 @@ final class BackupViewModel: ObservableObject {
     
     /// Tracks the progress of the current backup operation.
     /// Updates are published to enable real-time progress display in the UI.
-    @Published private(set) var progress: ProgressTracker?
+    @Published private(set) var progress: Progress?
     
     /// Error message to display to the user.
     /// Set when an operation fails and requires user notification.
@@ -71,7 +72,7 @@ final class BackupViewModel: ObservableObject {
     
     /// Service for managing repository credentials.
     /// Handles secure storage and retrieval of credentials.
-    private let credentialsService: CredentialsServiceProtocol
+    private let credentialsService: KeychainCredentialsManagerProtocol
     
     /// Service for managing security-scoped bookmarks.
     /// Enables persistent access to user-selected files and directories.
@@ -83,7 +84,7 @@ final class BackupViewModel: ObservableObject {
     
     /// Logger for recording operations and errors.
     /// Uses privacy-aware logging for sensitive information.
-    private let logger: LoggerProtocol
+    private let logger: Logger
     
     // MARK: - Initialization
     
@@ -98,15 +99,15 @@ final class BackupViewModel: ObservableObject {
     init(
         repository: Repository,
         backupService: BackupServiceProtocol,
-        credentialsService: CredentialsServiceProtocol,
+        credentialsService: KeychainCredentialsManagerProtocol,
         bookmarkService: BookmarkServiceProtocol,
         securityService: SecurityServiceProtocol,
-        logger: LoggerProtocol = Logging.logger(for: .backup)
+        logger: Logger = Logger()
     ) {
         self.configuration = BackupConfiguration(
             sources: [],
             repository: repository,
-            settings: .default
+            settings: BackupSettings.default
         )
         self.backupService = backupService
         self.credentialsService = credentialsService
@@ -114,7 +115,7 @@ final class BackupViewModel: ObservableObject {
         self.securityService = securityService
         self.logger = logger
         
-        logger.debug("Initialized BackupViewModel for repository: \(repository.name)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Initialized BackupViewModel for repository: \(repository.name)", file: #file, function: #function, line: #line)
     }
     
     // MARK: - Public Methods
@@ -130,11 +131,11 @@ final class BackupViewModel: ObservableObject {
     /// 3. Creates a security-scoped bookmark
     /// 4. Updates the configuration
     func addSource(_ url: URL) async throws {
-        logger.debug("Adding source to backup: \(url.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Adding source to backup: \(url.path)", file: #file, function: #function, line: #line)
         
         // Check if source already exists
         guard !configuration.sources.contains(where: { $0.url == url }) else {
-            logger.debug("Source already exists: \(url.path)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.debug("Source already exists: \(url.path)", file: #file, function: #function, line: #line)
             return
         }
         
@@ -157,9 +158,9 @@ final class BackupViewModel: ObservableObject {
                 settings: configuration.settings
             )
             
-            logger.info("Successfully added source: \(url.path)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.info("Successfully added source: \(url.path)", file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to add source: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.error("Failed to add source: \(error.localizedDescription)", file: #file, function: #function, line: #line)
             throw error
         }
     }
@@ -172,13 +173,13 @@ final class BackupViewModel: ObservableObject {
     /// 2. Cleans up any associated bookmarks
     /// 3. Updates the UI state
     func removeSource(_ url: URL) {
-        logger.debug("Removing source from backup: \(url.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.debug("Removing source from backup: \(url.path)", file: #file, function: #function, line: #line)
         
         // Remove bookmark
         do {
             try bookmarkService.removeBookmark(for: url)
         } catch {
-            logger.warning("Failed to remove bookmark: \(error.localizedDescription)", privacy: .public, file: #file, function: #function, line: #line)
+            logger.warning("Failed to remove bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
         }
         
         // Update configuration
@@ -190,7 +191,7 @@ final class BackupViewModel: ObservableObject {
             settings: configuration.settings
         )
         
-        logger.info("Successfully removed source: \(url.path)", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Successfully removed source: \(url.path)", file: #file, function: #function, line: #line)
     }
     
     /// Starts the backup operation.
@@ -203,20 +204,20 @@ final class BackupViewModel: ObservableObject {
     /// 5. Handles errors and updates UI state
     func startBackup() async {
         guard !configuration.sources.isEmpty else {
-            logger.warning("Cannot start backup: no sources selected", privacy: .public, file: #file, function: #function, line: #line)
+            logger.warning("Cannot start backup: no sources selected", file: #file, function: #function, line: #line)
             errorMessage = "Please select at least one source to backup"
             showError = true
             return
         }
         
-        logger.info("Starting backup operation", privacy: .public, file: #file, function: #function, line: #line)
+        logger.info("Starting backup operation", file: #file, function: #function, line: #line)
         
         do {
             // Get repository credentials
             let credentials = try await credentialsService.getCredentials(for: configuration.repository)
             
             // Create progress tracker
-            let tracker = ProgressTracker(total: Int64(configuration.sources.count))
+            let tracker = Progress(totalUnitsOfProgress: 1)
             self.progress = tracker
             
             // Start backup
@@ -226,17 +227,17 @@ final class BackupViewModel: ObservableObject {
                 credentials: credentials,
                 tags: configuration.tags,
                 onProgress: { [weak self] progress in
-                    self?.progress?.update(processed: Int64(progress.processedFiles))
+                    self?.progress?.completedUnitCount = Int64(progress.processedFiles)
                 },
                 onStatusChange: { [weak self] status in
                     switch status {
                     case .preparing:
-                        self?.logger.info("Preparing backup", privacy: .public, file: #file, function: #function, line: #line)
+                        self?.logger.info("Preparing backup", file: #file, function: #function, line: #line)
                     case .backing:
-                        self?.logger.info("Backing up files", privacy: .public, file: #file, function: #function, line: #line)
+                        self?.logger.info("Backing up files", file: #file, function: #function, line: #line)
                     case .completed:
-                        self?.logger.info("Backup completed successfully", privacy: .public, file: #file, function: #function, line: #line)
-                        self?.progress?.complete()
+                        self?.logger.info("Backup completed successfully", file: #file, function: #function, line: #line)
+                        self?.progress?.completedUnitCount = 1
                     case .failed(let error):
                         self?.handleError(error)
                     }
@@ -250,7 +251,7 @@ final class BackupViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func handleError(_ error: Error) {
-        progress?.fail(error)
+        progress?.cancel()
         
         switch error {
         case let resticError as ResticError:
@@ -261,7 +262,7 @@ final class BackupViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         
-        logger.error("Backup failed: \(errorMessage ?? "Unknown error")", privacy: .public, file: #file, function: #function, line: #line)
+        logger.error("Backup failed: \(errorMessage ?? "Unknown error")", file: #file, function: #function, line: #line)
         showError = true
     }
 }
