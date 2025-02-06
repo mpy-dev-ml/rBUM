@@ -14,42 +14,12 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     // MARK: - Properties
     private let logger: LoggerProtocol
     private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentXPC", attributes: .concurrent)
+    private let configuration: DevelopmentConfiguration
     
-    /// Configuration for simulating XPC behaviour
-    public struct Configuration {
-        /// Whether to simulate command execution failures
-        public var shouldSimulateCommandFailures: Bool
-        /// Whether to simulate connection failures
-        public var shouldSimulateConnectionFailures: Bool
-        /// Whether to simulate timeout failures
-        public var shouldSimulateTimeoutFailures: Bool
-        /// Artificial delay for operations (seconds)
-        public var artificialDelay: TimeInterval
-        /// Simulated command execution time (seconds)
-        public var commandExecutionTime: TimeInterval
-        
-        public init(
-            shouldSimulateCommandFailures: Bool = false,
-            shouldSimulateConnectionFailures: Bool = false,
-            shouldSimulateTimeoutFailures: Bool = false,
-            artificialDelay: TimeInterval = 0,
-            commandExecutionTime: TimeInterval = 0.5
-        ) {
-            self.shouldSimulateCommandFailures = shouldSimulateCommandFailures
-            self.shouldSimulateConnectionFailures = shouldSimulateConnectionFailures
-            self.shouldSimulateTimeoutFailures = shouldSimulateTimeoutFailures
-            self.artificialDelay = artificialDelay
-            self.commandExecutionTime = commandExecutionTime
-        }
-    }
-    
-    private var configuration: Configuration
+    public static let interfaceVersion: Int = 1
     
     // MARK: - Initialization
-    public init(
-        logger: LoggerProtocol,
-        configuration: Configuration = Configuration()
-    ) {
+    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
         self.logger = logger
         self.configuration = configuration
         
@@ -62,6 +32,37 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     }
     
     // MARK: - ResticXPCProtocol Implementation
+    public func validateInterface(completion: @escaping ([String : Any]?) -> Void) {
+        if configuration.shouldSimulateConnectionFailures {
+            logger.error(
+                "Simulating interface validation failure",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            completion(nil)
+            return
+        }
+        
+        completion(["version": Self.interfaceVersion])
+    }
+    
+    public func validateAccess(bookmarks: [String : NSData], auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+        logger.debug(
+            "Validating access for bookmarks: \(bookmarks.keys.joined(separator: ", "))",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
+        // In development mode, we always validate access successfully
+        let result = bookmarks.keys.reduce(into: [String: Bool]()) { dict, key in
+            dict[key] = true
+        }
+        
+        completion(["validation": result])
+    }
+    
     public func executeCommand(
         _ command: String,
         arguments: [String],

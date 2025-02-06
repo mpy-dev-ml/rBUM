@@ -5,48 +5,88 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
 
 import Foundation
 
-/// Factory protocol for creating services
-public protocol ServiceFactory {
-    func createLogger(category: String) -> LoggerProtocol
-    func createSecurityService() -> SecurityServiceProtocol
-    func createKeychainService() -> KeychainServiceProtocol
-    func createResticService() -> ResticServiceProtocol
-}
-
-/// Default implementation of ServiceFactory
-public final class DefaultServiceFactory: ServiceFactory {
-    public static let shared = DefaultServiceFactory()
+/// Factory for creating services with appropriate implementations based on build configuration
+///
+/// In DEBUG builds, this factory returns development mock services from Core/Sources/Services/Development
+/// In RELEASE builds, it returns the default production implementations
+public enum ServiceFactory {
+    private static let developmentConfiguration = DevelopmentConfiguration()
     
-    private init() {}
-    
-    public func createLogger(category: String) -> LoggerProtocol {
-        OSLogger(category: category)
+    /// Create security service with appropriate implementation
+    /// - Parameter logger: Logger for the service
+    /// - Returns: SecurityServiceProtocol implementation
+    public static func createSecurityService(logger: LoggerProtocol) -> SecurityServiceProtocol {
+        #if DEBUG
+        return DevelopmentSecurityService(
+            logger: logger,
+            configuration: developmentConfiguration
+        )
+        #else
+        return DefaultSecurityService(logger: logger)
+        #endif
     }
     
-    public func createSecurityService() -> SecurityServiceProtocol {
-        let logger = createLogger(category: "Security")
-        let dummyXPC = DummyXPCService(logger: logger)
-        return SecurityService(logger: logger, xpcService: dummyXPC)
+    /// Create keychain service with appropriate implementation
+    /// - Parameter logger: Logger for the service
+    /// - Returns: KeychainServiceProtocol implementation
+    public static func createKeychainService(logger: LoggerProtocol) -> KeychainServiceProtocol {
+        #if DEBUG
+        return DevelopmentKeychainService(
+            logger: logger,
+            configuration: developmentConfiguration
+        )
+        #else
+        return KeychainService(logger: logger)
+        #endif
     }
     
-    public func createKeychainService() -> KeychainServiceProtocol {
-        let logger = createLogger(category: "Keychain")
-        let security = createSecurityService()
-        // Explicitly specify we want KeychainService's init
-        return KeychainService.init(logger: logger, securityService: security) as! KeychainServiceProtocol
+    /// Create bookmark service with appropriate implementation
+    /// - Parameters:
+    ///   - logger: Logger for the service
+    ///   - securityService: Security service dependency
+    ///   - keychainService: Keychain service dependency
+    /// - Returns: BookmarkServiceProtocol implementation
+    public static func createBookmarkService(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        keychainService: KeychainServiceProtocol
+    ) -> BookmarkServiceProtocol {
+        #if DEBUG
+        return DevelopmentBookmarkService(
+            logger: logger,
+            configuration: developmentConfiguration
+        )
+        #else
+        return BookmarkService(
+            logger: logger,
+            securityService: securityService,
+            keychainService: keychainService
+        )
+        #endif
     }
     
-    public func createResticService() -> ResticServiceProtocol {
-        let logger = createLogger(category: "Restic")
-        let security = createSecurityService()
-        return ResticXPCService(logger: logger, securityService: security) as ResticServiceProtocol
+    /// Create XPC service with appropriate implementation
+    /// - Parameters:
+    ///   - logger: Logger for the service
+    ///   - securityService: Security service dependency
+    /// - Returns: ResticXPCProtocol implementation
+    public static func createXPCService(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol
+    ) -> ResticXPCProtocol {
+        #if DEBUG
+        return DevelopmentXPCService(
+            logger: logger,
+            configuration: developmentConfiguration
+        )
+        #else
+        return CircuitBreakerXPCService(
+            logger: logger,
+            securityService: securityService
+        )
+        #endif
     }
 }

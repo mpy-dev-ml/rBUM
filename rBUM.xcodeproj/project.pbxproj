@@ -10,6 +10,13 @@
 		8D36157C2D53E2810008675E /* StorageServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */; };
 		8D36157E2D53E4F40008675E /* RestoreServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */; };
 		8D3615802D53F9510008675E /* MockResticXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D36157F2D53F9510008675E /* MockResticXPCService.swift */; };
+		8D386F4B2D54D6AE00FAFA66 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 8D386F492D54D6AE00FAFA66 /* README.md */; };
+		8D386F4C2D54D6AE00FAFA66 /* DevelopmentSecurityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F472D54D6AE00FAFA66 /* DevelopmentSecurityService.swift */; };
+		8D386F4D2D54D6AE00FAFA66 /* DevelopmentXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F482D54D6AE00FAFA66 /* DevelopmentXPCService.swift */; };
+		8D386F4E2D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F452D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift */; };
+		8D386F4F2D54D6AE00FAFA66 /* DevelopmentKeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F462D54D6AE00FAFA66 /* DevelopmentKeychainService.swift */; };
+		8D386F512D54DC6E00FAFA66 /* DevelopmentConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */; };
+		8D386F532D54F08800FAFA66 /* BookmarkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F522D54F08800FAFA66 /* BookmarkError.swift */; };
 		8D3E9FF62D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0012D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0022D5122C600C21FE0 /* Core.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -64,7 +71,7 @@
 		8DEB6AA32D5292CF00DE8CDE /* BaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AA22D5292CF00DE8CDE /* BaseService.swift */; };
 		8DEB6AA52D52930700DE8CDE /* BaseSandboxedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AA42D52930700DE8CDE /* BaseSandboxedService.swift */; };
 		8DEB6AA72D52935F00DE8CDE /* ServiceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AA62D52935F00DE8CDE /* ServiceFactory.swift */; };
-		8DEB6AA92D52938700DE8CDE /* DummyXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AA82D52938700DE8CDE /* DummyXPCService.swift */; };
+		8DEB6AA92D52938700DE8CDE /* CircuitBreakerXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AA82D52938700DE8CDE /* CircuitBreakerXPCService.swift */; };
 		8DEB6AAB2D52939D00DE8CDE /* ServiceLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AAA2D52939D00DE8CDE /* ServiceLifecycle.swift */; };
 		8DEB6AAD2D5293C800DE8CDE /* ServiceError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AAC2D5293C800DE8CDE /* ServiceError.swift */; };
 		8DEB6AAF2D52977F00DE8CDE /* HealthCheckable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEB6AAE2D52977F00DE8CDE /* HealthCheckable.swift */; };
@@ -156,6 +163,13 @@
 		8D36157B2D53E2810008675E /* StorageServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageServiceProtocol.swift; sourceTree = "<group>"; };
 		8D36157D2D53E4F40008675E /* RestoreServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreServiceProtocol.swift; sourceTree = "<group>"; };
 		8D36157F2D53F9510008675E /* MockResticXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockResticXPCService.swift; sourceTree = "<group>"; };
+		8D386F452D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentBookmarkService.swift; sourceTree = "<group>"; };
+		8D386F462D54D6AE00FAFA66 /* DevelopmentKeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentKeychainService.swift; sourceTree = "<group>"; };
+		8D386F472D54D6AE00FAFA66 /* DevelopmentSecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSecurityService.swift; sourceTree = "<group>"; };
+		8D386F482D54D6AE00FAFA66 /* DevelopmentXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentXPCService.swift; sourceTree = "<group>"; };
+		8D386F492D54D6AE00FAFA66 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentConfiguration.swift; sourceTree = "<group>"; };
+		8D386F522D54F08800FAFA66 /* BookmarkError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkError.swift; sourceTree = "<group>"; };
 		8D3E9DD92D51219800C21FE0 /* rBUM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = rBUM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DEA2D51219900C21FE0 /* rBUMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DF42D51219900C21FE0 /* rBUMUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -213,7 +227,7 @@
 		8DEB6AA22D5292CF00DE8CDE /* BaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseService.swift; sourceTree = "<group>"; };
 		8DEB6AA42D52930700DE8CDE /* BaseSandboxedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseSandboxedService.swift; sourceTree = "<group>"; };
 		8DEB6AA62D52935F00DE8CDE /* ServiceFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFactory.swift; sourceTree = "<group>"; };
-		8DEB6AA82D52938700DE8CDE /* DummyXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DummyXPCService.swift; sourceTree = "<group>"; };
+		8DEB6AA82D52938700DE8CDE /* CircuitBreakerXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircuitBreakerXPCService.swift; sourceTree = "<group>"; };
 		8DEB6AAA2D52939D00DE8CDE /* ServiceLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLifecycle.swift; sourceTree = "<group>"; };
 		8DEB6AAC2D5293C800DE8CDE /* ServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceError.swift; sourceTree = "<group>"; };
 		8DEB6AAE2D52977F00DE8CDE /* HealthCheckable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthCheckable.swift; sourceTree = "<group>"; };
@@ -316,6 +330,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		8D386F4A2D54D6AE00FAFA66 /* Development */ = {
+			isa = PBXGroup;
+			children = (
+				8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */,
+				8D386F452D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift */,
+				8D386F462D54D6AE00FAFA66 /* DevelopmentKeychainService.swift */,
+				8D386F472D54D6AE00FAFA66 /* DevelopmentSecurityService.swift */,
+				8D386F482D54D6AE00FAFA66 /* DevelopmentXPCService.swift */,
+				8D386F492D54D6AE00FAFA66 /* README.md */,
+			);
+			path = Development;
+			sourceTree = "<group>";
+		};
 		8D3E9DD02D51219800C21FE0 = {
 			isa = PBXGroup;
 			children = (
@@ -381,6 +408,7 @@
 				8D3F8D972D524700007E239E /* SandboxDiagnostics.swift */,
 				8D3F8D982D524700007E239E /* SandboxMonitor.swift */,
 				8D3F8D992D524700007E239E /* SecurityService.swift */,
+				8D386F4A2D54D6AE00FAFA66 /* Development */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -388,6 +416,7 @@
 		8D4142632D52355F00FBF58A /* Errors */ = {
 			isa = PBXGroup;
 			children = (
+				8D386F522D54F08800FAFA66 /* BookmarkError.swift */,
 				8DB70A152D53901500F71C4B /* ResticXPCError.swift */,
 				8DEB6AAC2D5293C800DE8CDE /* ServiceError.swift */,
 				8DEB6A9B2D528F7500DE8CDE /* SandboxError.swift */,
@@ -527,7 +556,7 @@
 		8DEB6AA12D5292B300DE8CDE /* Mock */ = {
 			isa = PBXGroup;
 			children = (
-				8DEB6AA82D52938700DE8CDE /* DummyXPCService.swift */,
+				8DEB6AA82D52938700DE8CDE /* CircuitBreakerXPCService.swift */,
 			);
 			path = Mock;
 			sourceTree = "<group>";
@@ -769,6 +798,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8D386F4B2D54D6AE00FAFA66 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -815,6 +845,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				8D3F8D7C2D52464A007E239E /* OSLogger.swift in Sources */,
+				8D386F4C2D54D6AE00FAFA66 /* DevelopmentSecurityService.swift in Sources */,
+				8D386F4D2D54D6AE00FAFA66 /* DevelopmentXPCService.swift in Sources */,
+				8D386F4E2D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift in Sources */,
+				8D386F4F2D54D6AE00FAFA66 /* DevelopmentKeychainService.swift in Sources */,
 				8D4142952D52355F00FBF58A /* KeychainError.swift in Sources */,
 				8D4142962D52355F00FBF58A /* SecurityError.swift in Sources */,
 				8D4142972D52355F00FBF58A /* BackupServiceProtocol.swift in Sources */,
@@ -824,7 +858,7 @@
 				8D41429A2D52355F00FBF58A /* KeychainCredentialsManagerProtocol.swift in Sources */,
 				8D41429B2D52355F00FBF58A /* KeychainServiceProtocol.swift in Sources */,
 				8D36157E2D53E4F40008675E /* RestoreServiceProtocol.swift in Sources */,
-				8DEB6AA92D52938700DE8CDE /* DummyXPCService.swift in Sources */,
+				8DEB6AA92D52938700DE8CDE /* CircuitBreakerXPCService.swift in Sources */,
 				8DEB6AA32D5292CF00DE8CDE /* BaseService.swift in Sources */,
 				8D41429D2D52355F00FBF58A /* NotificationCenterProtocol.swift in Sources */,
 				8D41429F2D52355F00FBF58A /* RepositoryCreationServiceProtocol.swift in Sources */,
@@ -841,6 +875,7 @@
 				8D3F8D9F2D524700007E239E /* KeychainService.swift in Sources */,
 				8DEB6AA72D52935F00DE8CDE /* ServiceFactory.swift in Sources */,
 				8DEB6AAD2D5293C800DE8CDE /* ServiceError.swift in Sources */,
+				8D386F532D54F08800FAFA66 /* BookmarkError.swift in Sources */,
 				8D3F8DA02D524700007E239E /* PermissionManager.swift in Sources */,
 				8D3F8DA12D524700007E239E /* ResticXPCService.swift in Sources */,
 				8DEB6A962D528DFE00DE8CDE /* SandboxCompliant.swift in Sources */,
@@ -866,6 +901,7 @@
 				8D3615802D53F9510008675E /* MockResticXPCService.swift in Sources */,
 				8D4142A42D52355F00FBF58A /* ResticXPCServiceProtocol.swift in Sources */,
 				8DEB6A942D528C5B00DE8CDE /* LoggerProtocol.swift in Sources */,
+				8D386F512D54DC6E00FAFA66 /* DevelopmentConfiguration.swift in Sources */,
 				8DEB6ABF2D52D8F000DE8CDE /* KeychainCredentials.swift in Sources */,
 				8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */,
 				8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */,

@@ -40,6 +40,10 @@ public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
         return true
     }
     
+    @objc public func updateHealthStatus() {
+        // Implementation
+    }
+    
     // MARK: - LoggerProtocol Implementation
     public func debug(_ message: String, file: String, function: String, line: Int) {
         logger.debug("\(message, privacy: .public) [\(file):\(line) \(function)]")

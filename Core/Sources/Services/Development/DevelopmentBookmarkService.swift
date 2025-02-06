@@ -9,53 +9,17 @@
 import Foundation
 
 /// Development mock implementation of BookmarkServiceProtocol
-/// Provides in-memory storage and configurable behaviour for development
+/// Provides simulated bookmark behaviour for development
 public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     // MARK: - Properties
     private let logger: LoggerProtocol
     private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentBookmark", attributes: .concurrent)
     private var bookmarks: [URL: Data] = [:]
     private var activeAccess: Set<URL> = []
-    
-    /// Configuration for simulating bookmark behaviour
-    public struct Configuration {
-        /// Whether to simulate bookmark creation failures
-        public var shouldSimulateCreationFailures: Bool
-        /// Whether to simulate bookmark resolution failures
-        public var shouldSimulateResolutionFailures: Bool
-        /// Whether to simulate bookmark validation failures
-        public var shouldSimulateValidationFailures: Bool
-        /// Whether to simulate access failures
-        public var shouldSimulateAccessFailures: Bool
-        /// Artificial delay for operations (seconds)
-        public var artificialDelay: TimeInterval
-        /// Percentage of bookmarks that should be considered stale (0-100)
-        public var stalenessPercentage: Double
-        
-        public init(
-            shouldSimulateCreationFailures: Bool = false,
-            shouldSimulateResolutionFailures: Bool = false,
-            shouldSimulateValidationFailures: Bool = false,
-            shouldSimulateAccessFailures: Bool = false,
-            artificialDelay: TimeInterval = 0,
-            stalenessPercentage: Double = 0
-        ) {
-            self.shouldSimulateCreationFailures = shouldSimulateCreationFailures
-            self.shouldSimulateResolutionFailures = shouldSimulateResolutionFailures
-            self.shouldSimulateValidationFailures = shouldSimulateValidationFailures
-            self.shouldSimulateAccessFailures = shouldSimulateAccessFailures
-            self.artificialDelay = artificialDelay
-            self.stalenessPercentage = max(0, min(100, stalenessPercentage))
-        }
-    }
-    
-    private var configuration: Configuration
+    private let configuration: DevelopmentConfiguration
     
     // MARK: - Initialization
-    public init(
-        logger: LoggerProtocol,
-        configuration: Configuration = Configuration()
-    ) {
+    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
         self.logger = logger
         self.configuration = configuration
         
@@ -69,7 +33,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     
     // MARK: - BookmarkServiceProtocol Implementation
     public func createBookmark(for url: URL) throws -> Data {
-        if configuration.shouldSimulateCreationFailures {
+        if configuration.shouldSimulateBookmarkFailures {
             logger.error(
                 "Simulating bookmark creation failure for URL: \(url.path)",
                 file: #file,
@@ -93,7 +57,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     }
     
     public func resolveBookmark(_ bookmark: Data) throws -> URL {
-        if configuration.shouldSimulateResolutionFailures {
+        if configuration.shouldSimulateBookmarkFailures {
             logger.error(
                 "Simulating bookmark resolution failure",
                 file: #file,
@@ -125,7 +89,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol {
     }
     
     public func validateBookmark(_ bookmark: Data) throws -> Bool {
-        if configuration.shouldSimulateValidationFailures {
+        if configuration.shouldSimulateBookmarkFailures {
             logger.error(
                 "Simulating bookmark validation failure",
                 file: #file,

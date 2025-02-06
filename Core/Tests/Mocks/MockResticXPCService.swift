@@ -65,4 +65,9 @@ public final class MockResticXPCService: NSObject, ResticXPCServiceProtocol {
     public func performHealthCheck() async -> Bool {
         return true
     }
+    
+    // MARK: - HealthCheckable Implementation
+    @objc public func updateHealthStatus() {
+        // No-op for mock
+    }
 }

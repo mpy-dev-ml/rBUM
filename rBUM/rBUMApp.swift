@@ -33,30 +33,20 @@ struct rBUMApp: App {
         let notificationCenter = NotificationCenter.default
         
         // Initialize security-related services
-        let sandboxMonitor = SandboxMonitor(logger: logger, securityService: <#any SecurityServiceProtocol#>)
-        
-        let keychainService = KeychainService(
+        let securityService = ServiceFactory.createSecurityService(logger: logger)
+        let keychainService = ServiceFactory.createKeychainService(logger: logger)
+        let bookmarkService = ServiceFactory.createBookmarkService(
             logger: logger,
-            securityService: nil  // Will be set after SecurityService is created
+            securityService: securityService,
+            keychainService: keychainService
         )
         
-        let bookmarkService = BookmarkService(
+        let sandboxMonitor = SandboxMonitor(
             logger: logger,
-            securityService: nil, keychainService: <#any KeychainServiceProtocol#>  // Will be set after SecurityService is created
+            securityService: securityService
         )
         
-        let securityService = DefaultSecurityService(
-            logger: logger, securityService: <#any SecurityServiceProtocol#>,
-            bookmarkService: bookmarkService,
-            keychainService: keychainService,
-            sandboxMonitor: sandboxMonitor
-        )
-        
-        // Set the security service reference in dependent services
-        keychainService.securityService = securityService
-        bookmarkService.securityService = securityService
-        
-        let xpcService = ResticXPCService(
+        let xpcService = ServiceFactory.createXPCService(
             logger: logger,
             securityService: securityService
         )
@@ -79,16 +69,16 @@ struct rBUMApp: App {
         self.resticService = ResticCommandService(
             logger: logger,
             securityService: securityService,
-            xpcService: xpcService as! ResticXPCServiceProtocol,
+            xpcService: ServiceFactory.createXPCService(logger: logger, securityService: securityService),
             keychainService: keychainService
-        ) as! any ResticCommandServiceProtocol
+        )
         
         self.repositoryCreationService = DefaultRepositoryCreationService(
             logger: logger,
             securityService: securityService,
             bookmarkService: bookmarkService,
             keychainService: keychainService
-        ) as! any RepositoryCreationServiceProtocol
+        )
         
         logger.debug("App initialized",
                     file: #file,
