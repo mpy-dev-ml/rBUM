@@ -32,16 +32,16 @@ public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
     }
     
     // MARK: - HealthCheckable Implementation
+    @objc public func updateHealthStatus() async {
+        isHealthy = await performHealthCheck()
+    }
+    
     @objc public func performHealthCheck() async -> Bool {
         // Logger health check:
         // 1. Verify we can write to system log
         // 2. Verify subsystem and category are valid
         logger.debug("Health check: \(self.subsystem).\(self.category)")
         return true
-    }
-    
-    @objc public func updateHealthStatus() {
-        // Implementation
     }
     
     // MARK: - LoggerProtocol Implementation

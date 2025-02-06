@@ -189,15 +189,27 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     }
     
     // MARK: - HealthCheckable Implementation
-    public func performHealthCheck() async throws -> Bool {
+    @objc public func updateHealthStatus() async {
+        do {
+            isHealthy = try await performHealthCheck()
+        } catch {
+            logger.error("Health check failed: \(error.localizedDescription)",
+                       file: #file,
+                       function: #function,
+                       line: #line)
+            isHealthy = false
+        }
+    }
+    
+    @objc public func performHealthCheck() async throws -> Bool {
         logger.debug("Performing health check", file: #file, function: #function, line: #line)
         
         // Validate XPC connection
-        try await securityService.validateXPCConnection(connection)
+        let isValid = try await securityService.validateXPCConnection(connection)
         
         // Check if connection is valid (NSXPCConnection doesn't have isValid, 
         // but we can check if it's not invalidated)
-        if connection.invalidationHandler == nil {
+        if !isValid || connection.invalidationHandler == nil {
             throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
         }
         

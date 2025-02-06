@@ -30,8 +30,8 @@ enum ResticXPCErrorDomain {
 }
 
 // MARK: - Restic Service Implementation
-final class ResticService: BaseService, ResticXPCProtocol {
-    func executeCommand(_ command: String, arguments: [String], environment: [String : String], workingDirectory: String, bookmarks: [String : NSData], timeout: TimeInterval, auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+@objc final class ResticService: BaseService, ResticXPCProtocol {
+    @objc func executeCommand(_ command: String, arguments: [String], environment: [String : String], workingDirectory: String, bookmarks: [String : NSData], timeout: TimeInterval, auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
         queue.async {
             do {
                 try self.validateClient()
@@ -47,7 +47,7 @@ final class ResticService: BaseService, ResticXPCProtocol {
         }
     }
     
-    func ping(auditSessionId: au_asid_t, completion: @escaping (Bool) -> Void) {
+    @objc func ping(auditSessionId: au_asid_t, completion: @escaping (Bool) -> Void) {
         queue.async {
             do {
                 try self.validateClient()
@@ -59,7 +59,7 @@ final class ResticService: BaseService, ResticXPCProtocol {
         }
     }
     
-    func validateAccess(bookmarks: [String : NSData], auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
+    @objc func validateAccess(bookmarks: [String : NSData], auditSessionId: au_asid_t, completion: @escaping ([String : Any]?) -> Void) {
         queue.async {
             do {
                 try self.validateClient()
@@ -135,7 +135,7 @@ final class ResticService: BaseService, ResticXPCProtocol {
     }
     
     // MARK: - ResticXPCProtocol Implementation
-    func validateInterface(completion: @escaping ([String: Any]?) -> Void) {
+    @objc func validateInterface(completion: @escaping ([String: Any]?) -> Void) {
         queue.async {
             do {
                 try self.validateClient()

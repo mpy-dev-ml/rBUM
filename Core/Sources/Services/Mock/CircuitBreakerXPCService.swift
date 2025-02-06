@@ -29,6 +29,23 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         super.init()
     }
     
+    // MARK: - HealthCheckable Implementation
+    @objc public func performHealthCheck() async -> Bool {
+        return false
+    }
+    
+    @objc public func updateHealthStatus() {
+        logger.warning(
+            "Circuit breaker XPC service called - this should not happen in production",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        Task {
+            isHealthy = await performHealthCheck()
+        }
+    }
+    
     // MARK: - ResticXPCServiceProtocol Implementation
     func ping() async -> Bool {
         logger.warning(
@@ -78,14 +95,5 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
             line: #line
         )
         throw ServiceError.operationFailed
-    }
-    
-    // MARK: - HealthCheckable Implementation
-    func performHealthCheck() async -> Bool {
-        return false
-    }
-    
-    @objc public func updateHealthStatus() {
-        // Implementation
     }
 }

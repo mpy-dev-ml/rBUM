@@ -17,7 +17,7 @@ import Foundation
 @objc public protocol ResticXPCServiceProtocol: HealthCheckable {
     /// Ping the service to check availability
     /// - Returns: true if service is available
-    func ping() async -> Bool
+    @objc func ping() async -> Bool
     
     /// Initialize a new repository
     /// - Parameters:
@@ -25,7 +25,7 @@ import Foundation
     ///   - username: Repository username
     ///   - password: Repository password
     /// - Throws: ResticError if initialization fails
-    func initializeRepository(at url: URL, username: String, password: String) async throws
+    @objc func initializeRepository(at url: URL, username: String, password: String) async throws
     
     /// Create a backup
     /// - Parameters:
@@ -34,7 +34,7 @@ import Foundation
     ///   - username: Repository username
     ///   - password: Repository password
     /// - Throws: ResticError if backup fails
-    func backup(from source: URL, to destination: URL, username: String, password: String) async throws
+    @objc func backup(from source: URL, to destination: URL, username: String, password: String) async throws
     
     /// List snapshots in repository
     /// - Parameters:
@@ -42,7 +42,7 @@ import Foundation
     ///   - password: Repository password
     /// - Returns: List of snapshot IDs
     /// - Throws: ResticError if listing fails
-    func listSnapshots(username: String, password: String) async throws -> [String]
+    @objc func listSnapshots(username: String, password: String) async throws -> [String]
     
     /// Restore from backup
     /// - Parameters:
@@ -51,5 +51,5 @@ import Foundation
     ///   - username: Repository username
     ///   - password: Repository password
     /// - Throws: ResticError if restore fails
-    func restore(from source: URL, to destination: URL, username: String, password: String) async throws
+    @objc func restore(from source: URL, to destination: URL, username: String, password: String) async throws
 }
