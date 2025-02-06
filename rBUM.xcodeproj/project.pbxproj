@@ -385,21 +385,6 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		8D3F8DA42D524844007E239E /* Apple */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Apple;
-			sourceTree = "<group>";
-		};
-		8D3F8DA52D524844007E239E /* Platform */ = {
-			isa = PBXGroup;
-			children = (
-				8D3F8DA42D524844007E239E /* Apple */,
-			);
-			path = Platform;
-			sourceTree = "<group>";
-		};
 		8D4142632D52355F00FBF58A /* Errors */ = {
 			isa = PBXGroup;
 			children = (
@@ -457,7 +442,6 @@
 		8D4142752D52355F00FBF58A /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				8D3F8DA52D524844007E239E /* Platform */,
 				8D3F8D9B2D524700007E239E /* Services */,
 				8D3F8D882D5246A3007E239E /* Models */,
 				8D3F8D7B2D52464A007E239E /* Logging */,

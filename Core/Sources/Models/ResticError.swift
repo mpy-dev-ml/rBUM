@@ -1,3 +1,13 @@
+//
+//  ResticError.swift
+//  rBUM
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
 import Foundation
 
 /// Represents errors that can occur during Restic backup operations

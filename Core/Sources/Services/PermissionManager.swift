@@ -1,3 +1,13 @@
+//
+//  PermissionManager.swift
+//  rBUM
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
 import Foundation
 
 /// Manages permission persistence and recovery strategies for sandbox compliance

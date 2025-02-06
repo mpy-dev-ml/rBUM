@@ -1,3 +1,13 @@
+//
+//  RepositoryStatus.swift
+//  rBUM
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
+//  First created: 6 February 2025
+//  Last updated: 6 February 2025
+//
 /// Model representing the status of a repository after a check operation
 struct RepositoryStatus: Codable, Equatable {
     /// Whether the repository is valid
