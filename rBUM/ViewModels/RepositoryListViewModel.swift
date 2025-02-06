@@ -56,67 +56,7 @@ final class RepositoryListViewModel: ObservableObject {
         logger.debug("Loading repositories", file: #file, function: #function, line: #line)
         
         do {
-            let repositories = try await repositoryService
-                .listRepositories()
-                .sorted { leftRepo, rightRepo in
-                    let leftName = leftRepo.name
-                    let rightName = rightRepo.name
-                    return leftName.localizedCaseInsensitiveCompare(rightName) == .orderedAscending
-                }
-            
-            // Create progress tracker
-            let tracker = Progress(totalUnitCount: Int64(repositories.count))
-            self.progress = tracker
-            
-            // Verify each repository
-            let validRepos = await withTaskGroup(of: (Repository?, Error?).self) { group in
-                for repository in repositories {
-                    group.addTask {
-                        do {
-                            // Validate repository access
-                            try await self.securityService.validateAccess(to: repository.path)
-                            
-                            // Check repository status
-                            _ = try await self.repositoryService.checkRepository(repository)
-                            
-                            // Update progress
-                            await MainActor.run {
-                                tracker.completedUnitCount += 1
-                            }
-                            
-                            return (repository, nil)
-                        } catch {
-                            self.logger.error("Repository validation failed: \(error.localizedDescription)", file: #file, function: #function, line: #line)
-                            return (nil, error)
-                        }
-                    }
-                }
-                
-                var repos: [Repository] = []
-                var errors: [Error] = []
-                
-                for await (repo, error) in group {
-                    if let repo = repo {
-                        repos.append(repo)
-                    }
-                    if let error = error {
-                        errors.append(error)
-                    }
-                }
-                
-                // Log any errors
-                if !errors.isEmpty {
-                    self.logger.warning("\(errors.count) repositories failed validation", file: #file, function: #function, line: #line)
-                }
-                
-                return repos
-            }
-            
-            await MainActor.run {
-                self.repositories = validRepos
-                self.progress?.completedUnitCount = Int64(validRepos.count)
-                self.logger.info("Loaded \(validRepos.count) valid repositories", file: #file, function: #function, line: #line)
-            }
+            try await loadRepositoriesAsync()
         } catch {
             await MainActor.run {
                 self.error = error
@@ -124,6 +64,80 @@ final class RepositoryListViewModel: ObservableObject {
                 self.progress?.cancel()
                 self.logger.error("Failed to load repositories: \(error.localizedDescription)", file: #file, function: #function, line: #line)
             }
+        }
+    }
+    
+    private func compareRepositoryNames(
+        _ left: Repository,
+        _ right: Repository
+    ) -> Bool {
+        let name1 = left.name
+        let name2 = right.name
+        let comparisonResult = name1.localizedCaseInsensitiveCompare(name2)
+        return comparisonResult == .orderedAscending
+    }
+    
+    private func loadRepositoriesAsync() async throws {
+        let repositories = try await repositoryService
+            .listRepositories()
+            .sorted(by: compareRepositoryNames)
+        
+        // Create progress tracker
+        let tracker = Progress(totalUnitCount: Int64(repositories.count))
+        self.progress = tracker
+        
+        // Verify each repository
+        let validRepos = await withTaskGroup(of: (Repository?, Error?).self) { group in
+            for repository in repositories {
+                group.addTask {
+                    do {
+                        // Validate repository access
+                        try await self.securityService.validateAccess(to: repository.path)
+                        
+                        // Check repository status
+                        _ = try await self.repositoryService.checkRepository(repository)
+                        
+                        // Update progress
+                        await MainActor.run {
+                            tracker.completedUnitCount += 1
+                        }
+                        
+                        return (repository, nil)
+                    } catch {
+                        let message = "Repository validation failed: \(error.localizedDescription)"
+                        self.logger.error(message,
+                            file: #file,
+                            function: #function,
+                            line: #line)
+                        return (nil, error)
+                    }
+                }
+            }
+            
+            var repos: [Repository] = []
+            var errors: [Error] = []
+            
+            for await (repo, error) in group {
+                if let repo = repo {
+                    repos.append(repo)
+                }
+                if let error = error {
+                    errors.append(error)
+                }
+            }
+            
+            // Log any errors
+            if !errors.isEmpty {
+                self.logger.warning("\(errors.count) repositories failed validation", file: #file, function: #function, line: #line)
+            }
+            
+            return repos
+        }
+        
+        await MainActor.run {
+            self.repositories = validRepos
+            self.progress?.completedUnitCount = Int64(validRepos.count)
+            self.logger.info("Loaded \(validRepos.count) valid repositories", file: #file, function: #function, line: #line)
         }
     }
     
