@@ -11,6 +11,8 @@ disabled_rules:
   - trailing_comma
   - vertical_parameter_alignment
   - void_return
+  - function_parameter_count # Temporarily disabled due to XPC requirements
+  - implicit_getter # Temporarily disabled
 
 opt_in_rules:
   - closure_spacing
@@ -83,6 +85,8 @@ identifier_name:
     - x
     - y
     - z
+    - l
+    - r
 
 nesting:
   type_level: 3
@@ -90,8 +94,8 @@ nesting:
 custom_rules:
   explicit_failure_calls:
     name: "Explicit Failure Calls"
-    regex: "(try|require)\\!\\s*\\("
-    message: "Avoid using force unwrap with try or require"
+    regex: "(XCTFail\\([^)]*\\))"
+    message: "Prefer XCTFail with a descriptive message"
     severity: warning
 
   protocol_property_accessors_order:

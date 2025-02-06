@@ -31,7 +31,15 @@ enum ResticXPCErrorDomain {
 
 // MARK: - Restic Service Implementation
 @objc final class ResticService: BaseService, ResticXPCProtocol {
-    @objc func executeCommand(_ command: String, arguments: [String], environment: [String: String], workingDirectory: String, bookmarks: [String: NSData], timeout: TimeInterval, auditSessionId: au_asid_t, completion: @escaping ([String: Any]?) -> Void) {
+    @objc func executeResticCommand(
+        command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData],
+        auditSessionId: au_asid_t,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
         queue.async {
             do {
                 try self.validateClient()
@@ -147,9 +155,9 @@ enum ResticXPCErrorDomain {
     }
     
     // MARK: - Security Helpers
-    private func SecCodeCreateWithAuditToken(_ pid: pid_t) -> SecCode? {
+    private func secCodeCreateWithAuditToken(_ token: audit_token_t) throws -> SecCode? {
         var code: SecCode?
-        let attributes = [kSecGuestAttributePid: pid] as CFDictionary
+        let attributes = [kSecGuestAttributePid: token] as CFDictionary
         let status = SecCodeCopyGuestWithAttributes(nil, attributes, [], &code)
         return status == errSecSuccess ? code : nil
     }

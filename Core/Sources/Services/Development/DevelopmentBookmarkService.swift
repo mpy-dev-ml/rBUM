@@ -45,7 +45,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         }
         
         return queue.sync {
-            let bookmarkData = "mock_bookmark_\(url.path)".data(using: .utf8)!
+            let bookmarkData = Data("mock_bookmark_\(url.path)".utf8)
             bookmarks[url] = bookmarkData
             logger.info(
                 "Created bookmark for URL: \(url.path)",
@@ -112,7 +112,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         
         return queue.sync {
             // Check if bookmark exists and get corresponding URL
-            guard let _ = bookmarks.first(where: { $0.value == bookmark })?.key else {
+            guard let url = bookmarks.first(where: { $0.value == bookmark })?.key else {
                 return false
             }
             

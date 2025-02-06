@@ -39,6 +39,10 @@ public final class SandboxMonitor: BaseSandboxedService {
 
 // MARK: - SandboxMonitorProtocol Implementation
 extension SandboxMonitor: SandboxMonitorProtocol {
+    public var isMonitoring: Bool {
+        <#code#>
+    }
+    
     public func startMonitoring(url: URL) -> Bool {
         monitorQueue.sync(flags: .barrier) {
             guard !activeResources.contains(url) else { return true }

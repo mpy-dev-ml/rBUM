@@ -56,7 +56,13 @@ final class RepositoryListViewModel: ObservableObject {
         logger.debug("Loading repositories", file: #file, function: #function, line: #line)
         
         do {
-            let repositories = try await repositoryService.listRepositories()
+            let repositories = try await repositoryService
+                .listRepositories()
+                .sorted { leftRepo, rightRepo in
+                    let leftName = leftRepo.name
+                    let rightName = rightRepo.name
+                    return leftName.localizedCaseInsensitiveCompare(rightName) == .orderedAscending
+                }
             
             // Create progress tracker
             let tracker = Progress(totalUnitCount: Int64(repositories.count))

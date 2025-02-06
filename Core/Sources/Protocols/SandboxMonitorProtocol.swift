@@ -5,35 +5,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
 
 import Foundation
-
-/// Events that can occur during sandbox access monitoring
-public enum SandboxAccessEvent {
-    /// Access to the resource was granted
-    case accessGranted
-    /// Access to the resource was revoked
-    case accessRevoked
-    /// Access to the resource expired
-    case accessExpired
-    /// Access to the resource needs renewal
-    case accessNeedsRenewal
-}
-
-/// Protocol for receiving sandbox monitoring events
-public protocol SandboxMonitorDelegate: AnyObject {
-    /// Called when a sandbox access event occurs
-    /// - Parameters:
-    ///   - monitor: The monitor that generated the event
-    ///   - event: The event that occurred
-    ///   - url: The URL associated with the event
-    func sandboxMonitor(_ monitor: Any, didReceive event: SandboxAccessEvent, for url: URL)
-}
 
 /// Protocol defining sandbox monitoring operations
 public protocol SandboxMonitorProtocol: AnyObject {
@@ -49,11 +22,14 @@ public protocol SandboxMonitorProtocol: AnyObject {
     /// - Parameter url: The URL to stop monitoring
     func stopMonitoring(for url: URL)
     
+    /// Indicates if the monitor is currently active
+    var isMonitoring: Bool { get set }
+    
     /// Check if a URL is currently being monitored
     /// - Parameter url: The URL to check
     /// - Returns: true if the URL is being monitored
     func isMonitoring(url: URL) -> Bool
-    
+
     /// Health check for the monitor
     var isHealthy: Bool { get }
 }

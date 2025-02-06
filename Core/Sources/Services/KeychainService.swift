@@ -88,9 +88,10 @@ public final class KeychainService: BaseSandboxedService, Measurable {
         
         do {
             let testKey = "health_check"
-            let testData = "test".data(using: .utf8)!
+            let string = "test"
+            let data = Data(string.utf8)
             
-            try save(testData, for: testKey)
+            try save(data, for: testKey)
             try delete(for: testKey)
             
             logger.info("Keychain health check passed",

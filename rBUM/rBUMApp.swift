@@ -18,7 +18,7 @@ import Foundation
 private let logger = LoggerFactory.createLogger(category: "App")
 
 @main
-struct rBUMApp: App {
+struct RBUMApp: App {
     private let processExecutor = ProcessExecutor()
     private let credentialsManager: KeychainCredentialsManagerProtocol
     private let repositoryStorage: RepositoryStorageProtocol

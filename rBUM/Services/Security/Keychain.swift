@@ -58,11 +58,22 @@ public final class Keychain {
         }
         
         guard status == errSecSuccess else {
-            logger.error("Failed to save keychain item: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")", file: #file, function: #function, line: #line)
+            let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+            logger.error(
+                "Failed to save keychain item: \(errorMessage)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw KeychainError.saveFailed(status)
         }
         
-        logger.debug("Successfully saved to keychain for account: \(account)", file: #file, function: #function, line: #line)
+        logger.debug(
+            "Successfully saved to keychain for account: \(account)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     /// Retrieve data from the keychain
@@ -78,11 +89,22 @@ public final class Keychain {
         
         guard status == errSecSuccess,
               let data = result as? Data else {
-            logger.error("Failed to retrieve keychain item: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")", file: #file, function: #function, line: #line)
+            let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+            logger.error(
+                "Failed to retrieve keychain item: \(errorMessage)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw KeychainError.retrieveFailed(status)
         }
         
-        logger.debug("Successfully retrieved from keychain for account: \(account)", file: #file, function: #function, line: #line)
+        logger.debug(
+            "Successfully retrieved from keychain for account: \(account)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         return data
     }
     
@@ -94,11 +116,22 @@ public final class Keychain {
         
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            logger.error("Failed to delete keychain item: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")", file: #file, function: #function, line: #line)
+            let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+            logger.error(
+                "Failed to delete keychain item: \(errorMessage)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw KeychainError.deleteFailed(status)
         }
         
-        logger.debug("Successfully deleted from keychain for account: \(account)", file: #file, function: #function, line: #line)
+        logger.debug(
+            "Successfully deleted from keychain for account: \(account)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     /// List all accounts in the keychain for this service
@@ -114,7 +147,13 @@ public final class Keychain {
         guard status == errSecSuccess || status == errSecItemNotFound,
               let items = result as? [[String: Any]] else {
             if status != errSecItemNotFound {
-                logger.error("Failed to list keychain items: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")", file: #file, function: #function, line: #line)
+                let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+                logger.error(
+                    "Failed to list keychain items: \(errorMessage)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             }
             return []
         }

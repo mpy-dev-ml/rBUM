@@ -90,7 +90,16 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         }
         
         return queue.sync {
-            let bookmark = "mock-bookmark-\(UUID().uuidString)".data(using: .utf8)!
+            let string = "mock-bookmark-\(UUID().uuidString)"
+            guard let bookmark = string.data(using: .utf8) else {
+                logger.error(
+                    "Failed to create bookmark data",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+                throw SecurityError.bookmarkCreationFailed("Failed to create bookmark data")
+            }
             bookmarks[url] = bookmark
             logger.info(
                 "Created bookmark for URL: \(url.path)",
@@ -167,7 +176,16 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         }
         
         return queue.sync {
-            let bookmark = "mock-bookmark-\(UUID().uuidString)".data(using: .utf8)!
+            let string = "mock-bookmark-\(UUID().uuidString)"
+            guard let bookmark = string.data(using: .utf8) else {
+                logger.error(
+                    "Failed to create bookmark data",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+                throw SecurityError.bookmarkCreationFailed("Failed to create bookmark data")
+            }
             bookmarks[url] = bookmark
             logger.info(
                 "Created bookmark for URL: \(url.path)",

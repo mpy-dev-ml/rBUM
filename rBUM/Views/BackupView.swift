@@ -121,7 +121,13 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         return []
     }
     
-    func createBackup(paths: [URL], to repository: Repository, tags: [String]?, onProgress: ((ResticBackupProgress) -> Void)?, onStatusChange: ((ResticBackupStatus) -> Void)?) async throws {
+    func createBackup(
+        paths: [URL],
+        to repository: Repository,
+        tags: [String]?,
+        onProgress: ((ResticBackupProgress) -> Void)?,
+        onStatusChange: ((ResticBackupStatus) -> Void)?
+    ) async throws {
         // Simulate backup progress
         onStatusChange?(.preparing)
         
@@ -143,7 +149,14 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         onStatusChange?(.completed)
     }
     
-    func pruneSnapshots(in repository: Repository, keepLast: Int?, keepDaily: Int?, keepWeekly: Int?, keepMonthly: Int?, keepYearly: Int?) async throws {
+    func pruneSnapshots(
+        in repository: Repository,
+        keepLast: Int?,
+        keepDaily: Int?,
+        keepWeekly: Int?,
+        keepMonthly: Int?,
+        keepYearly: Int?
+    ) async throws {
         // No-op for preview
     }
     
