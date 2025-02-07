@@ -298,6 +298,48 @@ final class BackupServiceTests: XCTestCase {
 
 // MARK: - Test Helpers
 
+private struct LogMessage {
+    let level: LogLevel
+    let message: String
+    let metadata: [String: LogMetadataValue]?
+    let privacy: LogPrivacy
+    let error: Error?
+    let file: String
+    let function: String
+    let line: Int
+}
+
+private final class TestLogger: LoggerProtocol {
+    var messages: [String] = []
+
+    func log(
+        level: LogLevel,
+        message: String,
+        metadata: [String: LogMetadataValue]?,
+        privacy: LogPrivacy,
+        error: Error?,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        let logMessage = LogMessage(
+            level: level,
+            message: message,
+            metadata: metadata,
+            privacy: privacy,
+            error: error,
+            file: file,
+            function: function,
+            line: line
+        )
+        handleLogMessage(logMessage)
+    }
+    
+    private func handleLogMessage(_ message: LogMessage) {
+        messages.append(message.message)
+    }
+}
+
 private final class TestBackupService: BackupServiceProtocol {
     private let logger: LoggerProtocol
     private let notificationCenter: NotificationCenterProtocol
@@ -308,12 +350,42 @@ private final class TestBackupService: BackupServiceProtocol {
         self.notificationCenter = notificationCenter
     }
 
-    func startBackup(repository: Repository, configuration: BackupConfiguration) async throws -> BackupResult {
-        logger.info("Starting backup", privacy: .public)
+    private struct LogContext {
+        let message: String
+        let level: LogLevel
+        let error: Error?
+        
+        static func info(_ message: String) -> LogContext {
+            LogContext(message: message, level: .info, error: nil)
+        }
+        
+        static func error(_ message: String, error: Error) -> LogContext {
+            LogContext(message: message, level: .error, error: error)
+        }
+    }
+    
+    private func log(_ context: LogContext) {
+        logger.log(
+            level: context.level,
+            message: context.message,
+            metadata: nil,
+            privacy: .public,
+            error: context.error,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+    }
+    
+    func startBackup(
+        repository: Repository,
+        configuration: BackupConfiguration
+    ) async throws -> BackupResult {
+        log(.info("Starting backup"))
         notificationCenter.post(name: .backupStarted, object: nil)
 
         if shouldSimulateError {
-            logger.error("Backup failed", error: BackupError.backupFailed, privacy: .public)
+            log(.error("Backup failed", error: BackupError.backupFailed))
             notificationCenter.post(name: .backupFailed, object: nil)
             throw BackupError.backupFailed
         }
@@ -321,7 +393,7 @@ private final class TestBackupService: BackupServiceProtocol {
         // Simulate backup work
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        logger.info("Backup completed", privacy: .public)
+        log(.info("Backup completed"))
         notificationCenter.post(name: .backupCompleted, object: nil)
 
         return BackupResult(
@@ -336,24 +408,32 @@ private final class TestBackupService: BackupServiceProtocol {
         )
     }
 
-    func cancelBackup(repository _: Repository, configuration _: BackupConfiguration) async throws {
-        logger.info("Cancelling backup", privacy: .public)
+    func cancelBackup(
+        repository _: Repository,
+        configuration _: BackupConfiguration
+    ) async throws {
+        log(.info("Cancelling backup"))
         notificationCenter.post(name: .backupCancelled, object: nil)
     }
 
-    func backupProgress(repository _: Repository, configuration _: BackupConfiguration) -> AsyncStream<BackupProgress> {
+    func backupProgress(
+        repository _: Repository,
+        configuration _: BackupConfiguration
+    ) -> AsyncStream<BackupProgress> {
         AsyncStream { continuation in
             Task {
                 // Simulate progress updates
                 for progressIndex in stride(from: 0, through: 100, by: 50) {
-                    continuation.yield(BackupProgress(
-                        percentComplete: Double(progressIndex),
-                        currentFile: "/test/file\(progressIndex).txt",
-                        processedFiles: progressIndex,
-                        totalFiles: 100,
-                        processedBytes: Int64(progressIndex * 1024 * 1024),
-                        totalBytes: Int64(100 * 1024 * 1024)
-                    ))
+                    continuation.yield(
+                        BackupProgress(
+                            percentComplete: Double(progressIndex),
+                            currentFile: "/test/file\(progressIndex).txt",
+                            processedFiles: progressIndex,
+                            totalFiles: 100,
+                            processedBytes: Int64(progressIndex * 1024 * 1024),
+                            totalBytes: Int64(100 * 1024 * 1024)
+                        )
+                    )
                     try await Task.sleep(nanoseconds: 100_000_000)
                 }
                 continuation.finish()
@@ -362,20 +442,11 @@ private final class TestBackupService: BackupServiceProtocol {
     }
 }
 
-private final class TestLogger: LoggerProtocol {
-    var messages: [String] = []
+private final class TestNotificationCenter: NotificationCenterProtocol {
+    var postedNotifications: [Notification] = []
 
-    func log(
-        level _: LogLevel,
-        message: String,
-        metadata _: [String: LogMetadataValue]?,
-        privacy _: LogPrivacy,
-        error _: Error?,
-        file _: String,
-        function _: String,
-        line _: Int
-    ) {
-        messages.append(message)
+    func post(name: Notification.Name, object: Any?) {
+        postedNotifications.append(Notification(name: name, object: object))
     }
 }
 
