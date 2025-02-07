@@ -58,7 +58,7 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             }
         }
         set {
-            // Read-only property
+            // Add code here to handle the setter
         }
     }
     
