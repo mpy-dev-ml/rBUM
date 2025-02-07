@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
 import Core
+import Foundation
 
 /// Protocol defining backup tag management functionality
 public protocol BackupTagManagerProtocol {

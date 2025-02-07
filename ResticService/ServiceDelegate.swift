@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 final class ServiceDelegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {

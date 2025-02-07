@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
 import Core
+import Foundation
 import XCTest
 
 /// Mock XPC service for testing sandbox-compliant command execution

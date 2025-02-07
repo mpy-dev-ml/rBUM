@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
-import Testing
 @testable import Core
+import Testing
 
 struct CoreTests {
 

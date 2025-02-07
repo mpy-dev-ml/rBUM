@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import XCTest
-@testable import rBUM
 @testable import Core
+@testable import rBUM
+import XCTest
 
 final class ResticCommandServiceTests: XCTestCase {
     // MARK: - Properties
@@ -241,19 +241,19 @@ final class ResticCommandServiceTests: XCTestCase {
 private class MockLogger: LoggerProtocol {
     var messages: [String] = []
     
-    func debug(_ message: String, metadata: [String : LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
+    func debug(_ message: String, metadata: [String: LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
         messages.append(message)
     }
     
-    func info(_ message: String, metadata: [String : LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
+    func info(_ message: String, metadata: [String: LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
         messages.append(message)
     }
     
-    func warning(_ message: String, metadata: [String : LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
+    func warning(_ message: String, metadata: [String: LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
         messages.append(message)
     }
     
-    func error(_ message: String, metadata: [String : LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
+    func error(_ message: String, metadata: [String: LogMetadataValue]?, privacy: LogPrivacy, file: String, function: String, line: Int) {
         messages.append(message)
     }
     

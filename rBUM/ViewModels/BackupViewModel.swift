@@ -11,10 +11,10 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Foundation
-import SwiftUI
 import Core
+import Foundation
 import os.log
+import SwiftUI
 
 /// BackupViewModel manages the state and operations for creating and managing backups.
 /// It handles:

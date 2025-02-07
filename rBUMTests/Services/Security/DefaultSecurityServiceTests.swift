@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import XCTest
-@testable import rBUM
 @testable import Core
+@testable import rBUM
+import XCTest
 
 final class DefaultSecurityServiceTests: XCTestCase {
     // MARK: - Properties

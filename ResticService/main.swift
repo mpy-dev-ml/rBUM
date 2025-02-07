@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 // Create the delegate for the service.
 let serviceDelegate = ServiceDelegate()

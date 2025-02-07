@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
+import Core
 import Foundation
 import Security
-import Core
 
 /// A service for interacting with the macOS Keychain
 public final class Keychain {

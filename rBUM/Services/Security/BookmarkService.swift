@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 01/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Service for managing security-scoped bookmarks
 public final class BookmarkService: BaseSandboxedService, BookmarkServiceProtocol, HealthCheckable {

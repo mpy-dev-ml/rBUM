@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import XCTest
-@testable import rBUM
 @testable import Core
+@testable import rBUM
+import XCTest
 
 // MARK: - Mock Logger
 class MockLogger: LoggerProtocol {
@@ -18,25 +18,53 @@ class MockLogger: LoggerProtocol {
     var metadata: [[String: LogMetadataValue]] = []
     var privacyLevels: [LogPrivacy] = []
     
-    func debug(_ message: String, metadata: [String: LogMetadataValue]? = nil, privacy: LogPrivacy = .public, file: String = #file, function: String = #function, line: Int = #line) {
+    func debug(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         messages.append(message)
         self.metadata.append(metadata ?? [:])
         self.privacyLevels.append(privacy)
     }
     
-    func info(_ message: String, metadata: [String: LogMetadataValue]? = nil, privacy: LogPrivacy = .public, file: String = #file, function: String = #function, line: Int = #line) {
+    func info(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         messages.append(message)
         self.metadata.append(metadata ?? [:])
         self.privacyLevels.append(privacy)
     }
     
-    func warning(_ message: String, metadata: [String: LogMetadataValue]? = nil, privacy: LogPrivacy = .public, file: String = #file, function: String = #function, line: Int = #line) {
+    func warning(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         messages.append(message)
         self.metadata.append(metadata ?? [:])
         self.privacyLevels.append(privacy)
     }
     
-    func error(_ message: String, metadata: [String: LogMetadataValue]? = nil, privacy: LogPrivacy = .public, file: String = #file, function: String = #function, line: Int = #line) {
+    func error(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         messages.append(message)
         self.metadata.append(metadata ?? [:])
         self.privacyLevels.append(privacy)

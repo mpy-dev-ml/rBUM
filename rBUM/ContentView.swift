@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 29/01/2025.
 //
 
-import SwiftUI
 import Core
+import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel: ContentViewModel

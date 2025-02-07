@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
 import Core
+import Foundation
 
 /// Manages persistent storage of repository information and security-scoped bookmarks
 final class RepositoryStorage: Core.StorageServiceProtocol {

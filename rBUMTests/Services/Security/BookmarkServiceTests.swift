@@ -11,9 +11,9 @@
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
-import XCTest
-@testable import rBUM
 @testable import Core
+@testable import rBUM
+import XCTest
 
 final class BookmarkServiceTests: XCTestCase {
     // MARK: - Properties

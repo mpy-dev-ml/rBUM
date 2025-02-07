@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 02/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Service for creating and managing default repository locations on macOS
 public final class DefaultRepositoryCreationService: BaseSandboxedService, DefaultRepositoryCreationProtocol, HealthCheckable {

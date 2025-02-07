@@ -8,8 +8,8 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-import Foundation
 import AppKit
+import Foundation
 
 /// Service for monitoring sandbox compliance and resource access
 public final class SandboxMonitor: BaseSandboxedService {

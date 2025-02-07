@@ -14,13 +14,28 @@
 import Foundation
 import os.log
 
-/// Protocol for services that require logging capabilities
+/// Protocol for services that require logging capabilities.
+/// This protocol provides a standardised way to handle logging across the application,
+/// ensuring consistent log formatting and level-appropriate messaging.
 public protocol LoggingService {
+    /// The logger instance used by this service.
+    /// This property should be configured during service initialization
+    /// and remain constant throughout the service's lifecycle.
     var logger: LoggerProtocol { get }
 }
 
 public extension LoggingService {
-    /// Log an operation with timing information
+    /// Logs an operation's execution time and any errors that occur during its execution.
+    /// This method wraps an operation with timing information and appropriate error handling,
+    /// ensuring consistent logging across all service operations.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the operation being performed
+    ///   - level: The logging level to use (default: .debug)
+    ///   - operation: The operation to perform and measure
+    ///
+    /// - Returns: The result of the operation
+    /// - Throws: Rethrows any error thrown by the operation
     func logOperation<T>(_ name: String, level: OSLogType = .debug, perform operation: () throws -> T) rethrows -> T {
         let start = Date()
         defer {
@@ -51,7 +66,17 @@ public extension LoggingService {
         return try operation()
     }
     
-    /// Log an asynchronous operation with timing information
+    /// Logs an asynchronous operation's execution time and any errors that occur during its execution.
+    /// This method wraps an asynchronous operation with timing information and appropriate error handling,
+    /// ensuring consistent logging across all service operations.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the operation being performed
+    ///   - level: The logging level to use (default: .debug)
+    ///   - operation: The asynchronous operation to perform and measure
+    ///
+    /// - Returns: The result of the operation
+    /// - Throws: Rethrows any error thrown by the operation
     func logAsyncOperation<T>(_ name: String, level: OSLogType = .debug, perform operation: () async throws -> T) async rethrows -> T {
         let start = Date()
         defer {

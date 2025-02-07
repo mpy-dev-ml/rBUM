@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
 import Core
+import Foundation
 
 /// Service for persisting and managing security-scoped bookmarks
 public final class BookmarkPersistenceService: BaseSandboxedService, BookmarkPersistenceProtocol, HealthCheckable {

@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 01/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Priority level for backup jobs
 public enum BackupJobPriority: Int, Comparable {

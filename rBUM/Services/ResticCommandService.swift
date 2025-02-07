@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Service for executing Restic commands via XPC
 public final class ResticCommandService: BaseSandboxedService, ResticServiceProtocol, HealthCheckable, Measurable {

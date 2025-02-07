@@ -10,6 +10,36 @@
 //
 import Foundation
 
+/// Configuration for XPC command execution
+@objc public class XPCCommandConfig: NSObject {
+    public let command: String
+    public let arguments: [String]
+    public let environment: [String: String]
+    public let workingDirectory: String
+    public let bookmarks: [String: NSData]
+    public let timeout: TimeInterval
+    public let auditSessionId: au_asid_t
+    
+    public init(
+        command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData],
+        timeout: TimeInterval,
+        auditSessionId: au_asid_t
+    ) {
+        self.command = command
+        self.arguments = arguments
+        self.environment = environment
+        self.workingDirectory = workingDirectory
+        self.bookmarks = bookmarks
+        self.timeout = timeout
+        self.auditSessionId = auditSessionId
+        super.init()
+    }
+}
+
 /// Protocol defining the XPC interface for Restic operations
 @objc public protocol ResticXPCProtocol {
     /// Current interface version
@@ -21,22 +51,12 @@ import Foundation
     
     /// Execute a command through XPC
     /// - Parameters:
-    ///   - command: Command to execute
-    ///   - arguments: Command arguments
-    ///   - environment: Environment variables
-    ///   - workingDirectory: Working directory
-    ///   - bookmarks: Security-scoped bookmarks for file access
-    ///   - timeout: Timeout in seconds
-    ///   - auditSessionId: Audit session identifier for security validation
+    ///   - config: Configuration for command execution
     ///   - completion: Completion handler with result
-    func executeCommand(_ command: String,
-                       arguments: [String],
-                       environment: [String: String],
-                       workingDirectory: String,
-                       bookmarks: [String: NSData],
-                       timeout: TimeInterval,
-                       auditSessionId: au_asid_t,
-                       completion: @escaping ([String: Any]?) -> Void)
+    func executeCommand(
+        config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    )
     
     /// Ping the XPC service with security validation
     /// - Parameters:

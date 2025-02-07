@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Represents a backup snapshot
 struct Snapshot: Identifiable, Codable, Hashable {

@@ -138,7 +138,7 @@ final class BackupFlowUITests: XCTestCase {
         
         // Verify snapshot appears in list
         let snapshotList = app.tables["Snapshots"]
-        XCTAssertTrue(snapshotList.cells.count > 0)
+        XCTAssertTrue(!snapshotList.cells.isEmpty)
     }
     
     func testBackupCancellation() throws {

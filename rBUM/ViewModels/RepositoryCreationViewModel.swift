@@ -11,9 +11,9 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Foundation
 import AppKit
 import Core
+import Foundation
 import os.log
 
 /// macOS implementation of repository creation view model

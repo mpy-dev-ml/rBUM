@@ -8,10 +8,10 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
-import XCTest
 @testable import Core
+import Foundation
 @testable import rBUM
+import XCTest
 
 class SandboxComplianceTests: XCTestCase {
     var securityService: SecurityService!

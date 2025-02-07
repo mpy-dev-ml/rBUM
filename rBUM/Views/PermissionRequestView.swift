@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import SwiftUI
 import Core
+import SwiftUI
 
 /// View for requesting user permission to access files and directories
 struct PermissionRequestView: View {

@@ -11,9 +11,9 @@
 //  Created by Matthew Yeager on 29/01/2025.
 //
 
-import SwiftUI
 import Core
 import Foundation
+import SwiftUI
 
 private let logger = LoggerFactory.createLogger(category: "App")
 
@@ -59,31 +59,31 @@ struct RBUMApp: App {
             notificationCenter: notificationCenter
         )
         
-        self.repositoryStorage = DefaultRepositoryStorage(
-            logger: logger,
-            fileManager: fileManager,
-            dateProvider: dateProvider,
-            notificationCenter: notificationCenter
-        )
+        do {
+            self.repositoryStorage = try DefaultRepositoryStorage(
+                fileManager: fileManager,
+                logger: logger
+            )
+        } catch {
+            logger.error("Failed to initialize repository storage: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
+        }
         
         self.resticService = ResticCommandService(
             logger: logger,
             securityService: securityService,
-            xpcService: ServiceFactory.createXPCService(logger: logger, securityService: securityService),
+            xpcService: ServiceFactory.createXPCService(logger: logger, securityService: securityService) as! ResticXPCServiceProtocol,
             keychainService: keychainService
-        )
+        ) as! any ResticCommandServiceProtocol
         
         self.repositoryCreationService = DefaultRepositoryCreationService(
             logger: logger,
-            securityService: securityService,
+            securityService: resticService as! SecurityServiceProtocol,
             bookmarkService: bookmarkService,
             keychainService: keychainService
-        )
+        ) as! any RepositoryCreationServiceProtocol
         
-        logger.debug("App initialized",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug("App initialized", file: #file, function: #function, line: #line)
         
         // Setup app delegate
         setupAppDelegate()

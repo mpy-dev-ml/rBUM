@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Run SwiftLint
-#echo "Running SwiftLint..."
-#if which swiftlint >/dev/null; then
-#  swiftlint lint --strict
-#  if [ $? -ne 0 ]; then
-#    echo "SwiftLint failed - commit aborted"
-#    exit 1
-#  fi
-#fi
+echo "Running SwiftLint..."
+if which swiftlint >/dev/null; then
+  swiftlint lint --strict
+  if [ $? -ne 0 ]; then
+    echo "SwiftLint failed - commit aborted"
+    exit 1
+  fi
+fi
 
 # Check for debug code
 echo "Checking for debug code..."

@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
-import XCTest
 @testable import Core
+import XCTest
 
 final class BackupServiceTests: XCTestCase {
     // MARK: - Properties

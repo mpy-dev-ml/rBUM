@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 import os.log
 import Security
 
@@ -32,44 +32,33 @@ enum ResticXPCErrorDomain {
 // MARK: - Restic Service Implementation
 @objc final class ResticService: BaseService, ResticXPCProtocol {
     func executeCommand(
-        _ command: String,
-        arguments: [String],
-        environment: [String: String],
-        workingDirectory: String,
-        bookmarks: [String: NSData],
-        timeout: TimeInterval,
-        auditSessionId: au_asid_t,
+        config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
     ) {
         queue.async {
             do {
                 // Validate audit session
-                try self.validateAuditSession(auditSessionId)
+                try self.validateAuditSession(config.auditSessionId)
                 
                 // Start accessing bookmarked locations
-                let accessedURLs = try self.startAccessingBookmarkedLocations(bookmarks)
+                let accessedURLs = try self.startAccessingBookmarkedLocations(config.bookmarks)
                 defer {
-                    // Ensure we stop accessing locations even if an error occurs
+                    // Stop accessing bookmarked locations in defer block
                     self.stopAccessingBookmarkedLocations(accessedURLs)
                 }
                 
                 // Execute the command
                 let result = try self.executeResticCommand(
-                    command: command,
-                    arguments: arguments,
-                    environment: environment,
-                    workingDirectory: workingDirectory,
-                    timeout: timeout
+                    config.command,
+                    arguments: config.arguments,
+                    environment: config.environment,
+                    workingDirectory: config.workingDirectory,
+                    timeout: config.timeout
                 )
                 
                 completion(result)
             } catch {
-                self.logger.error(
-                    "Command execution failed: \(error.localizedDescription)",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
+                self.logger.error("Command execution failed: \(error.localizedDescription)")
                 completion(["error": error.localizedDescription])
             }
         }

@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 30/01/2025.
 //
 
-import Foundation
 import Core
+import Foundation
 
 /// Protocol for managing secure storage of repository credentials
 public protocol KeychainCredentialsManagerProtocol {

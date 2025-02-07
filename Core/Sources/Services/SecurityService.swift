@@ -11,8 +11,8 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-import Foundation
 import AppKit
+import Foundation
 
 /// Service implementing security operations with sandbox compliance and XPC support
 public final class SecurityService: SecurityServiceProtocol {

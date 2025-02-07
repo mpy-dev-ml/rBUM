@@ -11,10 +11,10 @@
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
-import Foundation
-import Core
-import Security
 import AppKit
+import Core
+import Foundation
+import Security
 
 /// macOS-specific implementation of security service
 public class DefaultSecurityService: BaseSandboxedService, Measurable {

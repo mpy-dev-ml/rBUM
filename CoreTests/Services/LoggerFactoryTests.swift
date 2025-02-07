@@ -11,9 +11,9 @@
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
-import XCTest
-import os.log
 @testable import Core
+import os.log
+import XCTest
 
 final class LoggerFactoryTests: XCTestCase {
     // MARK: - Properties

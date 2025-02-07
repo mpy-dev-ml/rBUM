@@ -8,8 +8,8 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-import Foundation
 import Core
+import Foundation
 
 /// Represents a backup configuration
 internal struct BackupConfiguration: Codable, Equatable, Identifiable {
