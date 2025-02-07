@@ -58,7 +58,7 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             }
         }
         set {
-            // Add code here to handle the setter
+            logger.warning("Attempted to set isMonitoring to \(newValue), but this property is read-only")
         }
     }
     
