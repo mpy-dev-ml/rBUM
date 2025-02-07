@@ -79,11 +79,13 @@ extension DefaultSecurityService {
             self.activeOperations.insert(id)
         }
         
-        logger.info("Starting security operation: \(type)",
-                   metadata: ["operationId": "\(id)"],
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "Starting security operation: \(type)",
+            metadata: ["operationId": "\(id)"],
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     /// Records the end of a security operation.
@@ -102,17 +104,21 @@ extension DefaultSecurityService {
         }
         
         if let error = error {
-            logger.error("Security operation failed: \(type), Error: \(error)",
-                        metadata: ["operationId": "\(id)"],
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Security operation failed: \(type), Error: \(error)",
+                metadata: ["operationId": "\(id)"],
+                file: #file,
+                function: #function,
+                line: #line
+            )
         } else {
-            logger.info("Security operation completed: \(type)",
-                       metadata: ["operationId": "\(id)"],
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Security operation completed: \(type)",
+                metadata: ["operationId": "\(id)"],
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
 }
