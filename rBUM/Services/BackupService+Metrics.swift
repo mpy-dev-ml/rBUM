@@ -62,18 +62,22 @@ extension BackupService {
             let result = try await operation()
             
             let duration = Date().timeIntervalSince(start)
-            logger.info("\(name) completed in \(String(format: "%.2f", duration))s",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "\(name) completed in \(String(format: "%.2f", duration))s",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             
             return result
         } catch {
             let duration = Date().timeIntervalSince(start)
-            logger.error("\(name) failed after \(String(format: "%.2f", duration))s: \(error)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "\(name) failed after \(String(format: "%.2f", duration))s: \(error)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw error
         }
     }

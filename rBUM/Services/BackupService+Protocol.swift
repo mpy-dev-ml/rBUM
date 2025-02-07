@@ -4,10 +4,19 @@ import Foundation
 // MARK: - BackupServiceProtocol Implementation
 
 extension BackupService {
+    /// Initialises a new backup repository.
+    /// - Parameter repository: The repository to initialise
+    /// - Throws: ResticError if the initialisation fails
     public func initializeRepository(_ repository: Repository) async throws {
         try await resticService.initializeRepository(repository)
     }
     
+    /// Creates a new backup of the specified paths in the target repository.
+    /// - Parameters:
+    ///   - repository: The repository to store the backup in
+    ///   - paths: List of file paths to back up
+    ///   - tags: Optional tags to associate with the backup
+    /// - Throws: BackupError if the backup operation fails
     public func createBackup(
         to repository: Repository,
         paths: [String],
@@ -38,10 +47,20 @@ extension BackupService {
         }
     }
     
+    /// Lists all snapshots in the specified repository.
+    /// - Parameter repository: The repository to list snapshots from
+    /// - Returns: Array of ResticSnapshot objects
+    /// - Throws: ResticError if the operation fails
     public func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         try await resticService.listSnapshots(in: repository)
     }
     
+    /// Restores a snapshot from a repository to a specified destination.
+    /// - Parameters:
+    ///   - snapshot: The snapshot to restore
+    ///   - repository: The repository containing the snapshot
+    ///   - destination: Local path where the snapshot should be restored
+    /// - Throws: ResticError if the restore operation fails
     public func restoreSnapshot(
         _ snapshot: ResticSnapshot,
         from repository: Repository,
@@ -54,6 +73,11 @@ extension BackupService {
         )
     }
     
+    /// Deletes a snapshot from a repository.
+    /// - Parameters:
+    ///   - snapshot: The snapshot to delete
+    ///   - repository: The repository containing the snapshot
+    /// - Throws: ResticError if the delete operation fails
     public func deleteSnapshot(
         _ snapshot: ResticSnapshot,
         from repository: Repository
@@ -64,10 +88,16 @@ extension BackupService {
         )
     }
     
+    /// Verifies the integrity of a repository.
+    /// - Parameter repository: The repository to verify
+    /// - Throws: ResticError if the verification fails
     public func verifyRepository(_ repository: Repository) async throws {
         try await resticService.verifyRepository(repository)
     }
     
+    /// Prunes old snapshots from a repository to free up space.
+    /// - Parameter repository: The repository to prune
+    /// - Throws: ResticError if the prune operation fails
     public func pruneRepository(_ repository: Repository) async throws {
         try await resticService.pruneRepository(repository)
     }
