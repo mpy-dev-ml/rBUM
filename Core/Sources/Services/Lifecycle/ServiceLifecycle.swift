@@ -13,6 +13,44 @@
 
 import Foundation
 
+/// Service lifecycle management framework for rBUM.
+///
+/// The ServiceLifecycle framework provides a comprehensive solution for managing
+/// the lifecycle of services within the application. It includes:
+/// - State management and transitions
+/// - Lifecycle event handling
+/// - Error handling and recovery
+/// - Validation and safety checks
+///
+/// Example usage:
+/// ```swift
+/// class MyService: LifecycleManaged, LoggingService {
+///     private(set) var state: ServiceState = .uninitialized
+///     let logger: LoggerProtocol
+///     
+///     init(logger: LoggerProtocol) {
+///         self.logger = logger
+///     }
+///     
+///     func performOperation() throws {
+///         try validateUsable(for: "performOperation")
+///         // Perform operation
+///     }
+/// }
+/// ```
+///
+/// Implementation notes:
+/// 1. Thread-safe state management
+/// 2. Comprehensive error handling
+/// 3. Proper resource cleanup
+/// 4. Detailed logging support
+///
+/// See also:
+/// - `ServiceState`: Possible states of a service
+/// - `LifecycleManaged`: Protocol for lifecycle management
+/// - `LoggingService`: Protocol for logging support
+public enum ServiceLifecycle {}
+
 /// Represents the possible states of a service throughout its lifecycle.
 /// Services transition between these states as they are initialised,
 /// run, encounter errors, and shut down.
