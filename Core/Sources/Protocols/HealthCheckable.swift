@@ -234,20 +234,38 @@ public enum HealthError: LocalizedError {
     }
 }
 
-/// Default implementation for Swift types
+/// Default implementation for Swift types that conform to HealthCheckable.
+/// Provides sensible defaults for health monitoring functionality.
 public extension HealthCheckable {
+    /// The current health state of the service.
+    /// Default implementation always returns `.healthy`.
     var healthState: HealthState { .healthy }
 
+    /// The timestamp of the last health check performed.
+    /// Default implementation returns `nil` as no checks are performed.
     var lastHealthCheck: Date? { nil }
 
+    /// Current health metrics for the service.
+    /// Default implementation returns empty metrics.
     var healthMetrics: HealthMetrics { HealthMetrics() }
 
+    /// Performs a health check on the service.
+    /// Default implementation always returns `.healthy`.
+    /// - Returns: The current health state
+    /// - Throws: HealthError if the check fails
     func performHealthCheck() async throws -> HealthState { .healthy }
 
+    /// Updates the service's health status.
+    /// Default implementation does nothing.
     func updateHealthStatus() async {}
 
+    /// Resets the service's health state to its initial value.
+    /// Default implementation does nothing.
     func resetHealthState() {}
 
+    /// Performs a comprehensive health check and returns detailed results.
+    /// - Returns: A HealthCheckResult containing status, metrics, and diagnostic information
+    /// - Throws: HealthError if the check fails
     func checkHealth() async throws -> HealthCheckResult {
         // Default implementation for checkHealth
         return HealthCheckResult(
@@ -259,11 +277,16 @@ public extension HealthCheckable {
         )
     }
 
+    /// Validates the service's configuration.
+    /// - Returns: True if the configuration is valid, false otherwise
+    /// - Throws: HealthError if validation fails
     func validateConfiguration() async throws -> Bool {
         // Default implementation for validateConfiguration
         return true
     }
 
+    /// Performs cleanup operations for the service.
+    /// - Throws: HealthError if cleanup fails
     func cleanup() async throws {
         // Default implementation for cleanup
     }
