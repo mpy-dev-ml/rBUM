@@ -15,12 +15,53 @@ import AppKit
 import Foundation
 
 /// Service implementing security operations with sandbox compliance and XPC support
+///
+/// The SecurityService provides a comprehensive security layer for the application,
+/// handling sandbox compliance, XPC communication, and security-scoped bookmarks.
+/// It manages:
+/// - Security-scoped bookmarks for file access
+/// - User permission requests
+/// - XPC service validation
+/// - Access control for sandboxed resources
+///
+/// Example usage:
+/// ```swift
+/// let security = SecurityService(logger: logger, xpcService: xpc)
+///
+/// // Request permission
+/// let granted = try await security.requestPermission(for: fileURL)
+///
+/// // Create and resolve bookmarks
+/// let bookmark = try security.createBookmark(for: fileURL)
+/// let url = try security.resolveBookmark(bookmark)
+///
+/// // Manage access
+/// try security.startAccessing(url)
+/// defer { try await security.stopAccessing(url) }
+/// ```
+///
+/// Implementation notes:
+/// 1. Thread-safe bookmark management
+/// 2. Proper cleanup on application termination
+/// 3. Comprehensive error handling
+/// 4. Detailed logging
 public final class SecurityService: SecurityServiceProtocol {
-    private let logger: LoggerProtocol
-    private let xpcService: ResticXPCServiceProtocol
-    private var activeBookmarks: [URL: Data] = [:]
-    private let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.security.bookmarks", attributes: .concurrent)
+    // MARK: - Properties
+    
+    /// Logger for tracking operations
+    let logger: LoggerProtocol
+    
+    /// XPC service for secure operations
+    let xpcService: ResticXPCServiceProtocol
+    
+    /// Active bookmarks mapped by URL
+    var activeBookmarks: [URL: Data] = [:]
+    
+    /// Queue for thread-safe bookmark operations
+    let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.security.bookmarks", attributes: .concurrent)
 
+    // MARK: - Initialization
+    
     /// Initialize the security service
     /// - Parameters:
     ///   - logger: Logger for tracking operations
@@ -31,6 +72,8 @@ public final class SecurityService: SecurityServiceProtocol {
         setupNotifications()
     }
 
+    // MARK: - Notifications
+    
     private func setupNotifications() {
         logger.debug(
             "Setting up security notifications",
@@ -51,264 +94,5 @@ public final class SecurityService: SecurityServiceProtocol {
         bookmarkQueue.sync(flags: .barrier) {
             activeBookmarks.removeAll()
         }
-    }
-
-    private func getActiveBookmark(for url: URL) -> Data? {
-        bookmarkQueue.sync {
-            activeBookmarks[url]
-        }
-    }
-
-    private func setActiveBookmark(_ bookmark: Data, for url: URL) {
-        bookmarkQueue.sync(flags: .barrier) {
-            activeBookmarks[url] = bookmark
-        }
-    }
-
-    private func removeActiveBookmark(for url: URL) {
-        _ = bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
-    }
-
-    @MainActor
-    public func requestPermission(for url: URL) async throws -> Bool {
-        logger.debug(
-            "Requesting permission for: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = url
-        panel.message = "Please grant access to this location"
-        panel.prompt = "Grant Access"
-
-        let response = await panel.beginSheetModal(
-            for: NSApp.keyWindow ?? NSWindow(
-                contentRect: .zero,
-                styleMask: .borderless,
-                backing: .buffered,
-                defer: false
-            )
-        )
-
-        if response == .OK {
-            logger.debug(
-                "Permission granted for: \(url.path)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return true
-        } else {
-            logger.debug(
-                "Permission denied for: \(url.path)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return false
-        }
-    }
-
-    public func createBookmark(for url: URL) throws -> Data {
-        logger.debug(
-            "Creating bookmark for: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        do {
-            let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            return bookmark
-        } catch {
-            throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
-        }
-    }
-
-    public func resolveBookmark(_ bookmark: Data) throws -> URL {
-        logger.debug(
-            "Resolving bookmark",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        var isStale = false
-        do {
-            let url = try URL(
-                resolvingBookmarkData: bookmark,
-                options: .withSecurityScope,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-
-            if isStale {
-                logger.debug(
-                    "Bookmark is stale",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                throw SecurityError.bookmarkStale("Bookmark needs to be recreated")
-            }
-
-            logger.debug(
-                "Bookmark resolved successfully",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return url
-
-        } catch {
-            logger.error(
-                "Failed to resolve bookmark: \(error.localizedDescription)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
-        }
-    }
-
-    public func startAccessing(_ url: URL) throws -> Bool {
-        logger.debug(
-            "Starting access for: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        return url.startAccessingSecurityScopedResource()
-    }
-
-    public func stopAccessing(_ url: URL) async throws {
-        logger.debug(
-            "Stopping access for: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        url.stopAccessingSecurityScopedResource()
-    }
-
-    public func validateAccess(to url: URL) async throws -> Bool {
-        logger.debug(
-            "Validating access to: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        do {
-            let bookmark = try createBookmark(for: url)
-            let resolvedURL = try resolveBookmark(bookmark)
-            return resolvedURL.path == url.path
-        } catch {
-            return false
-        }
-    }
-
-    public func persistAccess(to url: URL) async throws -> Data {
-        logger.debug(
-            "Persisting access to: \(url.path)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        let bookmark = try url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        )
-        setActiveBookmark(bookmark, for: url)
-        return bookmark
-    }
-
-    public func validateXPCService() async throws -> Bool {
-        logger.debug(
-            "Validating XPC service",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        let isValid = try await xpcService.ping()
-        if !isValid {
-            logger.error(
-                "XPC service validation failed",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.xpcValidationFailed("Service ping returned false")
-        }
-        return isValid
-    }
-
-    // MARK: - XPC Validation
-
-    public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
-        logger.debug(
-            "Validating XPC connection",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        // Verify connection state
-        guard connection.invalidationHandler != nil else {
-            logger.error(
-                "XPC connection is invalidated",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
-        }
-
-        // Verify interface configuration
-        guard connection.remoteObjectInterface != nil else {
-            logger.error(
-                "XPC connection has no remote object interface",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.xpcValidationFailed("XPC connection has no remote object interface")
-        }
-
-        // Verify audit session identifier
-        guard connection.auditSessionIdentifier != 0 else {
-            logger.error(
-                "XPC connection has invalid audit session",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.xpcValidationFailed("XPC connection has invalid audit session")
-        }
-
-        // Ensure connection is still valid
-        if connection.invalidationHandler == nil {
-            logger.error(
-                "XPC connection is invalidated",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw SecurityError.xpcValidationFailed("Connection is invalidated")
-        }
-
-        return true
     }
 }
