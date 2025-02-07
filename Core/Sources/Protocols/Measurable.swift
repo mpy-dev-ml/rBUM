@@ -51,9 +51,9 @@ public extension Measurable {
         let result = try await block()
         let duration = Date().timeIntervalSince(start)
         logger.info("\(operation) completed in \(String(format: "%.2f", duration))s",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+                    file: #file,
+                    function: #function,
+                    line: #line)
         return result
     }
 }

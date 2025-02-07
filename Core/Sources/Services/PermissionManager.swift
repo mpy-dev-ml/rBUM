@@ -75,10 +75,12 @@ public class PermissionManager {
         do {
             try keychain.configureXPCSharing(accessGroup: permissionAccessGroup)
         } catch {
-            self.logger.error("Failed to configure XPC sharing: \(error.localizedDescription)", 
-                            file: #file, 
-                            function: #function, 
-                            line: #line)
+            self.logger.error(
+                "Failed to configure XPC sharing: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -86,18 +88,22 @@ public class PermissionManager {
     /// - Parameter url: The URL to request permission for
     /// - Returns: true if permission was granted and persisted
     public func requestAndPersistPermission(for url: URL) async throws -> Bool {
-        logger.debug("Requesting permission for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Requesting permission for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         do {
             // Request permission
             guard try await securityService.requestPermission(for: url) else {
-                logger.error("Permission denied for: \(url.path)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Permission denied for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
             
@@ -105,17 +111,21 @@ public class PermissionManager {
             let bookmark = try await securityService.createBookmark(for: url)
             try persistBookmark(bookmark, for: url)
             
-            logger.info("Permission granted and persisted for: \(url.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Permission granted and persisted for: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return true
             
         } catch {
-            logger.error("Failed to request/persist permission: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to request/persist permission: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw PermissionError.persistenceFailed(error.localizedDescription)
         }
     }
@@ -124,18 +134,22 @@ public class PermissionManager {
     /// - Parameter url: The URL to recover permission for
     /// - Returns: true if permission was recovered
     public func recoverPermission(for url: URL) async throws -> Bool {
-        logger.debug("Attempting to recover permission for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Attempting to recover permission for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         do {
             // Check for existing bookmark
             guard let bookmark = try loadBookmark(for: url) else {
-                logger.debug("No stored bookmark found for: \(url.path)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.debug(
+                    "No stored bookmark found for: \(url.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
             
@@ -144,10 +158,12 @@ public class PermissionManager {
             
             // Verify resolved URL matches original
             guard resolvedURL.path == url.path else {
-                logger.error("Bookmark resolved to different path: \(resolvedURL.path)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Bookmark resolved to different path: \(resolvedURL.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 try removeBookmark(for: url)
                 return false
             }
@@ -155,26 +171,32 @@ public class PermissionManager {
             // Test access
             let canAccess = try await securityService.startAccessing(resolvedURL)
             guard canAccess else {
-                logger.error("Failed to access resolved URL: \(resolvedURL.path)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Failed to access resolved URL: \(resolvedURL.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 try removeBookmark(for: url)
                 return false
             }
             try await securityService.stopAccessing(resolvedURL)
             
-            logger.info("Successfully recovered permission for: \(url.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Successfully recovered permission for: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return true
             
         } catch {
-            logger.error("Failed to recover permission: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to recover permission: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             
             // Clean up failed bookmark
             try? removeBookmark(for: url)
@@ -195,20 +217,24 @@ public class PermissionManager {
             let resolvedURL = try securityService.resolveBookmark(bookmark)
             let canAccess = try await securityService.startAccessing(resolvedURL)
             if !canAccess {
-                logger.error("Failed to access resolved URL: \(resolvedURL.path)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Failed to access resolved URL: \(resolvedURL.path)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 try removeBookmark(for: url)
                 return false
             }
             return resolvedURL.path == url.path
             
         } catch {
-            logger.debug("Permission check failed: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.debug(
+                "Permission check failed: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return false
         }
     }
@@ -216,23 +242,29 @@ public class PermissionManager {
     /// Revoke permission for a URL
     /// - Parameter url: The URL to revoke permission for
     public func revokePermission(for url: URL) async throws {
-        logger.debug("Revoking permission for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Revoking permission for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         do {
             try removeBookmark(for: url)
-            logger.info("Permission revoked for: \(url.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Permission revoked for: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             
         } catch {
-            logger.error("Failed to revoke permission: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to revoke permission: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw PermissionError.revocationFailed(error.localizedDescription)
         }
     }
@@ -240,44 +272,54 @@ public class PermissionManager {
     // MARK: - Private Methods
     
     private func persistBookmark(_ bookmark: Data, for url: URL) throws {
-        logger.debug("Persisting bookmark for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Persisting bookmark for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         do {
             try keychain.save(bookmark, for: url.path, accessGroup: permissionAccessGroup)
         } catch {
-            logger.error("Failed to persist bookmark: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to persist bookmark: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw PermissionError.persistenceFailed(error.localizedDescription)
         }
     }
     
     private func loadBookmark(for url: URL) throws -> Data? {
-        logger.debug("Loading bookmark for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Loading bookmark for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         return try keychain.retrieve(for: url.path, accessGroup: permissionAccessGroup)
     }
     
     private func removeBookmark(for url: URL) throws {
-        logger.debug("Removing bookmark for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            "Removing bookmark for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         do {
             try keychain.delete(for: url.path, accessGroup: permissionAccessGroup)
         } catch {
-            logger.error("Failed to remove bookmark: \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to remove bookmark: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw PermissionError.revocationFailed(error.localizedDescription)
         }
     }

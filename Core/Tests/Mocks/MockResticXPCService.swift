@@ -66,12 +66,14 @@ public final class MockResticXPCService: NSObject, ResticXPCServiceProtocol, Hea
     ///   - retryCount: Number of retry attempts
     /// - Returns: Never returns, always throws for mock implementation
     /// - Throws: ProcessError.executionFailed
-    @objc public func executeCommand(_ command: String,
-                             arguments: [String],
-                             environment: [String: String],
-                             workingDirectory: String,
-                             bookmarks: [String: NSData]?,
-                             retryCount: Int) async throws -> ProcessResult {
+    @objc public func executeCommand(
+        _ command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData]?,
+        retryCount: Int
+    ) async throws -> ProcessResult {
         throw ProcessError.executionFailed("Mock: Command execution not implemented")
     }
     

@@ -156,10 +156,12 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
 
                 return true
             } catch {
-                logger.error("Repository validation failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Repository validation failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
         }
@@ -171,28 +173,34 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
             do {
                 // Check bookmark service
                 guard await bookmarkService.performHealthCheck() else {
-                    logger.error("Bookmark service health check failed",
-                               file: #file,
-                               function: #function,
-                               line: #line)
+                    logger.error(
+                        "Bookmark service health check failed",
+                        file: #file,
+                        function: #function,
+                        line: #line
+                    )
                     return false
                 }
 
                 // Check keychain service
                 guard await keychainService.performHealthCheck() else {
-                    logger.error("Keychain service health check failed",
-                               file: #file,
-                               function: #function,
-                               line: #line)
+                    logger.error(
+                        "Keychain service health check failed",
+                        file: #file,
+                        function: #function,
+                        line: #line
+                    )
                     return false
                 }
 
                 return true
             } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Health check failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
         }

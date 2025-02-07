@@ -185,7 +185,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
                 details: [
                     "activeBookmarks": bookmarks.count,
                     "activeAccesses": activeAccess.count,
-                    "metrics": metrics,
+                    "metrics": metrics
                     // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
                     // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
                 ]

@@ -206,9 +206,9 @@ extension ResticXPCService {
             isHealthy = try await performHealthCheck()
         } catch {
             logger.error("Health check failed: \(error.localizedDescription)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+                        file: #file,
+                        function: #function,
+                        line: #line)
             isHealthy = false
         }
     }
@@ -217,7 +217,10 @@ extension ResticXPCService {
     /// - Returns: A boolean indicating whether the service is healthy.
     /// - Throws: An error if the health check fails.
     @objc public func performHealthCheck() async throws -> Bool {
-        logger.debug("Performing health check", file: #file, function: #function, line: #line)
+        logger.debug("Performing health check",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         
         // Validate XPC connection
         let isValid = try await securityService.validateXPCConnection(connection)
@@ -305,7 +308,12 @@ extension ResticXPCService {
     private func createBookmark(for url: URL) throws -> NSData {
         // Create security-scoped bookmark
         var error: NSError?
-        let bookmark = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil, error: &error)
+        let bookmark = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil,
+            error: &error
+        )
         
         if let error = error {
             throw SecurityError.bookmarkCreationFailed("Failed to create bookmark: \(error.localizedDescription)")

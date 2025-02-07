@@ -10,30 +10,78 @@
 
 import Foundation
 
-/// Protocol for services that need health check capabilities.
-/// This protocol provides a standardised way to monitor and report service health,
-/// including detailed health metrics and status information.
+/// A protocol that defines health monitoring capabilities for services.
+///
+/// The `HealthCheckable` protocol provides a standardised way to monitor and report service health,
+/// including detailed health metrics and status information. It is particularly useful for:
+/// - Service availability monitoring
+/// - Performance tracking
+/// - Resource usage monitoring
+/// - Error rate tracking
+/// - System diagnostics
+///
+/// Example usage:
+/// ```swift
+/// class BackupService: NSObject, HealthCheckable {
+///     var healthState: HealthState = .unknown
+///     var lastHealthCheck: Date?
+///     var healthMetrics = HealthMetrics()
+///
+///     func performHealthCheck() async throws -> HealthState {
+///         // Perform health check logic
+///         return .healthy
+///     }
+/// }
+/// ```
 @objc public protocol HealthCheckable: NSObjectProtocol {
-    /// Current health state of the service (cached value)
+    /// The current health state of the service.
+    ///
+    /// This property provides a cached value of the service's health state,
+    /// which is updated periodically through health checks.
     @objc var healthState: HealthState { get }
     
-    /// Last time the health check was performed
+    /// The timestamp of the last performed health check.
+    ///
+    /// This property helps track when the health state was last verified
+    /// and can be used to determine if a new health check is needed.
     @objc var lastHealthCheck: Date? { get }
     
-    /// Current health metrics
+    /// The current health metrics of the service.
+    ///
+    /// These metrics provide detailed information about the service's performance
+    /// and resource usage, helping identify potential issues or bottlenecks.
     @objc var healthMetrics: HealthMetrics { get }
     
-    /// Perform a health check
-    /// - Returns: Current health state
-    /// - Throws: HealthError if check fails
+    /// Performs a comprehensive health check of the service.
+    ///
+    /// This method should verify:
+    /// - Service availability
+    /// - Resource usage
+    /// - Error rates
+    /// - Performance metrics
+    /// - System dependencies
+    ///
+    /// - Returns: The current health state of the service
+    /// - Throws: `HealthError` if the health check fails
     @objc func performHealthCheck() async throws -> HealthState
     
-    /// Update health status asynchronously
-    /// This method should be called periodically to update the service's health state
+    /// Updates the service's health status asynchronously.
+    ///
+    /// This method should be called periodically to ensure the health state
+    /// remains current. It typically involves:
+    /// - Performing a health check
+    /// - Updating the health state
+    /// - Recording metrics
+    /// - Logging status changes
     @objc optional func updateHealthStatus() async
     
-    /// Reset health state to unknown
-    /// This is useful when service configuration changes
+    /// Resets the health state to its initial condition.
+    ///
+    /// This method should:
+    /// - Clear any cached health state
+    /// - Reset health metrics
+    /// - Clear error counts
+    /// - Reset performance measurements
     @objc optional func resetHealthState()
 }
 
