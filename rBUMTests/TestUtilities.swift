@@ -3,14 +3,16 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
+//  Last updated: 7 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
+
 @testable import Core
 @testable import rBUM
 import XCTest
+
+// Re-export all test utilities
+@_exported import struct Core.LogMetadataValue
+@_exported import enum Core.LogPrivacy
 
 // MARK: - Mock Logger
 
