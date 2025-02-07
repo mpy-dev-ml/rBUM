@@ -11,41 +11,41 @@ public final class SecurityOperationRecorder {
         let timestamp: Date
         let status: OperationStatus
         let error: String?
-        
+
         enum OperationType: String {
             case access
             case permission
             case bookmark
             case xpc
         }
-        
+
         enum OperationStatus: String {
             case success
             case failure
             case pending
         }
-        
+
         static func == (lhs: SecurityOperation, rhs: SecurityOperation) -> Bool {
-            return lhs.url == rhs.url &&
-                   lhs.operationType == rhs.operationType &&
-                   lhs.timestamp == rhs.timestamp
+            lhs.url == rhs.url &&
+                lhs.operationType == rhs.operationType &&
+                lhs.timestamp == rhs.timestamp
         }
-        
+
         func hash(into hasher: inout Hasher) {
             hasher.combine(url)
             hasher.combine(operationType)
             hasher.combine(timestamp)
         }
     }
-    
+
     private let logger: Logger
     private let queue = DispatchQueue(label: "dev.mpy.rbum.security.operations")
     private var operations: Set<SecurityOperation> = []
-    
+
     init(logger: Logger) {
         self.logger = logger
     }
-    
+
     func recordOperation(
         url: URL,
         type: SecurityOperation.OperationType,
@@ -61,24 +61,24 @@ public final class SecurityOperationRecorder {
                 error: error
             )
             operations.insert(operation)
-            
+
             logger.info("""
-                Recording security operation:
-                Type: \(type.rawValue)
-                URL: \(url.path)
-                Status: \(status.rawValue)
-                \(error.map { "Error: \($0)" } ?? "")
-                """)
+            Recording security operation:
+            Type: \(type.rawValue)
+            URL: \(url.path)
+            Status: \(status.rawValue)
+            \(error.map { "Error: \($0)" } ?? "")
+            """)
         }
     }
-    
+
     func getOperations(for url: URL) -> [SecurityOperation] {
         queue.sync {
-            return operations.filter { $0.url == url }
+            operations.filter { $0.url == url }
                 .sorted { $0.timestamp > $1.timestamp }
         }
     }
-    
+
     func clearOperations() {
         queue.sync {
             operations.removeAll()

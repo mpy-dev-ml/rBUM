@@ -14,25 +14,31 @@ import Foundation
 /// Service for monitoring sandbox compliance and resource access
 public final class SandboxMonitor: BaseSandboxedService {
     // MARK: - Properties
+
     private let monitorQueue: DispatchQueue
     private var activeResources: Set<URL> = []
     private let maxResourceAccessDuration: TimeInterval
-    
+
     public weak var delegate: SandboxMonitorDelegate?
-    
+
     public var isHealthy: Bool {
         // For now, just check if we're able to monitor
         !activeResources.isEmpty
     }
-    
+
     // MARK: - Initialization
-    public init(logger: LoggerProtocol, securityService: SecurityServiceProtocol, maxResourceAccessDuration: TimeInterval = 3600) {
-        self.monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandbox.monitor", attributes: .concurrent)
+
+    public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol,
+        maxResourceAccessDuration: TimeInterval = 3600
+    ) {
+        monitorQueue = DispatchQueue(label: "dev.mpy.rBUM.sandbox.monitor", attributes: .concurrent)
         self.maxResourceAccessDuration = maxResourceAccessDuration
         super.init(logger: logger, securityService: securityService)
         setupNotifications()
     }
-    
+
     private func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -41,7 +47,7 @@ public final class SandboxMonitor: BaseSandboxedService {
             object: nil
         )
     }
-    
+
     @objc private func handleApplicationWillTerminate() {
         // Clean up all monitored resources
         let resources = monitorQueue.sync { Array(activeResources) }
@@ -50,6 +56,7 @@ public final class SandboxMonitor: BaseSandboxedService {
 }
 
 // MARK: - SandboxMonitorProtocol Implementation
+
 extension SandboxMonitor: SandboxMonitorProtocol {
     public var isMonitoring: Bool {
         get {
@@ -66,17 +73,17 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             )
         }
     }
-    
+
     public func startMonitoring(url: URL) -> Bool {
         monitorQueue.sync(flags: .barrier) {
             guard !activeResources.contains(url) else { return true }
-            
+
             Task {
                 do {
                     if try await startAccessing(url) {
                         activeResources.insert(url)
                         delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
-                        
+
                         // Schedule access expiration
                         scheduleAccessExpiration(for: url)
                     }
@@ -93,11 +100,11 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             return true
         }
     }
-    
+
     public func stopMonitoring(for url: URL) {
         monitorQueue.sync(flags: .barrier) {
             guard activeResources.contains(url) else { return }
-            
+
             Task {
                 do {
                     try await stopAccessing(url)
@@ -114,13 +121,13 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             }
         }
     }
-    
+
     public func isMonitoring(url: URL) -> Bool {
         monitorQueue.sync {
             activeResources.contains(url)
         }
     }
-    
+
     private func scheduleAccessExpiration(for url: URL) {
         Task {
             try await Task.sleep(nanoseconds: UInt64(maxResourceAccessDuration * 1_000_000_000))

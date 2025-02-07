@@ -18,7 +18,7 @@ public protocol ResticServiceProtocol: HealthCheckable {
     func initializeRepository(
         at url: URL
     ) async throws
-    
+
     /// Create a backup
     /// - Parameters:
     ///   - source: Source path
@@ -28,12 +28,12 @@ public protocol ResticServiceProtocol: HealthCheckable {
         from source: URL,
         to destination: URL
     ) async throws
-    
+
     /// List snapshots in repository
     /// - Returns: List of snapshot IDs
     /// - Throws: ResticError if listing fails
     func listSnapshots() async throws -> [String]
-    
+
     /// Restore from backup
     /// - Parameters:
     ///   - source: Source path

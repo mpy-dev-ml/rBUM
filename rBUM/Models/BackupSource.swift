@@ -14,16 +14,16 @@ import Foundation
 public struct BackupSource: Codable, Equatable {
     /// The path to the source directory or file
     public let path: URL
-    
+
     /// Whether to include subdirectories
     public let includeSubdirectories: Bool
-    
+
     /// File patterns to include (e.g., "*.txt", "*.jpg")
     public let includePatterns: [String]
-    
+
     /// File patterns to exclude (e.g., "*.tmp", "*.log")
     public let excludePatterns: [String]
-    
+
     /// Creates a new backup source
     /// - Parameters:
     ///   - path: The path to the source directory or file
@@ -41,7 +41,7 @@ public struct BackupSource: Codable, Equatable {
         self.includePatterns = includePatterns
         self.excludePatterns = excludePatterns
     }
-    
+
     /// Creates a backup source for a directory
     /// - Parameters:
     ///   - path: The path to the directory
@@ -50,7 +50,7 @@ public struct BackupSource: Codable, Equatable {
     public static func directory(_ path: URL, includeSubdirectories: Bool = true) -> BackupSource {
         BackupSource(path: path, includeSubdirectories: includeSubdirectories)
     }
-    
+
     /// Creates a backup source for specific file types
     /// - Parameters:
     ///   - path: The path to search

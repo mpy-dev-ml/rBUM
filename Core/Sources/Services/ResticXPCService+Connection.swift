@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - Connection Management
+
 @available(macOS 13.0, *)
 extension ResticXPCService {
     func configureConnection() {
@@ -9,18 +10,18 @@ extension ResticXPCService {
         connection.interruptionHandler = { [weak self] in
             self?.handleError(ResticXPCError.serviceUnavailable)
         }
-        
+
         connection.invalidationHandler = { [weak self] in
             self?.handleError(ResticXPCError.connectionFailed)
         }
     }
-    
+
     func validateInterface() {
         guard let service = connection.remoteObjectProxy as? ResticXPCServiceProtocol else {
             handleError(ResticXPCError.connectionFailed)
             return
         }
-        
+
         Task {
             if await service.ping() {
                 self.isHealthy = true
@@ -29,7 +30,7 @@ extension ResticXPCService {
             }
         }
     }
-    
+
     func handleError(_ error: Error) {
         isHealthy = false
         logger.error(
@@ -44,7 +45,7 @@ extension ResticXPCService {
             connection.invalidate()
         }
     }
-    
+
     func handleInvalidation() {
         logger.error(
             "XPC connection invalidated",
@@ -55,7 +56,7 @@ extension ResticXPCService {
         cleanupResources()
         isHealthy = false
     }
-    
+
     func handleInterruption() {
         logger.error(
             "XPC connection interrupted",

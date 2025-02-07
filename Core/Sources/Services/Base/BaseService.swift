@@ -14,12 +14,12 @@ import os.log
 /// Base class providing common service functionality
 open class BaseService: NSObject, LoggingService {
     public let logger: LoggerProtocol
-    
+
     public init(logger: LoggerProtocol) {
         self.logger = logger
         super.init()
     }
-    
+
     /// Execute an operation with retry logic
     public func withRetry<T>(
         attempts: Int = 3,
@@ -28,8 +28,8 @@ open class BaseService: NSObject, LoggingService {
         action: () async throws -> T
     ) async throws -> T {
         var lastError: Error?
-        
-        for attempt in 1...attempts {
+
+        for attempt in 1 ... attempts {
             do {
                 return try await action()
             } catch {
@@ -43,7 +43,7 @@ open class BaseService: NSObject, LoggingService {
                     function: #function,
                     line: #line
                 )
-                
+
                 if attempt < attempts {
                     try await Task.sleep(
                         nanoseconds: UInt64(delay * 1_000_000_000)
@@ -51,7 +51,7 @@ open class BaseService: NSObject, LoggingService {
                 }
             }
         }
-        
+
         throw ServiceError.retryFailed(
             operation: operation,
             underlyingError: lastError

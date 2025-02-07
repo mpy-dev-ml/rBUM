@@ -20,7 +20,7 @@ public struct ResticBackupError: Error, Codable, Equatable {
     public let details: String?
     /// Timestamp when the error occurred
     public let timestamp: Date
-    
+
     public init(
         type: BackupErrorType,
         message: String,
@@ -32,7 +32,7 @@ public struct ResticBackupError: Error, Codable, Equatable {
         self.details = details
         self.timestamp = timestamp
     }
-    
+
     /// Types of errors that can occur during Restic backup operations
     public enum BackupErrorType: String, Codable {
         /// Network-related errors (connection, timeout, etc.)

@@ -37,7 +37,7 @@ struct ProcessResult: Equatable {
     let output: String
     let error: String
     let exitCode: Int
-    
+
     var succeeded: Bool { exitCode == 0 }
 }
 
@@ -48,19 +48,19 @@ enum ProcessError: LocalizedError {
     case sandboxViolation(String)
     case timeout(String)
     case environmentError(String)
-    
+
     var errorDescription: String? {
         switch self {
-        case .executionFailed(let message):
-            return "Process execution failed: \(message)"
-        case .invalidExecutable(let path):
-            return "Invalid executable at path: \(path)"
-        case .sandboxViolation(let message):
-            return "Sandbox violation: \(message)"
-        case .timeout(let message):
-            return "Process timed out: \(message)"
-        case .environmentError(let message):
-            return "Environment error: \(message)"
+        case let .executionFailed(message):
+            "Process execution failed: \(message)"
+        case let .invalidExecutable(path):
+            "Invalid executable at path: \(path)"
+        case let .sandboxViolation(message):
+            "Sandbox violation: \(message)"
+        case let .timeout(message):
+            "Process timed out: \(message)"
+        case let .environmentError(message):
+            "Environment error: \(message)"
         }
     }
 }
@@ -71,7 +71,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
     private let logger: LoggerProtocol
     private let defaultTimeout: TimeInterval
     private let allowedPaths: Set<String>
-    
+
     init(
         fileManager: FileManager = .default,
         logger: LoggerProtocol = LoggerFactory.createLogger(
@@ -81,14 +81,14 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         allowedPaths: Set<String> = [
             "/usr/bin",
             "/usr/local/bin",
-            "/opt/homebrew/bin"
+            "/opt/homebrew/bin",
         ]
     ) {
         self.fileManager = fileManager
         self.logger = logger
         self.defaultTimeout = defaultTimeout
         self.allowedPaths = allowedPaths
-        
+
         logger.debug(
             """
             Initialized ProcessExecutor with allowed paths: \
@@ -99,7 +99,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             line: #line
         )
     }
-    
+
     func execute(
         command: String,
         arguments: [String],
@@ -110,19 +110,19 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         guard let executableURL = validateExecutablePath(command) else {
             throw ProcessError.invalidExecutable(command)
         }
-        
+
         // Create and configure process
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments
         process.environment = try sanitizeEnvironment(environment)
-        
+
         // Set up pipes for output capture
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = errorPipe
-        
+
         // Start process with timeout
         logger.debug(
             """
@@ -135,24 +135,24 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             function: #function,
             line: #line
         )
-        
+
         return try await withThrowingTaskGroup(of: ProcessResult.self) { group in
             group.addTask {
-                return try await self.runProcess(
+                try await self.runProcess(
                     process,
                     outputPipe: outputPipe,
                     errorPipe: errorPipe,
                     onOutput: onOutput
                 )
             }
-            
+
             group.addTask {
                 try await self.enforceTimeout(process)
                 throw ProcessError.timeout(
                     "Process exceeded timeout of \(self.defaultTimeout) seconds"
                 )
             }
-            
+
             // Return first completed result (success or error)
             return try await group.next() ?? ProcessResult(
                 output: "",
@@ -161,12 +161,12 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             )
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func validateExecutablePath(_ path: String) -> URL? {
         let url = URL(fileURLWithPath: path)
-        
+
         // Check if path is in allowed directories
         guard allowedPaths.contains(where: { url.path.hasPrefix($0) }) else {
             logger.error(
@@ -180,10 +180,11 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             )
             return nil
         }
-        
+
         // Validate executable exists and is executable
         guard fileManager.fileExists(atPath: url.path),
-              fileManager.isExecutableFile(atPath: url.path) else {
+              fileManager.isExecutableFile(atPath: url.path)
+        else {
             logger.error(
                 """
                 Executable not found or not executable: \
@@ -195,23 +196,23 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             )
             return nil
         }
-        
+
         return url
     }
-    
+
     private func sanitizeEnvironment(
         _ environment: [String: String]?
     ) throws -> [String: String] {
         var sanitized = ProcessInfo.processInfo.environment
-        
+
         // Remove sensitive environment variables
         let sensitiveKeys = ["SUDO_", "PASSWORD", "TOKEN", "KEY", "SECRET"]
         sanitized = sanitized.filter { key, _ in
             !sensitiveKeys.contains { key.uppercased().contains($0) }
         }
-        
+
         // Add provided environment variables after validation
-        if let environment = environment {
+        if let environment {
             for (key, value) in environment {
                 guard !key.isEmpty else { continue }
                 guard !sensitiveKeys.contains(
@@ -224,17 +225,17 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                 sanitized[key] = value
             }
         }
-        
+
         return sanitized
     }
-    
+
     private func runProcess(
         _ process: Process,
         outputPipe: Pipe,
         errorPipe: Pipe,
         onOutput: ((String) -> Void)?
     ) async throws -> ProcessResult {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             do {
                 process.terminationHandler = { process in
                     Task {
@@ -243,7 +244,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                                 .readToEnd() ?? Data()
                             let error = try errorPipe.fileHandleForReading
                                 .readToEnd() ?? Data()
-                            
+
                             let outputString = String(
                                 data: output,
                                 encoding: .utf8
@@ -252,7 +253,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                                 data: error,
                                 encoding: .utf8
                             ) ?? ""
-                            
+
                             if process.terminationStatus != 0 {
                                 self.logger.error(
                                     """
@@ -265,7 +266,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                                     line: #line
                                 )
                             }
-                            
+
                             continuation.resume(
                                 returning: ProcessResult(
                                     output: outputString,
@@ -282,11 +283,11 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                         }
                     }
                 }
-                
+
                 try process.run()
-                
+
                 // Handle real-time output if callback provided
-                if let onOutput = onOutput {
+                if let onOutput {
                     outputPipe.fileHandleForReading.readabilityHandler = { handle in
                         let data = handle.availableData
                         if let output = String(data: data, encoding: .utf8) {
@@ -303,17 +304,17 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             }
         }
     }
-    
+
     private func enforceTimeout(_ process: Process) async throws {
         try await Task.sleep(
             nanoseconds: UInt64(defaultTimeout * 1_000_000_000)
         )
         if process.isRunning {
             process.terminate()
-            self.logger.error(
+            logger.error(
                 """
                 Process terminated by timeout after \
-                \(self.defaultTimeout) seconds
+                \(defaultTimeout) seconds
                 """,
                 file: #file,
                 function: #function,

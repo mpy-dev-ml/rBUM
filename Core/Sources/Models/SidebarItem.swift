@@ -15,18 +15,18 @@ public enum SidebarItem: String, CaseIterable, Identifiable {
     case repositories = "Repositories"
     case backups = "Backups"
     case settings = "Settings"
-    
+
     public var id: String { rawValue }
-    
+
     /// Icon name for the item
     public var iconName: String {
         switch self {
         case .repositories:
-            return "folder"
+            "folder"
         case .backups:
-            return "arrow.clockwise"
+            "arrow.clockwise"
         case .settings:
-            return "gear"
+            "gear"
         }
     }
 }

@@ -18,13 +18,13 @@ public protocol StorageServiceProtocol {
     ///   - key: Storage key
     /// - Throws: StorageError if save fails
     func save(_ data: Data, forKey key: String) throws
-    
+
     /// Load data from storage
     /// - Parameter key: Storage key
     /// - Returns: Retrieved data
     /// - Throws: StorageError if load fails
     func load(forKey key: String) throws -> Data
-    
+
     /// Delete data from storage
     /// - Parameter key: Storage key
     /// - Throws: StorageError if deletion fails
@@ -37,17 +37,17 @@ public enum StorageError: LocalizedError {
     case invalidData
     case accessDenied
     case notFound
-    
+
     public var errorDescription: String? {
         switch self {
-        case .fileOperationFailed(let operation):
-            return "File operation failed: \(operation)"
+        case let .fileOperationFailed(operation):
+            "File operation failed: \(operation)"
         case .invalidData:
-            return "Invalid data format"
+            "Invalid data format"
         case .accessDenied:
-            return "Access denied"
+            "Access denied"
         case .notFound:
-            return "Data not found"
+            "Data not found"
         }
     }
 }

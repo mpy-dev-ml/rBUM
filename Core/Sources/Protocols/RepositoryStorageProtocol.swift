@@ -16,12 +16,12 @@ public protocol RepositoryStorageProtocol {
     /// - Parameter repository: Repository to save
     /// - Throws: SecurityError if save fails
     func saveRepository(_ repository: Repository) async throws
-    
+
     /// Get all stored repositories
     /// - Returns: Array of stored repositories
     /// - Throws: SecurityError if retrieval fails
     func getRepositories() async throws -> [Repository]
-    
+
     /// Delete a repository from persistent storage
     /// - Parameter repository: Repository to delete
     /// - Throws: SecurityError if deletion fails

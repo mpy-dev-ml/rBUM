@@ -18,7 +18,7 @@ struct ContentView: View {
     @StateObject private var viewModel: ContentViewModel
     private let credentialsManager: KeychainCredentialsManagerProtocol
     private let creationService: RepositoryCreationServiceProtocol
-    
+
     init(
         credentialsManager: KeychainCredentialsManagerProtocol,
         creationService: RepositoryCreationServiceProtocol
@@ -31,7 +31,7 @@ struct ContentView: View {
             )
         )
     }
-    
+
     var body: some View {
         NavigationSplitView {
             SidebarView(
@@ -63,24 +63,24 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case repositories = "Repositories"
     case backups = "Backups"
     case schedules = "Schedules"
-    
+
     var id: String { rawValue }
-    
+
     var icon: String {
         switch self {
         case .repositories:
-            return "folder"
+            "folder"
         case .backups:
-            return "arrow.clockwise"
+            "arrow.clockwise"
         case .schedules:
-            return "calendar"
+            "calendar"
         }
     }
 }
 
 struct SidebarView: View {
     @Binding var selection: SidebarItem?
-    
+
     var body: some View {
         List(SidebarItem.allCases, selection: $selection) { item in
             Label(item.rawValue, systemImage: item.icon)
@@ -92,37 +92,37 @@ struct SidebarView: View {
 // MARK: - Preview Helpers
 
 private final class PreviewRepositoryStorage: RepositoryStorageProtocol {
-    func save(_ repository: Repository) throws {
+    func save(_: Repository) throws {
         // No-op for preview
     }
-    
-    func delete(_ repository: Repository) throws {
+
+    func delete(_: Repository) throws {
         // No-op for preview
     }
-    
-    func get(forId id: String) throws -> Repository? {
+
+    func get(forId _: String) throws -> Repository? {
         // Return nil for preview
-        return nil
+        nil
     }
-    
-    func store(_ repository: Repository) throws {
+
+    func store(_: Repository) throws {
         // No-op for preview
     }
-    
-    func retrieve(forId id: UUID) throws -> Repository? {
+
+    func retrieve(forId _: UUID) throws -> Repository? {
         // Return nil for preview
-        return nil
+        nil
     }
-    
+
     func list() throws -> [Repository] {
         // Return empty list for preview
-        return []
+        []
     }
-    
-    func delete(forId id: UUID) throws {}
-    func exists(atPath path: URL, excludingId: UUID?) throws -> Bool { 
+
+    func delete(forId _: UUID) throws {}
+    func exists(atPath _: URL, excludingId _: UUID?) throws -> Bool {
         // Always return false for preview
-        return false 
+        false
     }
 }
 
@@ -133,7 +133,7 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
         password: String
     ) async throws -> Repository {
         // Create a preview repository
-        return Repository(
+        Repository(
             name: name,
             path: path,
             credentials: RepositoryCredentials(
@@ -142,14 +142,14 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
             )
         )
     }
-    
+
     func importRepository(
         name: String,
         path: String,
         password: String
     ) async throws -> Repository {
         // Import a preview repository (same as create for preview)
-        return Repository(
+        Repository(
             name: name,
             path: path,
             credentials: RepositoryCredentials(
@@ -158,7 +158,7 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
             )
         )
     }
-    
+
     func createRepository(
         name: String,
         path: URL,
@@ -173,7 +173,7 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
             )
         )
     }
-    
+
     func importRepository(
         name: String,
         path: URL,
@@ -192,45 +192,45 @@ private final class PreviewRepositoryCreationService: RepositoryCreationServiceP
 
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     func initRepository(
-        credentials: RepositoryCredentials
+        credentials _: RepositoryCredentials
     ) async throws {
         // No-op for preview
     }
-    
+
     func checkRepository(
-        credentials: RepositoryCredentials
+        credentials _: RepositoryCredentials
     ) async throws {
         // No-op for preview
     }
-    
+
     func listSnapshots(
-        in repository: Repository
+        in _: Repository
     ) async throws -> [ResticSnapshot] {
         // Return empty list for preview
-        return []
+        []
     }
-    
+
     func initializeRepository(
-        at path: URL,
-        password: String
+        at _: URL,
+        password _: String
     ) async throws {}
-    
+
     func check(
-        _ repository: Repository
+        _: Repository
     ) async throws {
         // No-op for preview
     }
-    
+
     func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        tags: [String]? = nil,
+        paths _: [URL],
+        to _: Repository,
+        tags _: [String]? = nil,
         onProgress: ((ResticBackupProgress) -> Void)? = nil,
         onStatusChange: ((ResticBackupStatus) -> Void)? = nil
     ) async throws {
         // Simulate backup progress
         onStatusChange?(.preparing)
-        
+
         // Simulate progress updates
         let progress = ResticBackupProgress(
             totalFiles: 100,
@@ -243,87 +243,87 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         )
         onProgress?(progress)
         onStatusChange?(.backing(progress))
-        
+
         // Simulate completion
-        try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
         onStatusChange?(.completed)
     }
-    
+
     func pruneSnapshots(
-        in repository: Repository,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
+        in _: Repository,
+        keepLast _: Int?,
+        keepDaily _: Int?,
+        keepWeekly _: Int?,
+        keepMonthly _: Int?,
+        keepYearly _: Int?
     ) async throws {}
-    
+
     func forget(
-        in repository: Repository,
-        snapshots: [ResticSnapshot]
+        in _: Repository,
+        snapshots _: [ResticSnapshot]
     ) async throws {}
-    
+
     func restore(
-        from snapshot: ResticSnapshot,
-        to path: URL,
-        onProgress: ((ResticRestoreProgress) -> Void)? = nil
+        from _: ResticSnapshot,
+        to _: URL,
+        onProgress _: ((ResticRestoreProgress) -> Void)? = nil
     ) async throws {}
-    
+
     func mount(
-        repository: Repository,
-        on path: URL,
-        onProgress: ((ResticMountProgress) -> Void)? = nil
+        repository _: Repository,
+        on _: URL,
+        onProgress _: ((ResticMountProgress) -> Void)? = nil
     ) async throws {}
-    
+
     func unmount(
-        repository: Repository,
-        on path: URL
+        repository _: Repository,
+        on _: URL
     ) async throws {}
 }
 
 private final class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
     func store(
-        _ credentials: RepositoryCredentials,
-        forRepositoryId id: String
+        _: RepositoryCredentials,
+        forRepositoryId _: String
     ) async throws {
         // No-op for preview
     }
-    
+
     func retrieve(
-        forId id: String
+        forId _: String
     ) async throws -> RepositoryCredentials {
         // Return dummy data for preview
-        return RepositoryCredentials(repositoryPath: "/tmp/preview", password: "preview")
+        RepositoryCredentials(repositoryPath: "/tmp/preview", password: "preview")
     }
-    
+
     func delete(
-        forId id: String
+        forId _: String
     ) async throws {
         // No-op for preview
     }
-    
+
     func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
         // Return empty list for preview
-        return []
+        []
     }
 }
 
 class ContentViewModel: ObservableObject {
     @Published var selectedSidebarItem: SidebarItem? = .repositories
-    
+
     let repositoryStorage: RepositoryStorageProtocol
     let repositoryCreationService: RepositoryCreationServiceProtocol
     let resticService: ResticCommandServiceProtocol
     let credentialsManager: KeychainCredentialsManagerProtocol
-    
+
     init(credentialsManager: KeychainCredentialsManagerProtocol) {
         self.credentialsManager = credentialsManager
-        self.repositoryStorage = RepositoryStorage()
-        self.resticService = ResticCommandService(
+        repositoryStorage = RepositoryStorage()
+        resticService = ResticCommandService(
             fileManager: .default,
             logger: Logging.logger(for: .repository)
         )
-        self.repositoryCreationService = RepositoryCreationService(
+        repositoryCreationService = RepositoryCreationService(
             resticService: resticService,
             repositoryStorage: repositoryStorage
         )

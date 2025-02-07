@@ -18,18 +18,21 @@ import Foundation
 /// - As a placeholder until the real XPC service is ready
 ///
 /// Warning: This service logs warnings if called and should never be used in production code paths.
-internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
+final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
     // MARK: - Properties
+
     private let logger: LoggerProtocol
     public private(set) var isHealthy: Bool = false
-    
+
     // MARK: - Initialization
+
     init(logger: LoggerProtocol) {
         self.logger = logger
         super.init()
     }
-    
+
     // MARK: - HealthCheckable Implementation
+
     @objc public func performHealthCheck() async throws -> Bool {
         logger.warning(
             "Circuit breaker XPC service health check called - this should not happen in production",
@@ -39,7 +42,7 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         )
         return false
     }
-    
+
     @objc public func updateHealthStatus() async {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
@@ -59,8 +62,9 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
             isHealthy = false
         }
     }
-    
+
     // MARK: - ResticXPCServiceProtocol Implementation
+
     func ping() async -> Bool {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
@@ -70,8 +74,8 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         )
         return false
     }
-    
-    func initializeRepository(at url: URL, username: String, password: String) async throws {
+
+    func initializeRepository(at _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -80,8 +84,8 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         )
         throw ServiceError.operationFailed
     }
-    
-    func backup(from source: URL, to destination: URL, username: String, password: String) async throws {
+
+    func backup(from _: URL, to _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -90,8 +94,8 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         )
         throw ServiceError.operationFailed
     }
-    
-    func listSnapshots(username: String, password: String) async throws -> [String] {
+
+    func listSnapshots(username _: String, password _: String) async throws -> [String] {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -100,8 +104,8 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         )
         throw ServiceError.operationFailed
     }
-    
-    func restore(from source: URL, to destination: URL, username: String, password: String) async throws {
+
+    func restore(from _: URL, to _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,

@@ -47,47 +47,47 @@ import SwiftUI
 @MainActor
 final class BackupViewModel: ObservableObject {
     // MARK: - Published Properties
-    
+
     /// Current backup configuration including sources, repository, and settings.
     /// This property is published to enable SwiftUI view updates when the configuration changes.
     @Published private(set) var configuration: BackupConfiguration
-    
+
     /// Flag indicating whether to show an error alert to the user.
     /// Set to true when an error occurs that requires user attention.
     @Published var showError = false
-    
+
     /// Tracks the progress of the current backup operation.
     /// Updates are published to enable real-time progress display in the UI.
     @Published private(set) var progress: Progress?
-    
+
     /// Error message to display to the user.
     /// Set when an operation fails and requires user notification.
     @Published private(set) var errorMessage: String?
-    
+
     // MARK: - Private Properties
-    
+
     /// Service for performing backup operations.
     /// Handles the actual execution of Restic commands.
     private let backupService: BackupServiceProtocol
-    
+
     /// Service for managing repository credentials.
     /// Handles secure storage and retrieval of credentials.
     private let credentialsService: KeychainCredentialsManagerProtocol
-    
+
     /// Service for managing security-scoped bookmarks.
     /// Enables persistent access to user-selected files and directories.
     private let bookmarkService: BookmarkServiceProtocol
-    
+
     /// Service for validating security requirements.
     /// Ensures operations comply with sandbox restrictions.
     private let securityService: SecurityServiceProtocol
-    
+
     /// Logger for recording operations and errors.
     /// Uses privacy-aware logging for sensitive information.
     private let logger: Logger
-    
+
     // MARK: - Initialization
-    
+
     /// Initialises a new backup view model.
     /// - Parameters:
     ///   - repository: The target repository for backups
@@ -104,7 +104,7 @@ final class BackupViewModel: ObservableObject {
         securityService: SecurityServiceProtocol,
         logger: Logger = Logger()
     ) {
-        self.configuration = BackupConfiguration(
+        configuration = BackupConfiguration(
             sources: [],
             repository: repository,
             settings: BackupSettings.default
@@ -114,12 +114,17 @@ final class BackupViewModel: ObservableObject {
         self.bookmarkService = bookmarkService
         self.securityService = securityService
         self.logger = logger
-        
-        logger.debug("Initialized BackupViewModel for repository: \(repository.name)", file: #file, function: #function, line: #line)
+
+        logger.debug(
+            "Initialized BackupViewModel for repository: \(repository.name)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Adds a new source to the backup configuration.
     /// - Parameter url: URL of the source to add
     /// - Throws: SecurityError if access validation fails
@@ -132,23 +137,23 @@ final class BackupViewModel: ObservableObject {
     /// 4. Updates the configuration
     func addSource(_ url: URL) async throws {
         logger.debug("Adding source to backup: \(url.path)", file: #file, function: #function, line: #line)
-        
+
         // Check if source already exists
         guard !configuration.sources.contains(where: { $0.url == url }) else {
             logger.debug("Source already exists: \(url.path)", file: #file, function: #function, line: #line)
             return
         }
-        
+
         do {
             // Validate access
             try securityService.validateAccess(to: url)
-            
+
             // Create bookmark for persistence
             let bookmark = try bookmarkService.createBookmark(for: url)
-            
+
             // Create new source
             let source = BackupSource(url: url)
-            
+
             // Update configuration
             configuration = BackupConfiguration(
                 sources: configuration.sources + [source],
@@ -157,14 +162,19 @@ final class BackupViewModel: ObservableObject {
                 schedule: configuration.schedule,
                 settings: configuration.settings
             )
-            
+
             logger.info("Successfully added source: \(url.path)", file: #file, function: #function, line: #line)
         } catch {
-            logger.error("Failed to add source: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            logger.error(
+                "Failed to add source: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw error
         }
     }
-    
+
     /// Removes a source from the backup configuration.
     /// - Parameter url: URL of the source to remove
     ///
@@ -174,14 +184,19 @@ final class BackupViewModel: ObservableObject {
     /// 3. Updates the UI state
     func removeSource(_ url: URL) {
         logger.debug("Removing source from backup: \(url.path)", file: #file, function: #function, line: #line)
-        
+
         // Remove bookmark
         do {
             try bookmarkService.removeBookmark(for: url)
         } catch {
-            logger.warning("Failed to remove bookmark: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            logger.warning(
+                "Failed to remove bookmark: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
-        
+
         // Update configuration
         configuration = BackupConfiguration(
             sources: configuration.sources.filter { $0.url != url },
@@ -190,10 +205,10 @@ final class BackupViewModel: ObservableObject {
             schedule: configuration.schedule,
             settings: configuration.settings
         )
-        
+
         logger.info("Successfully removed source: \(url.path)", file: #file, function: #function, line: #line)
     }
-    
+
     /// Starts the backup operation.
     ///
     /// This method:
@@ -209,17 +224,17 @@ final class BackupViewModel: ObservableObject {
             showError = true
             return
         }
-        
+
         logger.info("Starting backup operation", file: #file, function: #function, line: #line)
-        
+
         do {
             // Get repository credentials
             let credentials = try await credentialsService.getCredentials(for: configuration.repository)
-            
+
             // Create progress tracker
             let tracker = Progress(totalUnitsOfProgress: 1)
-            self.progress = tracker
-            
+            progress = tracker
+
             // Start backup
             try await backupService.createBackup(
                 paths: configuration.sources.map(\.url),
@@ -236,9 +251,14 @@ final class BackupViewModel: ObservableObject {
                     case .backing:
                         self?.logger.info("Backing up files", file: #file, function: #function, line: #line)
                     case .completed:
-                        self?.logger.info("Backup completed successfully", file: #file, function: #function, line: #line)
+                        self?.logger.info(
+                            "Backup completed successfully",
+                            file: #file,
+                            function: #function,
+                            line: #line
+                        )
                         self?.progress?.completedUnitCount = 1
-                    case .failed(let error):
+                    case let .failed(error):
                         self?.handleError(error)
                     }
                 }
@@ -247,12 +267,12 @@ final class BackupViewModel: ObservableObject {
             handleError(error)
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func handleError(_ error: Error) {
         progress?.cancel()
-        
+
         switch error {
         case let resticError as ResticError:
             errorMessage = resticError.localizedDescription
@@ -261,7 +281,7 @@ final class BackupViewModel: ObservableObject {
         default:
             errorMessage = error.localizedDescription
         }
-        
+
         logger.error("Backup failed: \(errorMessage ?? "Unknown error")", file: #file, function: #function, line: #line)
         showError = true
     }

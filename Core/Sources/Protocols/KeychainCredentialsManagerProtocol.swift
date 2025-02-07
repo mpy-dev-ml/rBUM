@@ -18,13 +18,13 @@ public protocol KeychainCredentialsManagerProtocol {
     ///   - repository: Repository the credentials belong to
     /// - Throws: SecurityError if save fails
     func saveCredentials(_ credentials: RepositoryCredentials, for repository: Repository) async throws
-    
+
     /// Get credentials for a repository
     /// - Parameter repository: Repository to get credentials for
     /// - Returns: Repository credentials
     /// - Throws: SecurityError if retrieval fails
     func getCredentials(for repository: Repository) async throws -> RepositoryCredentials
-    
+
     /// Delete credentials for a repository
     /// - Parameter repository: Repository to delete credentials for
     /// - Throws: SecurityError if deletion fails

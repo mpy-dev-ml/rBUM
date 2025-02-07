@@ -20,12 +20,12 @@ struct SettingsView: View {
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
-            
+
             BackupSettingsView()
                 .tabItem {
                     Label("Backup", systemImage: "arrow.clockwise")
                 }
-            
+
             SecuritySettingsView()
                 .tabItem {
                     Label("Security", systemImage: "lock")

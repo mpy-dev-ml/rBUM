@@ -31,118 +31,118 @@ import Foundation
 /// ```
 public struct DevelopmentConfiguration {
     // MARK: - Security Simulation
-    
+
     /// Controls whether permission-related failures should be simulated.
     ///
     /// When enabled, this will cause security operations to randomly fail with
     /// permission-related errors, helping test error handling paths.
     public var shouldSimulatePermissionFailures: Bool
-    
+
     /// Controls whether bookmark-related failures should be simulated.
     ///
     /// When enabled, this will cause security-scoped bookmark operations to
     /// randomly fail, helping test bookmark error handling.
     public var shouldSimulateBookmarkFailures: Bool
-    
+
     /// Controls whether access-related failures should be simulated.
     ///
     /// When enabled, this will cause resource access operations to randomly
     /// fail, helping test access error handling.
     public var shouldSimulateAccessFailures: Bool
-    
+
     // MARK: - Network Simulation
-    
+
     /// Controls whether network connection failures should be simulated.
     ///
     /// When enabled, this will cause network operations to randomly fail,
     /// helping test network error handling and recovery.
     public var shouldSimulateConnectionFailures: Bool
-    
+
     /// Controls whether timeout failures should be simulated.
     ///
     /// When enabled, this will cause operations to randomly time out,
     /// helping test timeout handling and recovery.
     public var shouldSimulateTimeoutFailures: Bool
-    
+
     /// The artificial delay to add to asynchronous operations.
     ///
     /// This delay is added to all async operations to simulate network
     /// latency or processing time. Specified in seconds.
     public var artificialDelay: TimeInterval
-    
+
     // MARK: - Resource Management
-    
+
     /// Controls whether command execution failures should be simulated.
     ///
     /// When enabled, this will cause command executions to randomly fail,
     /// helping test command error handling.
     public var shouldSimulateCommandFailures: Bool
-    
+
     /// The simulated execution time for commands.
     ///
     /// This value determines how long simulated commands will take to execute,
     /// helping test long-running operation handling. Specified in seconds.
     public var commandExecutionTime: TimeInterval
-    
+
     /// The maximum number of concurrent operations allowed.
     ///
     /// This limit helps test resource contention and queue management.
     public var maxConcurrentOperations: Int
-    
+
     /// The maximum memory usage allowed in bytes.
     ///
     /// This limit helps test memory pressure handling and resource management.
     public var maxMemoryUsage: UInt64
-    
+
     /// The maximum disk usage allowed in bytes.
     ///
     /// This limit helps test disk space management and cleanup procedures.
     public var maxDiskUsage: UInt64
-    
+
     // MARK: - Metrics Collection
-    
+
     /// Controls whether detailed metrics should be collected.
     ///
     /// When enabled, the system will collect and store detailed metrics about
     /// various operations and resource usage.
     public var shouldCollectMetrics: Bool
-    
+
     /// The maximum size of the operation history.
     ///
     /// This determines how many past operations are kept in memory for
     /// analysis and debugging.
     public var maxOperationHistorySize: Int
-    
+
     /// The interval at which metrics are collected.
     ///
     /// This determines how frequently metrics are sampled and stored.
     /// Specified in seconds.
     public var metricsCollectionInterval: TimeInterval
-    
+
     /// The types of metrics to collect.
     ///
     /// This set determines which categories of metrics should be collected
     /// and stored for analysis.
     public var metricsTypes: Set<MetricType>
-    
+
     /// Controls whether resource exhaustion should be simulated.
     ///
     /// When enabled, this will simulate various resource pressure scenarios
     /// to test system behaviour under resource constraints.
     public var shouldSimulateResourceExhaustion: Bool
-    
+
     /// The resource limits to enforce during simulation.
     ///
     /// These limits define the maximum resources available to the system
     /// during testing.
     public var resourceLimits: ResourceLimits
-    
+
     /// The resource thresholds for generating warnings.
     ///
     /// These thresholds determine when warning events should be generated
     /// for resource usage.
     public var resourceWarningThresholds: ResourceThresholds
-    
+
     /// The types of metrics that can be collected.
     ///
     /// These metric types cover different aspects of system performance
@@ -161,7 +161,7 @@ public struct DevelopmentConfiguration {
         /// Operation execution metrics
         case operations
     }
-    
+
     /// Resource limits for development and testing simulation.
     ///
     /// This struct defines the maximum resource limits that should be enforced
@@ -170,29 +170,29 @@ public struct DevelopmentConfiguration {
     public struct ResourceLimits {
         /// Maximum CPU usage percentage (0-100)
         public var cpu: Double
-        
+
         /// Maximum memory usage in bytes
         public var memory: UInt64
-        
+
         /// Maximum disk usage in bytes
         public var disk: UInt64
-        
+
         /// Maximum number of open file descriptors
         public var fileDescriptors: Int
-        
+
         /// Maximum network bandwidth in bytes per second
         public var networkBandwidth: UInt64
-        
+
         /// Default resource limits suitable for most development scenarios
         public static let `default` = ResourceLimits(
             cpu: 100.0,
-            memory: 1024 * 1024 * 1024,  // 1GB
-            disk: 10 * 1024 * 1024 * 1024,  // 10GB
+            memory: 1024 * 1024 * 1024, // 1GB
+            disk: 10 * 1024 * 1024 * 1024, // 10GB
             fileDescriptors: 1000,
-            networkBandwidth: 10 * 1024 * 1024  // 10MB/s
+            networkBandwidth: 10 * 1024 * 1024 // 10MB/s
         )
     }
-    
+
     /// Resource warning thresholds for development and testing.
     ///
     /// This struct defines the thresholds at which resource usage warnings
@@ -201,19 +201,19 @@ public struct DevelopmentConfiguration {
     public struct ResourceThresholds {
         /// CPU usage percentage that triggers a warning (0-100)
         public var cpuWarning: Double
-        
+
         /// Memory usage percentage that triggers a warning (0-100)
         public var memoryWarning: Double
-        
+
         /// Disk usage percentage that triggers a warning (0-100)
         public var diskWarning: Double
-        
+
         /// File descriptor usage percentage that triggers a warning (0-100)
         public var fileDescriptorWarning: Double
-        
+
         /// Network bandwidth usage percentage that triggers a warning (0-100)
         public var networkBandwidthWarning: Double
-        
+
         /// Default warning thresholds suitable for most development scenarios.
         ///
         /// These thresholds are set to 80% of the maximum resource limits,
@@ -226,9 +226,9 @@ public struct DevelopmentConfiguration {
             networkBandwidthWarning: 80.0
         )
     }
-    
+
     // MARK: - Initialization
-    
+
     /// Creates a new development configuration with specified simulation parameters.
     ///
     /// - Parameters:
@@ -260,8 +260,8 @@ public struct DevelopmentConfiguration {
         artificialDelay: TimeInterval = 0,
         commandExecutionTime: TimeInterval = 0,
         maxConcurrentOperations: Int = 10,
-        maxMemoryUsage: UInt64 = 1024 * 1024 * 1024,  // 1GB
-        maxDiskUsage: UInt64 = 10 * 1024 * 1024 * 1024,  // 10GB
+        maxMemoryUsage: UInt64 = 1024 * 1024 * 1024, // 1GB
+        maxDiskUsage: UInt64 = 10 * 1024 * 1024 * 1024, // 10GB
         shouldCollectMetrics: Bool = true,
         maxOperationHistorySize: Int = 1000,
         metricsCollectionInterval: TimeInterval = 60,
@@ -289,11 +289,11 @@ public struct DevelopmentConfiguration {
         self.resourceLimits = resourceLimits
         self.resourceWarningThresholds = resourceWarningThresholds
     }
-    
+
     /// Default configuration with no simulated failures and no delays.
     /// Use this for normal development when simulation of failures is not needed.
     public static let `default` = DevelopmentConfiguration()
-    
+
     /// Configuration for stress testing with all simulations enabled
     public static let stressTest = DevelopmentConfiguration(
         shouldSimulatePermissionFailures: true,
@@ -308,7 +308,7 @@ public struct DevelopmentConfiguration {
         shouldCollectMetrics: true,
         shouldSimulateResourceExhaustion: true
     )
-    
+
     /// Configuration for performance testing with metrics collection
     public static let performanceTest = DevelopmentConfiguration(
         artificialDelay: 0,
@@ -318,7 +318,7 @@ public struct DevelopmentConfiguration {
         metricsCollectionInterval: 1.0,
         metricsTypes: [.performance, .memory, .disk, .network]
     )
-    
+
     /// Configuration for security testing
     public static let securityTest = DevelopmentConfiguration(
         shouldSimulatePermissionFailures: true,
@@ -343,27 +343,30 @@ extension DevelopmentConfiguration: CustomStringConvertible {
           • Connection Failures: \(shouldSimulateConnectionFailures)
           • Timeout Failures: \(shouldSimulateTimeoutFailures)
           • Command Failures: \(shouldSimulateCommandFailures)
-        
+
         - Performance Simulation:
           • Artificial Delay: \(artificialDelay)s
           • Command Execution Time: \(commandExecutionTime)s
           • Max Concurrent Operations: \(maxConcurrentOperations)
           • Max Memory Usage: \(ByteCountFormatter.string(fromByteCount: Int64(maxMemoryUsage), countStyle: .binary))
           • Max Disk Usage: \(ByteCountFormatter.string(fromByteCount: Int64(maxDiskUsage), countStyle: .binary))
-        
+
         - Metrics Configuration:
           • Collect Metrics: \(shouldCollectMetrics)
           • History Size: \(maxOperationHistorySize)
           • Collection Interval: \(metricsCollectionInterval)s
-          • Metric Types: \(metricsTypes.map { $0.rawValue }.joined(separator: ", "))
-        
+          • Metric Types: \(metricsTypes.map(\.rawValue).joined(separator: ", "))
+
         - Resource Management:
           • Simulate Exhaustion: \(shouldSimulateResourceExhaustion)
           • CPU Limit: \(resourceLimits.cpu)%
           • Memory Limit: \(ByteCountFormatter.string(fromByteCount: Int64(resourceLimits.memory), countStyle: .binary))
           • Disk Limit: \(ByteCountFormatter.string(fromByteCount: Int64(resourceLimits.disk), countStyle: .binary))
           • File Descriptor Limit: \(resourceLimits.fileDescriptors)
-          • Network Bandwidth Limit: \(ByteCountFormatter.string(fromByteCount: Int64(resourceLimits.networkBandwidth), countStyle: .binary))/s
+          • Network Bandwidth Limit: \(ByteCountFormatter.string(
+              fromByteCount: Int64(resourceLimits.networkBandwidth),
+              countStyle: .binary
+          ))/s
         """
     }
 }

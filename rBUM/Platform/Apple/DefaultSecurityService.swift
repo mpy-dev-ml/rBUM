@@ -58,25 +58,25 @@ import Security
 /// ```
 public class DefaultSecurityService: BaseSandboxedService, Measurable {
     // MARK: - Properties
-    
+
     /// Service responsible for managing security-scoped bookmarks
     private let bookmarkService: BookmarkServiceProtocol
-    
+
     /// Service responsible for secure credential storage
     private let keychainService: KeychainServiceProtocol
-    
+
     /// Service responsible for monitoring sandbox compliance
     private let sandboxMonitor: SandboxMonitorProtocol
-    
+
     /// Queue for managing security operations
     private let operationQueue: OperationQueue
-    
+
     /// Concurrent queue for managing access to shared resources
     private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.defaultSecurity", attributes: .concurrent)
-    
+
     /// Set of currently active operation IDs
     private var activeOperations: Set<UUID> = []
-    
+
     /// Indicates whether the service is currently in a healthy state.
     ///
     /// The service is considered healthy when:
@@ -91,7 +91,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
     }
 
     // MARK: - Initialization
-    
+
     /// Initializes a new DefaultSecurityService with the required dependencies.
     ///
     /// - Parameters:
@@ -111,15 +111,15 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
         self.keychainService = keychainService
         self.sandboxMonitor = sandboxMonitor
 
-        self.operationQueue = OperationQueue()
-        self.operationQueue.name = "dev.mpy.rBUM.defaultSecurityQueue"
-        self.operationQueue.maxConcurrentOperationCount = 1
+        operationQueue = OperationQueue()
+        operationQueue.name = "dev.mpy.rBUM.defaultSecurityQueue"
+        operationQueue.maxConcurrentOperationCount = 1
 
         super.init(logger: logger, securityService: securityService)
     }
 
     // MARK: - SecurityServiceProtocol Implementation
-    
+
     /// Requests permission for the specified URL.
     ///
     /// This method will prompt the user to grant access to the specified URL.
@@ -192,7 +192,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
     ///
     /// - Parameter url: The URL for which access is being started
     /// - Returns: `true` if access is started successfully, `false` otherwise
-    public override func startAccessing(_ url: URL) -> Bool {
+    override public func startAccessing(_ url: URL) -> Bool {
         do {
             return try bookmarkService.startAccessing(url)
         } catch {
@@ -211,7 +211,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
     /// This method will attempt to stop accessing the specified URL.
     ///
     /// - Parameter url: The URL for which access is being stopped
-    public override func stopAccessing(_ url: URL) {
+    override public func stopAccessing(_ url: URL) {
         Task {
             do {
                 try await bookmarkService.stopAccessing(url)
@@ -252,7 +252,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
     }
 
     // MARK: - HealthCheckable Implementation
-    
+
     /// Performs a health check on the service.
     ///
     /// This method checks the service's health by verifying that:
@@ -284,7 +284,7 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
     }
 
     // MARK: - Private Helpers
-    
+
     /// Tracks an operation with the specified ID.
     ///
     /// - Parameter id: The ID of the operation to track

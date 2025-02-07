@@ -85,7 +85,7 @@ public enum SecurityOperationType: String {
     /// - Clean up resources properly
     /// - Handle access timeouts
     case access
-    
+
     /// Represents an operation to request or manage permissions.
     ///
     /// This type is used when:
@@ -118,7 +118,7 @@ public enum SecurityOperationType: String {
     /// - Respect system restrictions
     /// - Document permission usage
     case permission
-    
+
     /// Represents an operation involving security-scoped bookmarks.
     ///
     /// This type is used when:
@@ -151,7 +151,7 @@ public enum SecurityOperationType: String {
     /// - Secure bookmark storage
     /// - Clean up invalid bookmarks
     case bookmark
-    
+
     /// Represents an operation involving XPC service interactions.
     ///
     /// This type is used when:

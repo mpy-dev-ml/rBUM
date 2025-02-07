@@ -15,8 +15,11 @@ import Core
 import Foundation
 
 /// Service for creating and managing default repository locations on macOS
-public final class DefaultRepositoryCreationService: BaseSandboxedService, DefaultRepositoryCreationProtocol, HealthCheckable {
+public final class DefaultRepositoryCreationService: BaseSandboxedService, DefaultRepositoryCreationProtocol,
+    HealthCheckable
+{
     // MARK: - Properties
+
     private let bookmarkService: BookmarkServiceProtocol
     private let keychainService: KeychainServiceProtocol
     private let operationQueue: OperationQueue
@@ -31,6 +34,7 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
     }
 
     // MARK: - Initialization
+
     public init(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
@@ -40,14 +44,15 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
         self.bookmarkService = bookmarkService
         self.keychainService = keychainService
 
-        self.operationQueue = OperationQueue()
-        self.operationQueue.name = "dev.mpy.rBUM.defaultRepositoryQueue"
-        self.operationQueue.maxConcurrentOperationCount = 1
+        operationQueue = OperationQueue()
+        operationQueue.name = "dev.mpy.rBUM.defaultRepositoryQueue"
+        operationQueue.maxConcurrentOperationCount = 1
 
         super.init(logger: logger, securityService: securityService)
     }
 
     // MARK: - DefaultRepositoryCreationProtocol Implementation
+
     public func createDefaultRepository() async throws -> URL {
         let operationId = UUID()
 
@@ -168,6 +173,7 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
     }
 
     // MARK: - Health Check
+
     public func performHealthCheck() async -> Bool {
         await measure("Repository Creation Health Check") {
             do {
@@ -208,13 +214,14 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
 }
 
 // MARK: - Repository Creation Errors
+
 public enum RepositoryCreationError: LocalizedError {
     case creationFailed(String)
 
     public var errorDescription: String? {
         switch self {
-        case .creationFailed(let message):
-            return "Repository creation failed: \(message)"
+        case let .creationFailed(message):
+            "Repository creation failed: \(message)"
         }
     }
 }

@@ -13,33 +13,33 @@ import Foundation
 @available(macOS 13.0, *)
 public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCheckable, @unchecked Sendable {
     // MARK: - Properties
-    
+
     /// Logger for service operations
     private let logger: LoggerProtocol
-    
+
     /// Queue for synchronizing access to shared resources
     private let queue = DispatchQueue(
         label: "dev.mpy.rBUM.developmentBookmark",
         attributes: .concurrent
     )
-    
+
     /// Lock for thread-safe access to shared resources
     private let lock = NSLock()
-    
+
     /// Storage for bookmark data and metadata
     private var bookmarks: [URL: BookmarkEntry] = [:]
-    
+
     /// Set of URLs currently being accessed
     private var activeAccess: Set<URL> = []
-    
+
     /// Configuration for development behavior
     private let configuration: DevelopmentConfiguration
-    
+
     /// Metrics for bookmark operations
     private var metrics = BookmarkMetrics()
-    
+
     // MARK: - Initialization
-    
+
     /// Initialize the development bookmark service
     /// - Parameters:
     ///   - logger: Logger for service operations
@@ -50,12 +50,12 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
     ) {
         self.logger = logger
         self.configuration = configuration
-        
+
         // Start monitoring if metrics collection is enabled
         if configuration.shouldCollectMetrics {
             startMetricsCollection()
         }
-        
+
         logger.info(
             """
             Initialised DevelopmentBookmarkService with configuration:
@@ -66,9 +66,9 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             line: #line
         )
     }
-    
+
     // MARK: - Private Methods
-    
+
     /// Start collecting metrics at the configured interval
     private func startMetricsCollection() {
         queue.async {
@@ -80,29 +80,29 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             }
         }
     }
-    
+
     /// Collect metrics from various sources
     private func collectMetrics() {
         guard configuration.shouldCollectMetrics else { return }
-        
+
         withThreadSafety {
             // Update performance metrics
             // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
-            
+
             // Update resource usage
             // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
-            
+
             // Check resource limits
             // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
-            
+
             // Clean up stale bookmarks
             cleanupStaleBookmarks()
-            
+
             // Log current metrics
             logMetrics()
         }
     }
-    
+
     /// Log current metrics
     private func logMetrics() {
         logger.info(
@@ -117,7 +117,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             line: #line
         )
     }
-    
+
     /// Thread-safe access to shared resources
     /// - Parameter action: Action to perform with shared resources
     /// - Returns: Result of the action
@@ -126,7 +126,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         defer { lock.unlock() }
         return try action()
     }
-    
+
     /// Simulate failure if configured
     /// - Parameters:
     ///   - url: URL being operated on
@@ -138,16 +138,16 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         error: (URL) -> Error
     ) throws {
         guard configuration.shouldSimulateBookmarkFailures else { return }
-        
+
         // Simulate different types of failures based on configuration
         if configuration.shouldSimulatePermissionFailures {
             throw BookmarkError.accessDenied(url)
         }
-        
+
         if configuration.shouldSimulateTimeoutFailures {
             throw BookmarkError.operationTimeout(url)
         }
-        
+
         logger.error(
             """
             Simulating \(operation) failure for URL: \
@@ -160,12 +160,12 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         metrics.recordFailure(operation: operation)
         throw error(url)
     }
-    
+
     /// Clean up stale bookmarks
     private func cleanupStaleBookmarks() {
         let now = Date()
         let staleThreshold: TimeInterval = 3600 // 1 hour
-        
+
         withThreadSafety {
             for (url, entry) in bookmarks {
                 if now.timeIntervalSince(entry.lastAccessed) > staleThreshold {
@@ -175,9 +175,9 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             }
         }
     }
-    
+
     // MARK: - HealthCheckable Implementation
-    
+
     public func checkHealth() async throws -> HealthStatus {
         let status = withThreadSafety {
             HealthStatus(
@@ -185,21 +185,21 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
                 details: [
                     "activeBookmarks": bookmarks.count,
                     "activeAccesses": activeAccess.count,
-                    "metrics": metrics
+                    "metrics": metrics,
                     // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
                     // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
                 ]
             )
         }
-        
+
         // Check resource limits
         // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
-        
+
         return status
     }
-    
+
     // MARK: - BookmarkServiceProtocol Implementation
-    
+
     public func createBookmark(
         for url: URL
     ) throws -> Data {
@@ -208,28 +208,28 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             operation: "bookmark creation",
             error: BookmarkError.creationFailed
         )
-        
+
         return try withThreadSafety {
             // Moved to DevelopmentBookmarkService+BookmarkCreation.swift
         }
     }
-    
+
     public func resolveBookmark(
-        _ bookmark: Data
+        _: Data
     ) throws -> URL {
-        return try withThreadSafety {
+        try withThreadSafety {
             // Moved to DevelopmentBookmarkService+BookmarkResolution.swift
         }
     }
-    
+
     public func validateBookmark(
-        _ bookmark: Data
+        _: Data
     ) throws -> Bool {
-        return try withThreadSafety {
+        try withThreadSafety {
             // Moved to DevelopmentBookmarkService+BookmarkValidation.swift
         }
     }
-    
+
     public func startAccessing(
         _ url: URL
     ) throws -> Bool {
@@ -238,21 +238,21 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
             operation: "access start",
             error: BookmarkError.accessDenied
         )
-        
+
         return try withThreadSafety {
             // Moved to DevelopmentBookmarkService+AccessControl.swift
         }
     }
-    
+
     public func stopAccessing(
-        _ url: URL
+        _: URL
     ) async throws {
         if configuration.artificialDelay > 0 {
             try await Task.sleep(
                 nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000)
             )
         }
-        
+
         try withThreadSafety {
             // Moved to DevelopmentBookmarkService+AccessControl.swift
         }
@@ -272,7 +272,7 @@ private struct BookmarkMetrics: CustomStringConvertible {
     private(set) var staleAccessCount: Int = 0
     private(set) var operationLatencies: [String: TimeInterval] = [:]
     private(set) var errorTypes: [String: Int] = [:]
-    
+
     var description: String {
         """
         BookmarkMetrics:
@@ -287,52 +287,52 @@ private struct BookmarkMetrics: CustomStringConvertible {
         - Error Distribution: \(formatErrors())
         """
     }
-    
+
     private func formatLatencies() -> String {
         operationLatencies
             .map { "\($0.key): \(String(format: "%.2f", $0.value))s" }
             .joined(separator: ", ")
     }
-    
+
     private func formatErrors() -> String {
         errorTypes
             .map { "\($0.key): \($0.value)" }
             .joined(separator: ", ")
     }
-    
+
     mutating func recordCreation() {
         creationCount += 1
     }
-    
+
     mutating func recordResolution() {
         resolutionCount += 1
     }
-    
+
     mutating func recordValidation() {
         validationCount += 1
     }
-    
+
     mutating func recordAccessStart() {
         activeAccessCount += 1
     }
-    
+
     mutating func recordAccessStop() {
         activeAccessCount = max(0, activeAccessCount - 1)
     }
-    
+
     mutating func recordFailure(operation: String) {
         failureCount += 1
         errorTypes[operation, default: 0] += 1
     }
-    
+
     mutating func recordStaleBookmark() {
         staleBookmarkCount += 1
     }
-    
+
     mutating func recordStaleAccess() {
         staleAccessCount += 1
     }
-    
+
     mutating func recordLatency(operation: String, duration: TimeInterval) {
         let currentAvg = operationLatencies[operation, default: 0]
         let count = Double(errorTypes[operation, default: 0] + 1)

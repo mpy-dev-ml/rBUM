@@ -46,7 +46,7 @@ public struct SecurityMetrics {
     /// - Validate security scopes
     /// - Perform privileged operations
     private(set) var accessCount: Int = 0
-    
+
     /// The total number of permission requests made.
     ///
     /// This count includes requests for:
@@ -54,7 +54,7 @@ public struct SecurityMetrics {
     /// - Security-scoped bookmarks
     /// - System-level privileges
     private(set) var permissionCount: Int = 0
-    
+
     /// The total number of bookmark operations performed.
     ///
     /// This count includes operations to:
@@ -62,7 +62,7 @@ public struct SecurityMetrics {
     /// - Resolve bookmarks
     /// - Validate bookmark data
     private(set) var bookmarkCount: Int = 0
-    
+
     /// The total number of XPC service interactions.
     ///
     /// This count includes:
@@ -70,7 +70,7 @@ public struct SecurityMetrics {
     /// - Message sends
     /// - Connection invalidations
     private(set) var xpcCount: Int = 0
-    
+
     /// The total number of security operation failures.
     ///
     /// This count includes failures from:
@@ -79,7 +79,7 @@ public struct SecurityMetrics {
     /// - Bookmark operations
     /// - XPC interactions
     private(set) var failureCount: Int = 0
-    
+
     /// The current number of active access sessions.
     ///
     /// This count represents:
@@ -87,7 +87,7 @@ public struct SecurityMetrics {
     /// - Active permissions
     /// - Running privileged operations
     private(set) var activeAccessCount: Int = 0
-    
+
     /// A chronological history of all security operations.
     ///
     /// This array:
@@ -95,10 +95,10 @@ public struct SecurityMetrics {
     /// - Removes oldest entries when full
     /// - Records operation details and timestamps
     private(set) var operationHistory: [SecurityOperation] = []
-    
+
     /// The logger instance used for recording metric events.
     private let logger: Logger
-    
+
     /// Initialises a new SecurityMetrics instance with the specified logger.
     ///
     /// - Parameter logger: The logger instance to use for recording metric events
@@ -112,7 +112,7 @@ public struct SecurityMetrics {
     public init(logger: Logger) {
         self.logger = logger
     }
-    
+
     /// Records an access attempt with an optional success status and error message.
     ///
     /// This method:
@@ -128,11 +128,11 @@ public struct SecurityMetrics {
     /// ```swift
     /// metrics.recordAccess(success: false, error: "Access denied: insufficient permissions")
     /// ```
-    mutating func recordAccess(success: Bool = true, error: String? = nil) {
+    mutating func recordAccess(success: Bool = true, error _: String? = nil) {
         accessCount += 1
         if !success { failureCount += 1 }
     }
-    
+
     /// Records a permission request with an optional success status and error message.
     ///
     /// This method:
@@ -148,11 +148,11 @@ public struct SecurityMetrics {
     /// ```swift
     /// metrics.recordPermission(success: false, error: "User denied permission request")
     /// ```
-    mutating func recordPermission(success: Bool = true, error: String? = nil) {
+    mutating func recordPermission(success: Bool = true, error _: String? = nil) {
         permissionCount += 1
         if !success { failureCount += 1 }
     }
-    
+
     /// Records a bookmark operation with an optional success status and error message.
     ///
     /// This method:
@@ -168,11 +168,11 @@ public struct SecurityMetrics {
     /// ```swift
     /// metrics.recordBookmark(success: false, error: "Bookmark data is stale")
     /// ```
-    mutating func recordBookmark(success: Bool = true, error: String? = nil) {
+    mutating func recordBookmark(success: Bool = true, error _: String? = nil) {
         bookmarkCount += 1
         if !success { failureCount += 1 }
     }
-    
+
     /// Records an XPC service interaction with an optional success status and error message.
     ///
     /// This method:
@@ -188,11 +188,11 @@ public struct SecurityMetrics {
     /// ```swift
     /// metrics.recordXPC(success: false, error: "XPC service connection interrupted")
     /// ```
-    mutating func recordXPC(success: Bool = true, error: String? = nil) {
+    mutating func recordXPC(success: Bool = true, error _: String? = nil) {
         xpcCount += 1
         if !success { failureCount += 1 }
     }
-    
+
     /// Records a security operation and adds it to the operation history.
     ///
     /// This method:
@@ -215,7 +215,7 @@ public struct SecurityMetrics {
             operationHistory.removeFirst()
         }
     }
-    
+
     /// Increments the active access session count.
     ///
     /// This method should be called when:
@@ -231,7 +231,7 @@ public struct SecurityMetrics {
     mutating func incrementActiveAccess() {
         activeAccessCount += 1
     }
-    
+
     /// Decrements the active access session count, ensuring it does not go below 0.
     ///
     /// This method should be called when:
@@ -247,7 +247,7 @@ public struct SecurityMetrics {
     mutating func decrementActiveAccess() {
         activeAccessCount = max(0, activeAccessCount - 1)
     }
-    
+
     /// Records the end of an access session and decrements the active access count.
     ///
     /// This method:

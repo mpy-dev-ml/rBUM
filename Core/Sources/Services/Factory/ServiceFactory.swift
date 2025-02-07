@@ -14,35 +14,35 @@ import Foundation
 /// In RELEASE builds, it returns the default production implementations
 public enum ServiceFactory {
     private static let developmentConfiguration = DevelopmentConfiguration()
-    
+
     /// Create security service with appropriate implementation
     /// - Parameter logger: Logger for the service
     /// - Returns: SecurityServiceProtocol implementation
     public static func createSecurityService(logger: LoggerProtocol) -> SecurityServiceProtocol {
         #if DEBUG
-        return DevelopmentSecurityService(
-            logger: logger,
-            configuration: developmentConfiguration
-        )
+            return DevelopmentSecurityService(
+                logger: logger,
+                configuration: developmentConfiguration
+            )
         #else
-        return DefaultSecurityService(logger: logger)
+            return DefaultSecurityService(logger: logger)
         #endif
     }
-    
+
     /// Create keychain service with appropriate implementation
     /// - Parameter logger: Logger for the service
     /// - Returns: KeychainServiceProtocol implementation
     public static func createKeychainService(logger: LoggerProtocol) -> KeychainServiceProtocol {
         #if DEBUG
-        return DevelopmentKeychainService(
-            logger: logger,
-            configuration: developmentConfiguration
-        )
+            return DevelopmentKeychainService(
+                logger: logger,
+                configuration: developmentConfiguration
+            )
         #else
-        return KeychainService(logger: logger)
+            return KeychainService(logger: logger)
         #endif
     }
-    
+
     /// Create bookmark service with appropriate implementation
     /// - Parameters:
     ///   - logger: Logger for the service
@@ -55,19 +55,19 @@ public enum ServiceFactory {
         keychainService: KeychainServiceProtocol
     ) -> BookmarkServiceProtocol {
         #if DEBUG
-        return DevelopmentBookmarkService(
-            logger: logger,
-            configuration: developmentConfiguration
-        )
+            return DevelopmentBookmarkService(
+                logger: logger,
+                configuration: developmentConfiguration
+            )
         #else
-        return BookmarkService(
-            logger: logger,
-            securityService: securityService,
-            keychainService: keychainService
-        )
+            return BookmarkService(
+                logger: logger,
+                securityService: securityService,
+                keychainService: keychainService
+            )
         #endif
     }
-    
+
     /// Create XPC service with appropriate implementation
     /// - Parameters:
     ///   - logger: Logger for the service
@@ -78,15 +78,15 @@ public enum ServiceFactory {
         securityService: SecurityServiceProtocol
     ) -> ResticXPCProtocol {
         #if DEBUG
-        return DevelopmentXPCService(
-            logger: logger,
-            configuration: developmentConfiguration
-        )
+            return DevelopmentXPCService(
+                logger: logger,
+                configuration: developmentConfiguration
+            )
         #else
-        return CircuitBreakerXPCService(
-            logger: logger,
-            securityService: securityService
-        )
+            return CircuitBreakerXPCService(
+                logger: logger,
+                securityService: securityService
+            )
         #endif
     }
 }

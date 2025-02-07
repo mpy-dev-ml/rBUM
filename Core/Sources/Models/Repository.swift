@@ -14,19 +14,19 @@ import Foundation
 public struct Repository: Codable, Identifiable, Equatable {
     /// Unique identifier for the repository
     public let id: UUID
-    
+
     /// Path to the repository
     public let path: String
-    
+
     /// Name of the repository
     public let name: String
-    
+
     /// Optional description of the repository
     public let description: String?
-    
+
     /// Credentials for accessing the repository
     public let credentials: RepositoryCredentials
-    
+
     /// Creates a new repository
     /// - Parameters:
     ///   - id: Unique identifier

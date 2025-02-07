@@ -18,7 +18,7 @@ struct RepositoryDetailView: View {
     @StateObject private var viewModel: RepositoryDetailViewModel
     @State private var showPasswordSheet = false
     @Environment(\.dismiss) private var dismiss
-    
+
     /// Creates a view to manage a specific repository
     init(
         repository: Repository,
@@ -33,7 +33,7 @@ struct RepositoryDetailView: View {
             )
         )
     }
-    
+
     var body: some View {
         contentView
             .navigationTitle(viewModel.repository.name)
@@ -58,24 +58,24 @@ struct RepositoryDetailView: View {
                 await viewModel.checkRepository()
             }
     }
-    
+
     @ViewBuilder
     private var contentView: some View {
         TabView(selection: $viewModel.selectedTab) {
             OverviewTabView(viewModel: viewModel)
                 .tabItem { tabLabel(for: .overview) }
                 .tag(RepositoryDetailViewModel.Tab.overview)
-            
+
             SnapshotsTabView(viewModel: viewModel)
                 .tabItem { tabLabel(for: .snapshots) }
                 .tag(RepositoryDetailViewModel.Tab.snapshots)
-            
+
             SettingsTabView()
                 .tabItem { tabLabel(for: .settings) }
                 .tag(RepositoryDetailViewModel.Tab.settings)
         }
     }
-    
+
     private var backupButton: some View {
         NavigationLink(
             destination: BackupView(
@@ -90,7 +90,7 @@ struct RepositoryDetailView: View {
         .accessibilityLabel("Start backup")
         .accessibilityHint("Navigate to backup creation screen")
     }
-    
+
     private func tabLabel(for tab: RepositoryDetailViewModel.Tab) -> some View {
         Label(
             tab.rawValue,
@@ -102,7 +102,7 @@ struct RepositoryDetailView: View {
 
 private struct OverviewTabView: View {
     @ObservedObject var viewModel: RepositoryDetailViewModel
-    
+
     var body: some View {
         Form {
             RepositoryStatusSection(viewModel: viewModel)
@@ -114,13 +114,13 @@ private struct OverviewTabView: View {
 
 private struct RepositoryStatusSection: View {
     @ObservedObject var viewModel: RepositoryDetailViewModel
-    
+
     var body: some View {
         Section("Repository Status") {
             statusLabel
         }
     }
-    
+
     private var statusLabel: some View {
         Label {
             Text(viewModel.isChecking ? "Checking..." : "Status")
@@ -129,7 +129,7 @@ private struct RepositoryStatusSection: View {
         }
         .accessibilityLabel(viewModel.isChecking ? "Checking repository status" : "Repository status")
     }
-    
+
     @ViewBuilder
     private var statusIcon: some View {
         if viewModel.isChecking {
@@ -146,14 +146,14 @@ private struct RepositoryStatusSection: View {
 
 private struct RepositoryDetailsSection: View {
     @ObservedObject var viewModel: RepositoryDetailViewModel
-    
+
     var body: some View {
         Section("General") {
             generalInfoGroup
             lastCheckInfo
         }
     }
-    
+
     @ViewBuilder
     private var generalInfoGroup: some View {
         VStack(alignment: .leading) {
@@ -162,21 +162,23 @@ private struct RepositoryDetailsSection: View {
                 label: { Text("Name") }
             )
             .accessibilityLabel("Repository name: \(viewModel.repository.name)")
-            
+
             LabeledContent<Text, Text>(
                 content: { Text(viewModel.repository.path) },
                 label: { Text("Path") }
             )
             .accessibilityLabel("Repository path: \(viewModel.repository.path)")
-            
+
             LabeledContent<Text, Text>(
                 content: { Text(viewModel.repository.createdAt.formatted(date: .abbreviated, time: .shortened)) },
                 label: { Text("Created") }
             )
-            .accessibilityLabel("Created on \(viewModel.repository.createdAt.formatted(date: .abbreviated, time: .shortened))")
+            .accessibilityLabel(
+                "Created on \(viewModel.repository.createdAt.formatted(date: .abbreviated, time: .shortened))"
+            )
         }
     }
-    
+
     @ViewBuilder
     private var lastCheckInfo: some View {
         if let lastCheck = viewModel.lastCheck {
@@ -191,7 +193,7 @@ private struct RepositoryDetailsSection: View {
 
 private struct SnapshotsTabView: View {
     @ObservedObject var viewModel: RepositoryDetailViewModel
-    
+
     var body: some View {
         NavigationLink(destination: SnapshotListView(repository: viewModel.repository)) {
             Label("Snapshots", systemImage: "clock.arrow.circlepath")

@@ -12,16 +12,16 @@ import Foundation
 public struct DevelopmentConfiguration: Equatable, Hashable {
     /// Whether to simulate bookmark-related failures
     public let shouldSimulateBookmarkFailures: Bool
-    
+
     /// Whether to simulate access-related failures
     public let shouldSimulateAccessFailures: Bool
-    
+
     /// Artificial delay in seconds for async operations
     public let artificialDelay: TimeInterval
-    
+
     /// Default configuration values
     public static let `default` = DevelopmentConfiguration()
-    
+
     /// Create a new development configuration
     /// - Parameters:
     ///   - shouldSimulateBookmarkFailures: If true, simulates bookmark operation failures

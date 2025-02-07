@@ -35,26 +35,26 @@ public enum LogLevel {
     case error
     /// Fault level for severe errors that may prevent proper functioning
     case fault
-    
+
     /// Convert to OSLogType
     var osLogType: OSLogType {
         switch self {
-        case .debug: return .debug
-        case .info: return .info
-        case .warning: return .default
-        case .error: return .error
-        case .fault: return .fault
+        case .debug: .debug
+        case .info: .info
+        case .warning: .default
+        case .error: .error
+        case .fault: .fault
         }
     }
-    
+
     /// String representation for logging
     var description: String {
         switch self {
-        case .debug: return "DEBUG"
-        case .info: return "INFO"
-        case .warning: return "WARNING"
-        case .error: return "ERROR"
-        case .fault: return "FAULT"
+        case .debug: "DEBUG"
+        case .info: "INFO"
+        case .warning: "WARNING"
+        case .error: "ERROR"
+        case .fault: "FAULT"
         }
     }
 }
@@ -65,20 +65,20 @@ public enum LogLevel {
 public struct PerformanceMetrics {
     /// Start time of the operation
     let startTime: Date
-    
+
     /// End time of the operation
     let endTime: Date
-    
+
     /// Duration of the operation in seconds
     var duration: TimeInterval {
         endTime.timeIntervalSince(startTime)
     }
-    
+
     /// Memory usage in bytes
     var memoryUsage: UInt64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let kerr: kern_return_t = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(
@@ -89,10 +89,10 @@ public struct PerformanceMetrics {
                 )
             }
         }
-        
+
         return kerr == KERN_SUCCESS ? info.resident_size : 0
     }
-    
+
     /// Format metrics as a string
     var description: String {
         """
@@ -124,7 +124,7 @@ public extension LoggingService {
     ) {
         let metricsString = metrics.map { " [\($0.description)]" } ?? ""
         let formattedMessage = "[\(level.description)] \(message)\(metricsString)"
-        
+
         switch level {
         case .debug:
             logger.debug(formattedMessage, file: file, function: function, line: line)
@@ -138,7 +138,7 @@ public extension LoggingService {
             logger.fault(formattedMessage, file: file, function: function, line: line)
         }
     }
-    
+
     /// Logs an operation's execution time and any errors that occur during its execution.
     /// This method wraps an operation with timing information and appropriate error handling,
     /// ensuring consistent logging across all service operations.
@@ -156,7 +156,7 @@ public extension LoggingService {
         perform operation: () throws -> T
     ) rethrows -> T {
         let startTime = Date()
-        
+
         do {
             let result = try operation()
             let metrics = PerformanceMetrics(
@@ -182,7 +182,7 @@ public extension LoggingService {
             throw error
         }
     }
-    
+
     /// Logs an asynchronous operation's execution time and any errors that occur during its execution.
     /// This method wraps an asynchronous operation with timing information and appropriate error handling,
     /// ensuring consistent logging across all service operations.
@@ -200,7 +200,7 @@ public extension LoggingService {
         perform operation: () async throws -> T
     ) async rethrows -> T {
         let startTime = Date()
-        
+
         do {
             let result = try await operation()
             let metrics = PerformanceMetrics(

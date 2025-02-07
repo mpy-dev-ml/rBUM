@@ -23,14 +23,14 @@ import os.log
 @available(macOS 13.0, *)
 public struct SecurityOperationRecorder {
     private let logger: Logger
-    
+
     /// Initializes a new SecurityOperationRecorder with the specified logger.
     ///
     /// - Parameter logger: The logger instance to use for recording operations
     public init(logger: Logger) {
         self.logger = logger
     }
-    
+
     /// Records a security operation with the specified parameters.
     ///
     /// This method creates a new `SecurityOperation` instance and logs it using the configured

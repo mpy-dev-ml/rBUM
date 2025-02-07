@@ -89,7 +89,7 @@ public enum BookmarkError: LocalizedError {
     /// 3. Request user access
     /// 4. Retry creation
     case creationFailed(URL)
-    
+
     /// Indicates that resolving an existing bookmark failed.
     ///
     /// This error occurs when:
@@ -109,7 +109,7 @@ public enum BookmarkError: LocalizedError {
     /// 3. Recreate bookmark
     /// 4. Update cached paths
     case resolutionFailed(URL)
-    
+
     /// Indicates that a bookmark has become stale and needs recreation.
     ///
     /// This error occurs when:
@@ -129,7 +129,7 @@ public enum BookmarkError: LocalizedError {
     /// 3. Refresh access
     /// 4. Update references
     case staleBookmark(URL)
-    
+
     /// Indicates that the bookmark data is invalid or corrupted.
     ///
     /// This error occurs when:
@@ -149,7 +149,7 @@ public enum BookmarkError: LocalizedError {
     /// 3. Create fresh bookmark
     /// 4. Update storage
     case invalidBookmark(URL)
-    
+
     /// Indicates that access to the bookmarked resource was denied.
     ///
     /// This error occurs when:
@@ -169,7 +169,7 @@ public enum BookmarkError: LocalizedError {
     /// 3. Check resource state
     /// 4. Update access rights
     case accessDenied(URL)
-    
+
     /// A localised description of the error suitable for user display.
     ///
     /// This property provides a human-readable description of the error,
@@ -191,19 +191,19 @@ public enum BookmarkError: LocalizedError {
     /// - Log for support
     public var errorDescription: String? {
         switch self {
-        case .creationFailed(let url):
-            return "Failed to create security-scoped bookmark for \(url.path)"
-        case .resolutionFailed(let url):
-            return "Failed to resolve security-scoped bookmark for \(url.path)"
-        case .staleBookmark(let url):
-            return "Security-scoped bookmark is stale for \(url.path)"
-        case .invalidBookmark(let url):
-            return "Invalid security-scoped bookmark for \(url.path)"
-        case .accessDenied(let url):
-            return "Access denied to \(url.path)"
+        case let .creationFailed(url):
+            "Failed to create security-scoped bookmark for \(url.path)"
+        case let .resolutionFailed(url):
+            "Failed to resolve security-scoped bookmark for \(url.path)"
+        case let .staleBookmark(url):
+            "Security-scoped bookmark is stale for \(url.path)"
+        case let .invalidBookmark(url):
+            "Invalid security-scoped bookmark for \(url.path)"
+        case let .accessDenied(url):
+            "Access denied to \(url.path)"
         }
     }
-    
+
     /// A detailed explanation of why the error occurred.
     ///
     /// This property provides technical details about the error that may be
@@ -226,35 +226,35 @@ public enum BookmarkError: LocalizedError {
     /// - System diagnostics
     public var failureReason: String? {
         switch self {
-        case .creationFailed(let url):
-            return """
-                The system was unable to create a security-scoped bookmark for the file \
-                or directory at \(url.path)
-                """
-        case .resolutionFailed(let url):
-            return """
-                The system was unable to resolve the security-scoped bookmark for \
-                \(url.path). The bookmark may be corrupted or the resource may have \
-                been moved.
-                """
-        case .staleBookmark(let url):
-            return """
-                The security-scoped bookmark for \(url.path) has become stale. \
-                This can happen if the resource was moved or modified.
-                """
-        case .invalidBookmark(let url):
-            return """
-                The bookmark for \(url.path) is invalid. This can happen if the file \
-                was moved or renamed. Please select the file again.
-                """
-        case .accessDenied(let url):
-            return """
-                The application does not have permission to access \(url.path). \
-                The user may need to grant access.
-                """
+        case let .creationFailed(url):
+            """
+            The system was unable to create a security-scoped bookmark for the file \
+            or directory at \(url.path)
+            """
+        case let .resolutionFailed(url):
+            """
+            The system was unable to resolve the security-scoped bookmark for \
+            \(url.path). The bookmark may be corrupted or the resource may have \
+            been moved.
+            """
+        case let .staleBookmark(url):
+            """
+            The security-scoped bookmark for \(url.path) has become stale. \
+            This can happen if the resource was moved or modified.
+            """
+        case let .invalidBookmark(url):
+            """
+            The bookmark for \(url.path) is invalid. This can happen if the file \
+            was moved or renamed. Please select the file again.
+            """
+        case let .accessDenied(url):
+            """
+            The application does not have permission to access \(url.path). \
+            The user may need to grant access.
+            """
         }
     }
-    
+
     /// A suggestion for how the user can recover from the error.
     ///
     /// This property provides a human-readable suggestion for how the user can
@@ -276,27 +276,27 @@ public enum BookmarkError: LocalizedError {
     /// - Support responses
     public var recoverySuggestion: String? {
         switch self {
-        case .creationFailed(let url):
-            return """
-                Please ensure the application has permission to access \(url.path) \
-                and try again.
-                """
-        case .resolutionFailed(let url):
-            return """
-                Try recreating the bookmark for \(url.path). If the issue persists, \
-                the user may need to reselect the resource.
-                """
-        case .staleBookmark(let url):
-            return """
-                The security-scoped bookmark for \(url.path) has become stale. \
-                This can happen if the resource was moved or modified.
-                """
-        case .invalidBookmark(let url):
-            return """
-                Please request access to \(url.path) again to create a new bookmark.
-                """
-        case .accessDenied(let url):
-            return "Please grant access to \(url.path) when prompted."
+        case let .creationFailed(url):
+            """
+            Please ensure the application has permission to access \(url.path) \
+            and try again.
+            """
+        case let .resolutionFailed(url):
+            """
+            Try recreating the bookmark for \(url.path). If the issue persists, \
+            the user may need to reselect the resource.
+            """
+        case let .staleBookmark(url):
+            """
+            The security-scoped bookmark for \(url.path) has become stale. \
+            This can happen if the resource was moved or modified.
+            """
+        case let .invalidBookmark(url):
+            """
+            Please request access to \(url.path) again to create a new bookmark.
+            """
+        case let .accessDenied(url):
+            "Please grant access to \(url.path) when prompted."
         }
     }
 }

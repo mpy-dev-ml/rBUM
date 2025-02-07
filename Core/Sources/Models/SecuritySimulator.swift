@@ -18,7 +18,7 @@ import os.log
 public struct SecuritySimulator {
     private let logger: Logger
     private let configuration: DevelopmentConfiguration
-    
+
     /// Initializes a new `SecuritySimulator` instance with the given logger and configuration.
     ///
     /// - Parameters:
@@ -28,7 +28,7 @@ public struct SecuritySimulator {
         self.logger = logger
         self.configuration = configuration
     }
-    
+
     /// Simulates a security failure for the given operation and URL if configured to do so.
     ///
     /// If the `shouldSimulateAccessFailures` property in the `configuration` is `true`, this
@@ -47,7 +47,7 @@ public struct SecuritySimulator {
         error: (String) -> Error
     ) throws {
         guard configuration.shouldSimulateAccessFailures else { return }
-        
+
         let errorMessage = "\(operation) failed (simulated)"
         logger.error(
             """
@@ -60,7 +60,7 @@ public struct SecuritySimulator {
         )
         throw error(errorMessage)
     }
-    
+
     /// Simulates a delay if an artificial delay is configured.
     ///
     /// If the `artificialDelay` property in the `configuration` is greater than 0, this

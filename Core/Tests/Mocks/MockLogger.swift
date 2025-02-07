@@ -19,27 +19,27 @@ class MockLogger: LoggerProtocol {
     func warning(_ message: String, file: String, function: String, line: Int) {
         warningMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }
-    
+
     struct LogMessage {
         let message: String
         let file: String
         let function: String
         let line: Int
     }
-    
+
     var debugMessages: [LogMessage] = []
     var infoMessages: [LogMessage] = []
     var warningMessages: [LogMessage] = []
     var errorMessages: [LogMessage] = []
-    
+
     func debug(_ message: String, file: String, function: String, line: Int) {
         debugMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }
-    
+
     func info(_ message: String, file: String, function: String, line: Int) {
         infoMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }
-    
+
     func error(_ message: String, file: String, function: String, line: Int) {
         errorMessages.append(LogMessage(message: message, file: file, function: function, line: line))
     }

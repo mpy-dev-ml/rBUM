@@ -81,7 +81,7 @@ public extension SandboxCompliant {
         defer { stopAccessing(url) }
         return try action()
     }
-    
+
     /// Safely performs an asynchronous action with a security-scoped resource.
     ///
     /// This method provides a convenient way to work with security-scoped resources by:
@@ -109,7 +109,7 @@ public extension SandboxCompliant {
         defer { stopAccessing(url) }
         return try await action()
     }
-    
+
     /// Validate access to a URL
     ///
     /// This method checks if access to a URL is granted.

@@ -16,7 +16,7 @@ import Foundation
     public let bookmarks: [String: NSData]
     public let timeout: TimeInterval
     public let auditSessionId: au_asid_t
-    
+
     public init(
         command: String,
         arguments: [String],
@@ -41,13 +41,13 @@ import Foundation
 @objc public protocol ResticXPCProtocol {
     /// Current interface version
     static var interfaceVersion: Int { get }
-    
+
     /// Validate interface version and security requirements
     /// - Parameter completion: Completion handler with validation result and interface version
     func validateInterface(
         completion: @escaping ([String: Any]?) -> Void
     )
-    
+
     /// Execute a command through XPC
     /// - Parameters:
     ///   - config: Configuration for command execution
@@ -56,7 +56,7 @@ import Foundation
         config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
     )
-    
+
     /// Ping the XPC service with security validation
     /// - Parameters:
     ///   - auditSessionId: Audit session identifier for security validation
@@ -65,7 +65,7 @@ import Foundation
         auditSessionId: au_asid_t,
         completion: @escaping (Bool) -> Void
     )
-    
+
     /// Validate access permissions with enhanced security
     /// - Parameters:
     ///   - bookmarks: Security-scoped bookmarks for validation
@@ -81,15 +81,15 @@ import Foundation
 /// Error domain and codes for ResticXPC operations
 public enum ResticXPCErrorDomain {
     public static let name = "dev.mpy.rBUM.ResticXPC"
-    
+
     public enum Code: Int {
         case interfaceVersionMismatch = 1000
         case securityValidationFailed = 1001
-        case auditSessionInvalid     = 1002
+        case auditSessionInvalid = 1002
         case bookmarkValidationFailed = 1003
-        case serviceUnavailable      = 1004
-        case commandExecutionFailed  = 1005
-        case timeoutExceeded        = 1006
-        case accessDenied           = 1007
+        case serviceUnavailable = 1004
+        case commandExecutionFailed = 1005
+        case timeoutExceeded = 1006
+        case accessDenied = 1007
     }
 }

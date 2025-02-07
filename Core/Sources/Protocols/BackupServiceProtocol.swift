@@ -19,7 +19,7 @@ public protocol BackupServiceProtocol {
     /// - Parameter repository: Repository to initialize
     /// - Throws: Error if initialization fails
     func initializeRepository(_ repository: Repository) async throws
-    
+
     /// Create a new backup snapshot
     /// - Parameters:
     ///   - repository: Repository to backup to
@@ -27,13 +27,13 @@ public protocol BackupServiceProtocol {
     ///   - tags: Optional tags for the backup
     /// - Throws: Error if backup fails
     func createBackup(to repository: Repository, paths: [String], tags: [String]?) async throws
-    
+
     /// List snapshots in a repository
     /// - Parameter repository: Repository to list snapshots from
     /// - Returns: Array of snapshots
     /// - Throws: Error if listing fails
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot]
-    
+
     /// Restore files from a snapshot
     /// - Parameters:
     ///   - snapshot: Snapshot to restore from

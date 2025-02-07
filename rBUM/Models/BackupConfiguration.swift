@@ -12,31 +12,31 @@ import Core
 import Foundation
 
 /// Represents a backup configuration
-internal struct BackupConfiguration: Codable, Equatable, Identifiable {
+struct BackupConfiguration: Codable, Equatable, Identifiable {
     /// Unique identifier for the configuration
-    internal let id: UUID
-    
+    let id: UUID
+
     /// Name of the backup configuration
-    internal let name: String
-    
+    let name: String
+
     /// Optional description of what this backup does
-    internal let description: String?
-    
+    let description: String?
+
     /// Whether this backup configuration is enabled
-    internal let enabled: Bool
-    
+    let enabled: Bool
+
     /// Schedule for running the backup
-    internal let schedule: BackupSchedule?
-    
+    let schedule: BackupSchedule?
+
     /// Source locations to backup
-    internal let sources: [BackupSource]
-    
+    let sources: [BackupSource]
+
     /// Paths to exclude from backup
-    internal let excludedPaths: [String]
-    
+    let excludedPaths: [String]
+
     /// Tags for organizing backups
-    internal let tags: [BackupTag]
-    
+    let tags: [BackupTag]
+
     /// Creates a new backup configuration
     /// - Parameters:
     ///   - id: Unique identifier
@@ -47,7 +47,7 @@ internal struct BackupConfiguration: Codable, Equatable, Identifiable {
     ///   - sources: Source locations to backup
     ///   - excludedPaths: Paths to exclude
     ///   - tags: Tags for organization
-    internal init(
+    init(
         id: UUID = UUID(),
         name: String,
         description: String? = nil,

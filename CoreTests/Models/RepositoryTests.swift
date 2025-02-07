@@ -16,12 +16,12 @@ import XCTest
 
 final class RepositoryTests: XCTestCase {
     // MARK: - Properties
-    
+
     private var repository: Repository!
     private var credentials: RepositoryCredentials!
-    
+
     // MARK: - Setup
-    
+
     override func setUp() async throws {
         try await super.setUp()
         credentials = RepositoryCredentials(password: "test-password")
@@ -33,15 +33,15 @@ final class RepositoryTests: XCTestCase {
             credentials: credentials
         )
     }
-    
+
     override func tearDown() async throws {
         repository = nil
         credentials = nil
         try await super.tearDown()
     }
-    
+
     // MARK: - Tests
-    
+
     func testRepositoryInitialization() throws {
         XCTAssertNotNil(repository)
         XCTAssertNotNil(repository.id)
@@ -50,7 +50,7 @@ final class RepositoryTests: XCTestCase {
         XCTAssertEqual(repository.description, "Test Description")
         XCTAssertNotNil(repository.credentials)
     }
-    
+
     func testRepositoryEquality() throws {
         let sameRepository = Repository(
             id: repository.id,
@@ -59,9 +59,9 @@ final class RepositoryTests: XCTestCase {
             description: repository.description,
             credentials: repository.credentials
         )
-        
+
         XCTAssertEqual(repository, sameRepository)
-        
+
         let differentRepository = Repository(
             id: UUID(),
             path: repository.path,
@@ -69,33 +69,33 @@ final class RepositoryTests: XCTestCase {
             description: repository.description,
             credentials: repository.credentials
         )
-        
+
         XCTAssertNotEqual(repository, differentRepository)
     }
-    
+
     func testRepositoryCredentialsEncryption() throws {
         XCTAssertNotEqual(credentials.password, repository.credentials.password)
         XCTAssertTrue(repository.credentials.isEncrypted)
     }
-    
+
     func testRepositoryValidation() throws {
         // Test valid repository
         XCTAssertNoThrow(try repository.validate())
-        
+
         // Test invalid path
         var invalidRepository = repository
         invalidRepository.path = URL(fileURLWithPath: "")
         XCTAssertThrowsError(try invalidRepository.validate()) { error in
             XCTAssertEqual(error as? RepositoryError, .invalidPath)
         }
-        
+
         // Test invalid name
         invalidRepository = repository
         invalidRepository.name = ""
         XCTAssertThrowsError(try invalidRepository.validate()) { error in
             XCTAssertEqual(error as? RepositoryError, .invalidName)
         }
-        
+
         // Test missing credentials
         invalidRepository = repository
         invalidRepository.credentials = nil

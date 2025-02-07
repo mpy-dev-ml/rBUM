@@ -62,7 +62,7 @@ public protocol SecurityServiceProtocol {
     /// - Returns: `true` if permission was granted, `false` otherwise
     /// - Throws: `SecurityError` if the permission request fails
     func requestPermission(for url: URL) async throws -> Bool
-    
+
     /// Creates a security-scoped bookmark for persistent access to a URL.
     ///
     /// Security-scoped bookmarks allow an app to maintain access to user-selected
@@ -75,7 +75,7 @@ public protocol SecurityServiceProtocol {
     /// - Returns: The bookmark data for persistent access
     /// - Throws: `SecurityError` if bookmark creation fails
     func createBookmark(for url: URL) throws -> Data
-    
+
     /// Resolves a security-scoped bookmark back to its URL.
     ///
     /// This method should:
@@ -88,7 +88,7 @@ public protocol SecurityServiceProtocol {
     /// - Returns: The resolved URL
     /// - Throws: `SecurityError` if bookmark resolution fails
     func resolveBookmark(_ bookmark: Data) throws -> URL
-    
+
     /// Begins accessing a security-scoped resource.
     ///
     /// This method must be called before attempting to access any security-scoped
@@ -102,7 +102,7 @@ public protocol SecurityServiceProtocol {
     /// - Returns: `true` if access was successfully started
     /// - Throws: `SecurityError` if access cannot be started
     func startAccessing(_ url: URL) throws -> Bool
-    
+
     /// Stops accessing a security-scoped resource.
     ///
     /// This method must be called after finishing access to a security-scoped
@@ -115,7 +115,7 @@ public protocol SecurityServiceProtocol {
     /// - Parameter url: The URL to stop accessing
     /// - Throws: `SecurityError` if access cannot be stopped properly
     func stopAccessing(_ url: URL) async throws
-    
+
     /// Validates whether access to a URL is currently granted.
     ///
     /// This method should:
@@ -128,19 +128,19 @@ public protocol SecurityServiceProtocol {
     /// - Returns: `true` if access is currently granted
     /// - Throws: `SecurityError` if validation fails
     func validateAccess(to url: URL) async throws -> Bool
-    
+
     /// Persist access to a URL by creating a security-scoped bookmark
     /// - Parameter url: The URL to persist access for
     /// - Returns: The bookmark data that can be used to restore access
     /// - Throws: SecurityError if access cannot be persisted
     func persistAccess(to url: URL) async throws -> Data
-    
+
     /// Validate XPC connection security
     /// - Parameter connection: The XPC connection to validate
     /// - Returns: true if connection is secure and valid
     /// - Throws: SecurityError if validation fails or security requirements are not met
     func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool
-    
+
     /// Validate the XPC service connection
     /// - Returns: true if the XPC service is available and has necessary permissions
     /// - Throws: SecurityError if XPC service is unavailable or lacks permissions

@@ -25,7 +25,7 @@ public protocol RestoreServiceProtocol {
         paths: [String],
         to target: String
     ) async throws
-    
+
     /// List available snapshots in a repository
     /// - Parameter repository: Repository to list snapshots from
     /// - Returns: Array of available snapshots
@@ -39,17 +39,17 @@ public enum RestoreError: LocalizedError {
     case invalidPath(String)
     case restoreFailed(String)
     case snapshotListFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidSnapshot:
-            return "Invalid snapshot"
-        case .invalidPath(let path):
-            return "Invalid path: \(path)"
-        case .restoreFailed(let reason):
-            return "Restore failed: \(reason)"
-        case .snapshotListFailed(let reason):
-            return "Failed to list snapshots: \(reason)"
+            "Invalid snapshot"
+        case let .invalidPath(path):
+            "Invalid path: \(path)"
+        case let .restoreFailed(reason):
+            "Restore failed: \(reason)"
+        case let .snapshotListFailed(reason):
+            "Failed to list snapshots: \(reason)"
         }
     }
 }

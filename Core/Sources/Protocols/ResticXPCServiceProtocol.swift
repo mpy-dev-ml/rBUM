@@ -18,7 +18,7 @@ import Foundation
     /// Ping the service to check availability
     /// - Returns: true if service is available
     @objc func ping() async -> Bool
-    
+
     /// Initialize a new repository
     /// - Parameters:
     ///   - url: Repository URL
@@ -26,7 +26,7 @@ import Foundation
     ///   - password: Repository password
     /// - Throws: ResticError if initialization fails
     @objc func initializeRepository(at url: URL, username: String, password: String) async throws
-    
+
     /// Create a backup
     /// - Parameters:
     ///   - source: Source path
@@ -35,7 +35,7 @@ import Foundation
     ///   - password: Repository password
     /// - Throws: ResticError if backup fails
     @objc func backup(from source: URL, to destination: URL, username: String, password: String) async throws
-    
+
     /// List snapshots in repository
     /// - Parameters:
     ///   - username: Repository username
@@ -43,7 +43,7 @@ import Foundation
     /// - Returns: List of snapshot IDs
     /// - Throws: ResticError if listing fails
     @objc func listSnapshots(username: String, password: String) async throws -> [String]
-    
+
     /// Restore from backup
     /// - Parameters:
     ///   - source: Source path

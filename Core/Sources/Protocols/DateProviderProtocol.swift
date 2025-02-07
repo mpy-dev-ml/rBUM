@@ -22,8 +22,8 @@ public protocol DateProviderProtocol {
 /// Default implementation of DateProviderProtocol using system time
 public struct DateProvider: DateProviderProtocol {
     public init() {}
-    
+
     public func now() -> Date {
-        return Date()
+        Date()
     }
 }

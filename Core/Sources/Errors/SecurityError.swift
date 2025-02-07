@@ -89,7 +89,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Check entitlements configuration
     /// - Verify security settings
     case permissionDenied(String)
-    
+
     /// Indicates that creating a security-scoped bookmark failed.
     ///
     /// This error occurs when:
@@ -111,7 +111,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Validate URL format
     /// - Request necessary permissions
     case bookmarkCreationFailed(String)
-    
+
     /// Indicates that resolving an existing security-scoped bookmark failed.
     ///
     /// This error occurs when:
@@ -133,7 +133,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Check access permissions
     /// - Clean up invalid bookmarks
     case bookmarkResolutionFailed(String)
-    
+
     /// Indicates that a security-scoped bookmark has become stale.
     ///
     /// This error occurs when:
@@ -155,7 +155,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Revalidate permissions
     /// - Clean up stale data
     case bookmarkStale(String)
-    
+
     /// Indicates that an operation would violate sandbox restrictions.
     ///
     /// This error occurs when:
@@ -177,7 +177,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Check entitlements
     /// - Follow sandbox guidelines
     case sandboxViolation(String)
-    
+
     /// Indicates that access to a resource was denied.
     ///
     /// This error occurs when:
@@ -199,7 +199,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Check resource state
     /// - Handle access conflicts
     case accessDenied(String)
-    
+
     /// Indicates that a required resource is not available or accessible.
     ///
     /// This error occurs when:
@@ -221,7 +221,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Use alternative resource
     /// - Handle offline state
     case resourceUnavailable(String)
-    
+
     /// Indicates that establishing an XPC connection failed.
     ///
     /// This error occurs when:
@@ -243,7 +243,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Verify service name
     /// - Handle timeouts
     case xpcConnectionFailed(String)
-    
+
     /// Indicates that the XPC service encountered an error during operation.
     ///
     /// This error occurs when:
@@ -265,7 +265,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Monitor resources
     /// - Handle timeouts
     case xpcServiceError(String)
-    
+
     /// Indicates that the XPC service denied permission for the requested operation.
     ///
     /// This error occurs when:
@@ -287,7 +287,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Update policy
     /// - Request elevation
     case xpcPermissionDenied(String)
-    
+
     /// Indicates that XPC message validation failed.
     ///
     /// This error occurs when:
@@ -309,7 +309,7 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Verify data types
     /// - Log validation details
     case xpcValidationFailed(String)
-    
+
     /// A localised description of the error suitable for user display.
     ///
     /// This property provides a human-readable description of the error,
@@ -330,28 +330,28 @@ public enum SecurityError: LocalizedError, Equatable {
     /// - Provide in support tickets
     public var errorDescription: String? {
         switch self {
-        case .permissionDenied(let message):
-            return "Permission denied: \(message)"
-        case .bookmarkCreationFailed(let message):
-            return "Failed to create bookmark: \(message)"
-        case .bookmarkResolutionFailed(let message):
-            return "Failed to resolve bookmark: \(message)"
-        case .bookmarkStale(let message):
-            return "Bookmark is stale: \(message)"
-        case .sandboxViolation(let message):
-            return "Sandbox violation: \(message)"
-        case .accessDenied(let message):
-            return "Access denied: \(message)"
-        case .resourceUnavailable(let message):
-            return "Resource unavailable: \(message)"
-        case .xpcConnectionFailed(let message):
-            return "XPC connection failed: \(message)"
-        case .xpcServiceError(let message):
-            return "XPC service error: \(message)"
-        case .xpcPermissionDenied(let message):
-            return "XPC permission denied: \(message)"
-        case .xpcValidationFailed(let message):
-            return "XPC validation failed: \(message)"
+        case let .permissionDenied(message):
+            "Permission denied: \(message)"
+        case let .bookmarkCreationFailed(message):
+            "Failed to create bookmark: \(message)"
+        case let .bookmarkResolutionFailed(message):
+            "Failed to resolve bookmark: \(message)"
+        case let .bookmarkStale(message):
+            "Bookmark is stale: \(message)"
+        case let .sandboxViolation(message):
+            "Sandbox violation: \(message)"
+        case let .accessDenied(message):
+            "Access denied: \(message)"
+        case let .resourceUnavailable(message):
+            "Resource unavailable: \(message)"
+        case let .xpcConnectionFailed(message):
+            "XPC connection failed: \(message)"
+        case let .xpcServiceError(message):
+            "XPC service error: \(message)"
+        case let .xpcPermissionDenied(message):
+            "XPC permission denied: \(message)"
+        case let .xpcValidationFailed(message):
+            "XPC validation failed: \(message)"
         }
     }
 }

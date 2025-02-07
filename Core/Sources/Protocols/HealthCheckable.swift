@@ -39,19 +39,19 @@ import Foundation
     /// This property provides a cached value of the service's health state,
     /// which is updated periodically through health checks.
     @objc var healthState: HealthState { get }
-    
+
     /// The timestamp of the last performed health check.
     ///
     /// This property helps track when the health state was last verified
     /// and can be used to determine if a new health check is needed.
     @objc var lastHealthCheck: Date? { get }
-    
+
     /// The current health metrics of the service.
     ///
     /// These metrics provide detailed information about the service's performance
     /// and resource usage, helping identify potential issues or bottlenecks.
     @objc var healthMetrics: HealthMetrics { get }
-    
+
     /// Performs a comprehensive health check of the service.
     ///
     /// This method should verify:
@@ -64,7 +64,7 @@ import Foundation
     /// - Returns: The current health state of the service
     /// - Throws: `HealthError` if the health check fails
     @objc func performHealthCheck() async throws -> HealthState
-    
+
     /// Updates the service's health status asynchronously.
     ///
     /// This method should be called periodically to ensure the health state
@@ -74,7 +74,7 @@ import Foundation
     /// - Recording metrics
     /// - Logging status changes
     @objc optional func updateHealthStatus() async
-    
+
     /// Resets the health state to its initial condition.
     ///
     /// This method should:
@@ -91,22 +91,22 @@ import Foundation
     case healthy = 1
     case degraded = 2
     case unhealthy = 3
-    
+
     /// String representation of the health state
     public var description: String {
         switch self {
-        case .unknown: return "Unknown"
-        case .healthy: return "Healthy"
-        case .degraded: return "Degraded"
-        case .unhealthy: return "Unhealthy"
+        case .unknown: "Unknown"
+        case .healthy: "Healthy"
+        case .degraded: "Degraded"
+        case .unhealthy: "Unhealthy"
         }
     }
-    
+
     /// Whether the state indicates the service is operational
     public var isOperational: Bool {
         switch self {
-        case .healthy, .degraded: return true
-        case .unknown, .unhealthy: return false
+        case .healthy, .degraded: true
+        case .unknown, .unhealthy: false
         }
     }
 }
@@ -118,19 +118,19 @@ public enum HealthError: LocalizedError {
     case invalidState(service: String, state: String)
     case dependencyUnavailable(service: String, dependency: String)
     case configurationError(service: String, reason: String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .timeout(let service):
-            return "Health check timed out for service: \(service)"
-        case .connectionFailed(let service):
-            return "Failed to connect to service: \(service)"
-        case .invalidState(let service, let state):
-            return "Invalid state (\(state)) for service: \(service)"
-        case .dependencyUnavailable(let service, let dependency):
-            return "Dependency \(dependency) unavailable for service: \(service)"
-        case .configurationError(let service, let reason):
-            return "Configuration error in service \(service): \(reason)"
+        case let .timeout(service):
+            "Health check timed out for service: \(service)"
+        case let .connectionFailed(service):
+            "Failed to connect to service: \(service)"
+        case let .invalidState(service, state):
+            "Invalid state (\(state)) for service: \(service)"
+        case let .dependencyUnavailable(service, dependency):
+            "Dependency \(dependency) unavailable for service: \(service)"
+        case let .configurationError(service, reason):
+            "Configuration error in service \(service): \(reason)"
         }
     }
 }
@@ -139,19 +139,19 @@ public enum HealthError: LocalizedError {
 @objc public class HealthMetrics: NSObject {
     /// Response time in seconds
     @objc public let responseTime: TimeInterval
-    
+
     /// Memory usage in bytes
     @objc public let memoryUsage: UInt64
-    
+
     /// CPU usage percentage (0-100)
     @objc public let cpuUsage: Double
-    
+
     /// Number of active connections
     @objc public let activeConnections: Int
-    
+
     /// Custom metrics dictionary
     @objc public let customMetrics: [String: NSNumber]
-    
+
     public init(
         responseTime: TimeInterval = 0,
         memoryUsage: UInt64 = 0,
@@ -166,9 +166,9 @@ public enum HealthError: LocalizedError {
         self.customMetrics = customMetrics
         super.init()
     }
-    
+
     /// Format metrics as a string
-    public override var description: String {
+    override public var description: String {
         """
         Response Time: \(String(format: "%.3f", responseTime))s
         Memory Usage: \(ByteCountFormatter.string(
@@ -185,14 +185,14 @@ public enum HealthError: LocalizedError {
 /// Default implementation for Swift types
 public extension HealthCheckable {
     var healthState: HealthState { .healthy }
-    
+
     var lastHealthCheck: Date? { nil }
-    
+
     var healthMetrics: HealthMetrics { HealthMetrics() }
-    
+
     func performHealthCheck() async throws -> HealthState { .healthy }
-    
+
     func updateHealthStatus() async {}
-    
+
     func resetHealthState() {}
 }

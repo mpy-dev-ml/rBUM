@@ -17,22 +17,22 @@ import SwiftUI
 @MainActor
 final class RepositoryListViewModel: ObservableObject {
     // MARK: - Published Properties
-    
+
     @Published private(set) var repositories: [Repository] = []
     @Published var error: Error?
     @Published var showError = false
     @Published private(set) var progress: Progress?
-    
+
     // MARK: - Private Properties
-    
+
     private let repositoryService: RepositoryServiceProtocol
     private let credentialsService: KeychainCredentialsManagerProtocol
     private let bookmarkService: BookmarkServiceProtocol
     private let securityService: SecurityServiceProtocol
     private let logger: Logger
-    
+
     // MARK: - Initialization
-    
+
     init(
         repositoryService: RepositoryServiceProtocol,
         credentialsService: KeychainCredentialsManagerProtocol,
@@ -45,16 +45,16 @@ final class RepositoryListViewModel: ObservableObject {
         self.bookmarkService = bookmarkService
         self.securityService = securityService
         self.logger = logger
-        
+
         logger.debug("Initialized RepositoryListViewModel")
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Load all repositories
     func loadRepositories() async {
         logger.debug("Loading repositories")
-        
+
         do {
             try await loadRepositoriesAsync()
         } catch {
@@ -66,7 +66,7 @@ final class RepositoryListViewModel: ObservableObject {
             }
         }
     }
-    
+
     private func compareRepositoryNames(
         _ left: Repository,
         _ right: Repository
@@ -76,16 +76,16 @@ final class RepositoryListViewModel: ObservableObject {
         let comparisonResult = name1.localizedCaseInsensitiveCompare(name2)
         return comparisonResult == .orderedAscending
     }
-    
+
     private func loadRepositoriesAsync() async throws {
         let repositories = try await repositoryService
             .listRepositories()
             .sorted(by: compareRepositoryNames)
-        
+
         // Create progress tracker
         let tracker = Progress(totalUnitCount: Int64(repositories.count))
-        self.progress = tracker
-        
+        progress = tracker
+
         // Verify each repository
         let validRepos = await withTaskGroup(of: (Repository?, Error?).self) { group in
             for repository in repositories {
@@ -93,15 +93,15 @@ final class RepositoryListViewModel: ObservableObject {
                     do {
                         // Validate repository access
                         try await self.securityService.validateAccess(to: URL(fileURLWithPath: repository.path))
-                        
+
                         // Check repository status
                         try await self.repositoryService.updateRepository(repository)
-                        
+
                         // Update progress
                         await MainActor.run {
                             tracker.completedUnitCount += 1
                         }
-                        
+
                         return (repository, nil)
                     } catch {
                         let message = "Repository validation failed: \(error.localizedDescription)"
@@ -110,64 +110,64 @@ final class RepositoryListViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             var repos: [Repository] = []
             var errors: [Error] = []
-            
+
             for await (repo, error) in group {
-                if let repo = repo {
+                if let repo {
                     repos.append(repo)
                 }
-                if let error = error {
+                if let error {
                     errors.append(error)
                 }
             }
-            
+
             // Log any errors
             if !errors.isEmpty {
                 self.logger.warning("\(errors.count) repositories failed validation")
             }
-            
+
             return repos
         }
-        
+
         await MainActor.run {
             self.repositories = validRepos
             self.progress?.completedUnitCount = Int64(validRepos.count)
             self.logger.info("Loaded \(validRepos.count) valid repositories")
         }
     }
-    
+
     /// Delete a repository
     /// - Parameter repository: Repository to delete
     func deleteRepository(_ repository: Repository) async {
         logger.info("Deleting repository: \(repository.id)")
-        
+
         do {
             // Create progress tracker
             let tracker = Progress(totalUnitCount: 1)
-            self.progress = tracker
-            
+            progress = tracker
+
             // Delete repository
             try await repositoryService.deleteRepository(repository)
-            
+
             // Delete credentials
             try await credentialsService.delete(forId: repository.id.uuidString)
-            
+
             // Delete bookmark
             try await bookmarkService.stopAccessing(URL(fileURLWithPath: repository.path))
-            
+
             // Update progress
             progress?.completedUnitCount = 1
-            
+
             // Refresh list
             await loadRepositories()
-            
+
             logger.info("Successfully deleted repository: \(repository.id)")
         } catch {
             progress?.cancel()
             self.error = error
-            self.showError = true
+            showError = true
             logger.error("Failed to delete repository: \(error.localizedDescription)")
         }
     }
@@ -179,17 +179,17 @@ enum RepositoryUIError: LocalizedError {
     case bookmarkInvalid(String)
     case repositoryNotFound(String)
     case operationFailed(String)
-    
+
     var errorDescription: String? {
         switch self {
-        case .accessDenied(let message):
-            return "Access denied: \(message)"
-        case .bookmarkInvalid(let message):
-            return "Invalid bookmark: \(message)"
-        case .repositoryNotFound(let message):
-            return "Repository not found: \(message)"
-        case .operationFailed(let message):
-            return "Operation failed: \(message)"
+        case let .accessDenied(message):
+            "Access denied: \(message)"
+        case let .bookmarkInvalid(message):
+            "Invalid bookmark: \(message)"
+        case let .repositoryNotFound(message):
+            "Repository not found: \(message)"
+        case let .operationFailed(message):
+            "Operation failed: \(message)"
         }
     }
 }

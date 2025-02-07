@@ -50,13 +50,13 @@ public class PermissionManager {
     private let logger: LoggerProtocol
     private let securityService: SecurityServiceProtocol
     private let keychain: KeychainServiceProtocol
-    
+
     /// Prefix used for keychain permission entries to avoid naming conflicts
     private let keychainPrefix = "dev.mpy.rBUM.permission."
-    
+
     /// Access group identifier for sharing permissions with the XPC service
     private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
-    
+
     /// Creates a new permission manager instance.
     ///
     /// - Parameters:
@@ -71,7 +71,7 @@ public class PermissionManager {
         self.logger = logger
         self.securityService = securityService
         self.keychain = keychain
-        
+
         do {
             try keychain.configureXPCSharing(accessGroup: permissionAccessGroup)
         } catch {
@@ -83,7 +83,7 @@ public class PermissionManager {
             )
         }
     }
-    
+
     /// Request and persist permission for a URL
     /// - Parameter url: The URL to request permission for
     /// - Returns: true if permission was granted and persisted
@@ -94,7 +94,7 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         do {
             // Request permission
             guard try await securityService.requestPermission(for: url) else {
@@ -106,11 +106,11 @@ public class PermissionManager {
                 )
                 return false
             }
-            
+
             // Create and store bookmark
             let bookmark = try await securityService.createBookmark(for: url)
             try persistBookmark(bookmark, for: url)
-            
+
             logger.info(
                 "Permission granted and persisted for: \(url.path)",
                 file: #file,
@@ -118,7 +118,7 @@ public class PermissionManager {
                 line: #line
             )
             return true
-            
+
         } catch {
             logger.error(
                 "Failed to request/persist permission: \(error.localizedDescription)",
@@ -129,7 +129,7 @@ public class PermissionManager {
             throw PermissionError.persistenceFailed(error.localizedDescription)
         }
     }
-    
+
     /// Recover permission for a URL
     /// - Parameter url: The URL to recover permission for
     /// - Returns: true if permission was recovered
@@ -140,7 +140,7 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         do {
             // Check for existing bookmark
             guard let bookmark = try loadBookmark(for: url) else {
@@ -152,10 +152,10 @@ public class PermissionManager {
                 )
                 return false
             }
-            
+
             // Attempt to resolve bookmark
             let resolvedURL = try securityService.resolveBookmark(bookmark)
-            
+
             // Verify resolved URL matches original
             guard resolvedURL.path == url.path else {
                 logger.error(
@@ -167,7 +167,7 @@ public class PermissionManager {
                 try removeBookmark(for: url)
                 return false
             }
-            
+
             // Test access
             let canAccess = try await securityService.startAccessing(resolvedURL)
             guard canAccess else {
@@ -181,7 +181,7 @@ public class PermissionManager {
                 return false
             }
             try await securityService.stopAccessing(resolvedURL)
-            
+
             logger.info(
                 "Successfully recovered permission for: \(url.path)",
                 file: #file,
@@ -189,7 +189,7 @@ public class PermissionManager {
                 line: #line
             )
             return true
-            
+
         } catch {
             logger.error(
                 "Failed to recover permission: \(error.localizedDescription)",
@@ -197,14 +197,14 @@ public class PermissionManager {
                 function: #function,
                 line: #line
             )
-            
+
             // Clean up failed bookmark
             try? removeBookmark(for: url)
-            
+
             throw PermissionError.recoveryFailed(error.localizedDescription)
         }
     }
-    
+
     /// Check if permission exists for a URL
     /// - Parameter url: The URL to check
     /// - Returns: true if permission exists and is valid
@@ -213,7 +213,7 @@ public class PermissionManager {
             guard let bookmark = try loadBookmark(for: url) else {
                 return false
             }
-            
+
             let resolvedURL = try securityService.resolveBookmark(bookmark)
             let canAccess = try await securityService.startAccessing(resolvedURL)
             if !canAccess {
@@ -227,7 +227,7 @@ public class PermissionManager {
                 return false
             }
             return resolvedURL.path == url.path
-            
+
         } catch {
             logger.debug(
                 "Permission check failed: \(error.localizedDescription)",
@@ -238,7 +238,7 @@ public class PermissionManager {
             return false
         }
     }
-    
+
     /// Revoke permission for a URL
     /// - Parameter url: The URL to revoke permission for
     public func revokePermission(for url: URL) async throws {
@@ -248,7 +248,7 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         do {
             try removeBookmark(for: url)
             logger.info(
@@ -257,7 +257,7 @@ public class PermissionManager {
                 function: #function,
                 line: #line
             )
-            
+
         } catch {
             logger.error(
                 "Failed to revoke permission: \(error.localizedDescription)",
@@ -268,9 +268,9 @@ public class PermissionManager {
             throw PermissionError.revocationFailed(error.localizedDescription)
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func persistBookmark(_ bookmark: Data, for url: URL) throws {
         logger.debug(
             "Persisting bookmark for: \(url.path)",
@@ -278,7 +278,7 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         do {
             try keychain.save(bookmark, for: url.path, accessGroup: permissionAccessGroup)
         } catch {
@@ -291,7 +291,7 @@ public class PermissionManager {
             throw PermissionError.persistenceFailed(error.localizedDescription)
         }
     }
-    
+
     private func loadBookmark(for url: URL) throws -> Data? {
         logger.debug(
             "Loading bookmark for: \(url.path)",
@@ -299,10 +299,10 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         return try keychain.retrieve(for: url.path, accessGroup: permissionAccessGroup)
     }
-    
+
     private func removeBookmark(for url: URL) throws {
         logger.debug(
             "Removing bookmark for: \(url.path)",
@@ -310,7 +310,7 @@ public class PermissionManager {
             function: #function,
             line: #line
         )
-        
+
         do {
             try keychain.delete(for: url.path, accessGroup: permissionAccessGroup)
         } catch {
@@ -330,15 +330,15 @@ public enum PermissionError: LocalizedError {
     case persistenceFailed(String)
     case recoveryFailed(String)
     case revocationFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .persistenceFailed(let reason):
-            return "Failed to persist permission: \(reason)"
-        case .recoveryFailed(let reason):
-            return "Failed to recover permission: \(reason)"
-        case .revocationFailed(let reason):
-            return "Failed to revoke permission: \(reason)"
+        case let .persistenceFailed(reason):
+            "Failed to persist permission: \(reason)"
+        case let .recoveryFailed(reason):
+            "Failed to recover permission: \(reason)"
+        case let .revocationFailed(reason):
+            "Failed to revoke permission: \(reason)"
         }
     }
 }

@@ -14,12 +14,12 @@ public protocol FileManagerProtocol {
     /// - Parameter path: The path to check
     /// - Returns: True if the file exists and is accessible
     func fileExists(atPath path: String) -> Bool
-    
+
     /// Check if a file exists and get its type
     /// - Parameter path: The path to check
     /// - Returns: A tuple containing existence and whether it's a directory
     func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool
-    
+
     /// Create a directory at the given URL
     /// - Parameters:
     ///   - url: The URL where the directory should be created
@@ -31,17 +31,17 @@ public protocol FileManagerProtocol {
         withIntermediateDirectories createIntermediates: Bool,
         attributes: [FileAttributeKey: Any]?
     ) throws
-    
+
     /// Remove item at the given URL
     /// - Parameter url: The URL of the item to remove
     /// - Throws: FileError if removal fails
     func removeItem(at url: URL) throws
-    
+
     /// Get contents of a file at the given path
     /// - Parameter path: The path to read from
     /// - Returns: The file contents as Data, or nil if the file cannot be read
     func contents(atPath path: String) -> Data?
-    
+
     /// Write data to a file at the given path
     /// - Parameters:
     ///   - path: The path to write to
@@ -53,26 +53,26 @@ public protocol FileManagerProtocol {
         contents data: Data?,
         attributes attr: [FileAttributeKey: Any]?
     ) -> Bool
-    
+
     /// Copy an item from one location to another
     /// - Parameters:
     ///   - srcURL: The source URL
     ///   - dstURL: The destination URL
     /// - Throws: FileError if the copy fails
     func copyItem(at srcURL: URL, to dstURL: URL) throws
-    
+
     /// Move an item from one location to another
     /// - Parameters:
     ///   - srcURL: The source URL
     ///   - dstURL: The destination URL
     /// - Throws: FileError if the move fails
     func moveItem(at srcURL: URL, to dstURL: URL) throws
-    
+
     /// Get attributes of an item
     /// - Parameter path: The path to get attributes for
     /// - Returns: The attributes dictionary, or nil if not accessible
     func attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any]
-    
+
     /// List contents of a directory
     /// - Parameter url: The directory URL to list
     /// - Returns: Array of URLs for the directory contents
@@ -91,19 +91,19 @@ public enum FileError: LocalizedError {
     case alreadyExists(path: String)
     case invalidPath(path: String)
     case operationFailed(path: String, reason: String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .fileNotFound(let path):
-            return "File not found at path: \(path)"
-        case .accessDenied(let path):
-            return "Access denied to path: \(path)"
-        case .alreadyExists(let path):
-            return "File already exists at path: \(path)"
-        case .invalidPath(let path):
-            return "Invalid path: \(path)"
-        case .operationFailed(let path, let reason):
-            return "Operation failed for path: \(path), reason: \(reason)"
+        case let .fileNotFound(path):
+            "File not found at path: \(path)"
+        case let .accessDenied(path):
+            "Access denied to path: \(path)"
+        case let .alreadyExists(path):
+            "File already exists at path: \(path)"
+        case let .invalidPath(path):
+            "Invalid path: \(path)"
+        case let .operationFailed(path, reason):
+            "Operation failed for path: \(path), reason: \(reason)"
         }
     }
 }
@@ -111,17 +111,17 @@ public enum FileError: LocalizedError {
 /// Default implementation of FileManagerProtocol using FileManager
 public struct DefaultFileManager: FileManagerProtocol {
     private let fileManager = FileManager.default
-    
+
     public init() {}
-    
+
     public func fileExists(atPath path: String) -> Bool {
-        return fileManager.fileExists(atPath: path)
+        fileManager.fileExists(atPath: path)
     }
-    
+
     public func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
-        return fileManager.fileExists(atPath: path, isDirectory: isDirectory)
+        fileManager.fileExists(atPath: path, isDirectory: isDirectory)
     }
-    
+
     public func createDirectory(
         at url: URL,
         withIntermediateDirectories createIntermediates: Bool,
@@ -141,7 +141,7 @@ public struct DefaultFileManager: FileManagerProtocol {
             throw FileError.operationFailed(path: url.path, reason: error.localizedDescription)
         }
     }
-    
+
     public func removeItem(at url: URL) throws {
         do {
             try fileManager.removeItem(at: url)
@@ -153,23 +153,23 @@ public struct DefaultFileManager: FileManagerProtocol {
             throw FileError.operationFailed(path: url.path, reason: error.localizedDescription)
         }
     }
-    
+
     public func contents(atPath path: String) -> Data? {
-        return fileManager.contents(atPath: path)
+        fileManager.contents(atPath: path)
     }
-    
+
     public func createFile(
         atPath path: String,
         contents data: Data?,
         attributes attr: [FileAttributeKey: Any]?
     ) -> Bool {
-        return fileManager.createFile(
+        fileManager.createFile(
             atPath: path,
             contents: data,
             attributes: attr
         )
     }
-    
+
     public func copyItem(at srcURL: URL, to dstURL: URL) throws {
         do {
             try fileManager.copyItem(at: srcURL, to: dstURL)
@@ -186,7 +186,7 @@ public struct DefaultFileManager: FileManagerProtocol {
             )
         }
     }
-    
+
     public func moveItem(at srcURL: URL, to dstURL: URL) throws {
         do {
             try fileManager.moveItem(at: srcURL, to: dstURL)
@@ -203,7 +203,7 @@ public struct DefaultFileManager: FileManagerProtocol {
             )
         }
     }
-    
+
     public func attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any] {
         do {
             return try fileManager.attributesOfItem(atPath: path)
@@ -215,7 +215,7 @@ public struct DefaultFileManager: FileManagerProtocol {
             throw FileError.operationFailed(path: path, reason: error.localizedDescription)
         }
     }
-    
+
     public func contentsOfDirectory(
         at url: URL,
         includingPropertiesForKeys keys: [URLResourceKey]?,

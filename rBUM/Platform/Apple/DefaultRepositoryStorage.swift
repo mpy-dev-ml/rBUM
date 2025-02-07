@@ -17,11 +17,13 @@ import Foundation
 /// Default repository storage implementation for macOS
 final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     // MARK: - Properties
+
     private let fileManager: FileManagerProtocol
     private let logger: LoggerProtocol
     private let storageURL: URL
 
     // MARK: - Initialization
+
     init(
         fileManager: FileManagerProtocol = DefaultFileManager(),
         logger: LoggerProtocol = LoggerFactory.createLogger(category: "RepositoryStorage"),
@@ -34,7 +36,8 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             self.storageURL = url
         } else {
             // Get application support directory
-            guard let appSupport = try? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            guard let appSupport = try? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            else {
                 logger.error("Could not access application support directory")
                 throw RepositoryError.invalidDirectory
             }
@@ -49,10 +52,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     }
 
     // MARK: - Repository Management
+
     func save(_ repository: Repository) async throws {
         logger.debug("Saving repository", metadata: [
             "id": .string(repository.id.uuidString),
-            "name": .string(repository.name)
+            "name": .string(repository.name),
         ])
 
         do {
@@ -64,11 +68,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try data.write(to: fileURL, options: .atomic)
 
             logger.info("Saved repository successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to save repository", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.saveFailed(error)
         }
@@ -94,7 +98,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
                     } catch {
                         logger.error("Failed to load repository", metadata: [
                             "path": .string(url.path),
-                            "error": .string(error.localizedDescription)
+                            "error": .string(error.localizedDescription),
                         ])
                         return nil
                     }
@@ -102,13 +106,13 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
             logger.info("Loaded repositories", metadata: [
-                "count": .string("\(repositories.count)")
+                "count": .string("\(repositories.count)"),
             ])
             return repositories
 
         } catch {
             logger.error("Failed to load repositories", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.loadFailed(error)
         }
@@ -117,7 +121,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     func delete(_ repository: Repository) async throws {
         logger.debug("Deleting repository", metadata: [
             "id": .string(repository.id.uuidString),
-            "name": .string(repository.name)
+            "name": .string(repository.name),
         ])
 
         do {
@@ -125,11 +129,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try fileManager.removeItem(at: fileURL)
 
             logger.info("Deleted repository successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to delete repository", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.deleteFailed(error)
         }
@@ -138,7 +142,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     func updateStatus(_ repository: Repository, status: RepositoryStatus) async throws {
         logger.debug("Updating repository status", metadata: [
             "id": .string(repository.id.uuidString),
-            "status": .string("\(status)")
+            "status": .string("\(status)"),
         ])
 
         do {
@@ -148,11 +152,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try await save(updated)
 
             logger.info("Updated repository status successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to update repository status", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.updateFailed(error)
         }
@@ -160,6 +164,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
 }
 
 // MARK: - Repository Errors
+
 enum RepositoryError: LocalizedError {
     case invalidDirectory
     case saveFailed(Error)
@@ -170,15 +175,15 @@ enum RepositoryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidDirectory:
-            return "Could not access repository storage directory"
-        case .saveFailed(let error):
-            return "Failed to save repository: \(error.localizedDescription)"
-        case .loadFailed(let error):
-            return "Failed to load repositories: \(error.localizedDescription)"
-        case .deleteFailed(let error):
-            return "Failed to delete repository: \(error.localizedDescription)"
-        case .updateFailed(let error):
-            return "Failed to update repository status: \(error.localizedDescription)"
+            "Could not access repository storage directory"
+        case let .saveFailed(error):
+            "Failed to save repository: \(error.localizedDescription)"
+        case let .loadFailed(error):
+            "Failed to load repositories: \(error.localizedDescription)"
+        case let .deleteFailed(error):
+            "Failed to delete repository: \(error.localizedDescription)"
+        case let .updateFailed(error):
+            "Failed to update repository status: \(error.localizedDescription)"
         }
     }
 }

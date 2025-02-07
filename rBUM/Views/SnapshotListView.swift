@@ -17,15 +17,15 @@ struct SnapshotListView: View {
     @StateObject private var viewModel: SnapshotListViewModel
     @State private var showingDeleteAlert = false
     @State private var snapshotToDelete: Snapshot?
-    
+
     init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: SnapshotListViewModel(
             repository: repository,
-            resticService: ResticCommandService(),  // Use default parameters
+            resticService: ResticCommandService(), // Use default parameters
             credentialsManager: KeychainCredentialsManager()
         ))
     }
-    
+
     var body: some View {
         Group {
             if viewModel.isLoading {
@@ -56,7 +56,7 @@ struct SnapshotListView: View {
                                         } label: {
                                             Label("Restore", systemImage: "arrow.uturn.backward")
                                         }
-                                        
+
                                         Button(role: .destructive) {
                                             snapshotToDelete = snapshot
                                             showingDeleteAlert = true
@@ -83,9 +83,9 @@ struct SnapshotListView: View {
                                 .tag(filter)
                         }
                     }
-                    
+
                     Divider()
-                    
+
                     Button {
                         viewModel.showPruneSheet = true
                     } label: {
@@ -138,25 +138,25 @@ struct SnapshotListView: View {
 
 private struct SnapshotRowView: View {
     let snapshot: Snapshot
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(snapshot.time, style: .time)
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 Text(snapshot.formattedSize())
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             Text(snapshot.paths.joined(separator: ", "))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            
+
             if !snapshot.tags.isEmpty {
                 HStack {
                     ForEach(snapshot.tags, id: \.self) { tag in
@@ -177,10 +177,10 @@ private struct SnapshotRowView: View {
 private struct RestoreSheetView: View {
     let snapshot: Snapshot
     let onRestore: (URL) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPath: URL?
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -189,19 +189,19 @@ private struct RestoreSheetView: View {
                     Text("Size: \(snapshot.formattedSize())")
                     Text("Paths: \(snapshot.paths.joined(separator: ", "))")
                 }
-                
+
                 Section("Restore Location") {
                     if let path = selectedPath {
                         Text(path.path())
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     Button("Choose Location") {
                         let panel = NSOpenPanel()
                         panel.canChooseFiles = false
                         panel.canChooseDirectories = true
                         panel.canCreateDirectories = true
-                        
+
                         if panel.runModal() == .OK {
                             selectedPath = panel.url
                         }
@@ -215,7 +215,7 @@ private struct RestoreSheetView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .primaryAction) {
                     Button("Restore") {
                         if let path = selectedPath {
@@ -233,7 +233,7 @@ private struct RestoreSheetView: View {
 private struct PruneSheetView: View {
     @ObservedObject var viewModel: SnapshotListViewModel
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -245,7 +245,7 @@ private struct PruneSheetView: View {
                         Text("snapshots")
                     }
                 }
-                
+
                 Section("Keep Time-Based") {
                     HStack {
                         Text("Daily")
@@ -253,21 +253,21 @@ private struct PruneSheetView: View {
                             .multilineTextAlignment(.trailing)
                         Text("snapshots")
                     }
-                    
+
                     HStack {
                         Text("Weekly")
                         TextField("", value: $viewModel.pruneOptions.keepWeekly, format: .number)
                             .multilineTextAlignment(.trailing)
                         Text("snapshots")
                     }
-                    
+
                     HStack {
                         Text("Monthly")
                         TextField("", value: $viewModel.pruneOptions.keepMonthly, format: .number)
                             .multilineTextAlignment(.trailing)
                         Text("snapshots")
                     }
-                    
+
                     HStack {
                         Text("Yearly")
                         TextField("", value: $viewModel.pruneOptions.keepYearly, format: .number)
@@ -275,7 +275,7 @@ private struct PruneSheetView: View {
                         Text("snapshots")
                     }
                 }
-                
+
                 Section("Keep Tags") {
                     ForEach(viewModel.uniqueTags, id: \.self) { tag in
                         Toggle(tag, isOn: Binding(
@@ -290,7 +290,7 @@ private struct PruneSheetView: View {
                         ))
                     }
                 }
-                
+
                 Section {
                     Text("Snapshots matching any of these rules will be kept. All other snapshots will be removed.")
                         .foregroundStyle(.secondary)
@@ -303,7 +303,7 @@ private struct PruneSheetView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .primaryAction) {
                     Button("Prune") {
                         Task {

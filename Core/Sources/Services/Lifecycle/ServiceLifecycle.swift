@@ -19,16 +19,16 @@ import Foundation
 public enum ServiceState {
     /// Service has not yet been initialised
     case uninitialized
-    
+
     /// Service is currently performing initialisation
     case initializing
-    
+
     /// Service has successfully initialised and is ready for use
     case ready
-    
+
     /// Service has encountered an error during operation
     case error(Error)
-    
+
     /// Service has been shut down and is no longer available
     case shutdown
 }
@@ -45,14 +45,14 @@ public enum ServiceState {
 public protocol LifecycleManaged {
     /// The current state of the service
     var state: ServiceState { get }
-    
+
     /// Initialises the service and prepares it for use.
     /// This method should be called before any other operations
     /// are performed on the service.
     ///
     /// - Throws: Any error that occurs during initialisation
     func initialize() async throws
-    
+
     /// Performs an orderly shutdown of the service.
     /// This method should be called when the service is no longer needed
     /// to ensure proper resource cleanup.
@@ -75,7 +75,7 @@ public extension LifecycleManaged where Self: LoggingService {
                     line: #line)
         // Override in concrete implementations
     }
-    
+
     /// Default implementation of service shutdown with logging.
     /// Concrete implementations should override this method to add
     /// their specific shutdown logic.

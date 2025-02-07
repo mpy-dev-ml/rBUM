@@ -90,7 +90,7 @@ public enum SecurityOperationStatus: String {
     /// - Update dependent operations
     /// - Log success details
     case success
-    
+
     /// Indicates that the operation failed to complete.
     ///
     /// This status means:
@@ -126,7 +126,7 @@ public enum SecurityOperationStatus: String {
     /// - Implement recovery strategies
     /// - Log failure details
     case failure
-    
+
     /// Indicates that the operation is still in progress.
     ///
     /// This status means:

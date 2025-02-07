@@ -21,15 +21,15 @@ extension DevelopmentBookmarkService {
         let resourceSize: UInt64
         let resourceType: String
         let permissions: [String]
-        
+
         static func create(for url: URL) throws -> BookmarkEntry {
             let now = Date()
             let resourceValues = try url.resourceValues(forKeys: [
                 .fileSizeKey,
                 .fileResourceTypeKey,
-                .posixPermissionsKey
+                .posixPermissionsKey,
             ])
-            
+
             return BookmarkEntry(
                 data: Data("mock_bookmark_\(url.path)".utf8),
                 createdAt: now,
@@ -41,7 +41,7 @@ extension DevelopmentBookmarkService {
                 permissions: Self.formatPermissions(resourceValues.posixPermissions)
             )
         }
-        
+
         private static func formatPermissions(_ permissions: Int?) -> [String] {
             guard let perms = permissions else { return [] }
             var result: [String] = []
@@ -50,9 +50,9 @@ extension DevelopmentBookmarkService {
             if perms & 0o100 != 0 { result.append("execute") }
             return result
         }
-        
+
         func accessed() -> BookmarkEntry {
-            return BookmarkEntry(
+            BookmarkEntry(
                 data: data,
                 createdAt: createdAt,
                 lastAccessed: Date(),
@@ -63,9 +63,9 @@ extension DevelopmentBookmarkService {
                 permissions: permissions
             )
         }
-        
+
         func markStale() -> BookmarkEntry {
-            return BookmarkEntry(
+            BookmarkEntry(
                 data: data,
                 createdAt: createdAt,
                 lastAccessed: lastAccessed,

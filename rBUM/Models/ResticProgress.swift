@@ -25,13 +25,13 @@ public enum ResticBackupStatus: Codable {
     case failed(ResticBackupError)
     /// Backup was cancelled by the user
     case cancelled
-    
+
     public var isActive: Bool {
         switch self {
         case .preparing, .backing, .finalising:
-            return true
+            true
         case .completed, .failed, .cancelled:
-            return false
+            false
         }
     }
 }
@@ -45,12 +45,12 @@ public struct ResticBackupProgress: Codable, Equatable {
     public let currentFile: String
     public let startTime: Date
     public let updatedAt: Date
-    
+
     public var percentComplete: Double {
         guard totalBytes > 0 else { return 0 }
         return Double(processedBytes) / Double(totalBytes) * 100
     }
-    
+
     public init(
         totalFiles: Int,
         processedFiles: Int,
@@ -79,12 +79,12 @@ public struct ResticRestoreProgress: Codable, Equatable {
     public let currentFile: String
     public let startTime: Date
     public let updatedAt: Date
-    
+
     public var percentComplete: Double {
         guard totalBytes > 0 else { return 0 }
         return Double(processedBytes) / Double(totalBytes) * 100
     }
-    
+
     public init(
         totalFiles: Int,
         processedFiles: Int,
@@ -110,7 +110,7 @@ public struct ResticMountProgress: Codable, Equatable {
     public let mountPoint: URL
     public let startTime: Date
     public let updatedAt: Date
-    
+
     public init(
         status: String,
         mountPoint: URL,
@@ -140,7 +140,7 @@ struct ResticBackupResponse: Codable {
     let totalBytes: Int64
     let bytesDone: Int64
     let errorCount: Int
-    
+
     enum CodingKeys: String, CodingKey {
         case messageType = "message_type"
         case filesNew = "files_new"
@@ -157,9 +157,9 @@ struct ResticBackupResponse: Codable {
         case bytesDone = "bytes_done"
         case errorCount = "error_count"
     }
-    
+
     func toBackupProgress(startTime: Date) -> ResticBackupProgress {
-        return ResticBackupProgress(
+        ResticBackupProgress(
             totalFiles: totalFiles,
             processedFiles: filesDone,
             totalBytes: totalBytes,

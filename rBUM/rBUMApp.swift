@@ -25,13 +25,13 @@ struct RBUMApp: App {
     private let resticService: ResticCommandServiceProtocol
     private let repositoryCreationService: RepositoryCreationServiceProtocol
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    
+
     init() {
         // Initialize dependencies
         let fileManager: FileManagerProtocol = DefaultFileManager()
         let dateProvider: DateProviderProtocol = DateProvider()
         let notificationCenter = NotificationCenter.default
-        
+
         // Initialize security-related services
         let securityService = ServiceFactory.createSecurityService(logger: logger)
         let keychainService = ServiceFactory.createKeychainService(logger: logger)
@@ -40,27 +40,27 @@ struct RBUMApp: App {
             securityService: securityService,
             keychainService: keychainService
         )
-        
+
         let sandboxMonitor = SandboxMonitor(
             logger: logger,
             securityService: securityService
         )
-        
+
         let xpcService = ServiceFactory.createXPCService(
             logger: logger,
             securityService: securityService
         )
-        
+
         // Initialize repository services
-        self.credentialsManager = KeychainCredentialsManager(
+        credentialsManager = KeychainCredentialsManager(
             logger: logger,
             keychainService: keychainService,
             dateProvider: dateProvider,
             notificationCenter: notificationCenter
         )
-        
+
         do {
-            self.repositoryStorage = try DefaultRepositoryStorage(
+            repositoryStorage = try DefaultRepositoryStorage(
                 fileManager: fileManager,
                 logger: logger
             )
@@ -73,32 +73,35 @@ struct RBUMApp: App {
             )
             fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
         }
-        
-        self.resticService = ResticCommandService(
+
+        resticService = ResticCommandService(
             logger: logger,
             securityService: securityService,
-            xpcService: ServiceFactory.createXPCService(logger: logger, securityService: securityService) as! ResticXPCServiceProtocol,
+            xpcService: ServiceFactory.createXPCService(
+                logger: logger,
+                securityService: securityService
+            ) as! ResticXPCServiceProtocol,
             keychainService: keychainService
         ) as! any ResticCommandServiceProtocol
-        
-        self.repositoryCreationService = DefaultRepositoryCreationService(
+
+        repositoryCreationService = DefaultRepositoryCreationService(
             logger: logger,
             securityService: resticService as! SecurityServiceProtocol,
             bookmarkService: bookmarkService,
             keychainService: keychainService
         ) as! any RepositoryCreationServiceProtocol
-        
+
         logger.debug(
             "App initialized",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         // Setup app delegate
         setupAppDelegate()
     }
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView(
@@ -126,16 +129,16 @@ struct RBUMApp: App {
             }
             SidebarCommands()
         }
-        
+
         #if os(macOS)
-        Settings {
-            SettingsView()
-        }
+            Settings {
+                SettingsView()
+            }
         #endif
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupAppDelegate() {
         logger.debug(
             "Setting up app delegate",
@@ -143,7 +146,7 @@ struct RBUMApp: App {
             function: #function,
             line: #line
         )
-        
+
         // Register for notifications
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
@@ -153,7 +156,7 @@ struct RBUMApp: App {
             handleAppTermination()
         }
     }
-    
+
     private func handleAppTermination() {
         logger.debug(
             "Handling app termination",
@@ -161,14 +164,14 @@ struct RBUMApp: App {
             function: #function,
             line: #line
         )
-        
+
         // Clean up resources
         cleanupResources()
-        
+
         // Save state
         saveApplicationState()
     }
-    
+
     private func cleanupResources() {
         logger.debug(
             "Cleaning up resources",
@@ -177,7 +180,7 @@ struct RBUMApp: App {
             line: #line
         )
     }
-    
+
     private func saveApplicationState() {
         logger.debug(
             "Saving application state",
@@ -186,7 +189,7 @@ struct RBUMApp: App {
             line: #line
         )
     }
-    
+
     private func checkForUpdates() {
         logger.debug(
             "Checking for updates",
@@ -194,23 +197,24 @@ struct RBUMApp: App {
             function: #function,
             line: #line
         )
-        
+
         // TODO: Implement update checking
     }
 }
 
 // MARK: - App Delegate
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = LoggerFactory.createLogger(category: "AppDelegate")
-    
-    func applicationDidFinishLaunching(_ notification: Notification) {
+
+    func applicationDidFinishLaunching(_: Notification) {
         logger.info(
             "Application did finish launching",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         // Register for sleep/wake notifications
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -218,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.willSleepNotification,
             object: nil
         )
-        
+
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(handleWakeNotification(_:)),
@@ -226,20 +230,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
     }
-    
-    func applicationWillTerminate(_ notification: Notification) {
+
+    func applicationWillTerminate(_: Notification) {
         logger.info(
             "Application will terminate",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         // Unregister observers
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
-    
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+
+    func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
         logger.info(
             "Application requested to terminate",
             file: #file,
@@ -248,8 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         return .terminateNow
     }
-    
-    @objc private func handleSleepNotification(_ notification: Notification) {
+
+    @objc private func handleSleepNotification(_: Notification) {
         logger.info(
             "System is going to sleep",
             file: #file,
@@ -258,8 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         // TODO: Handle sleep state
     }
-    
-    @objc private func handleWakeNotification(_ notification: Notification) {
+
+    @objc private func handleWakeNotification(_: Notification) {
         logger.info(
             "System woke from sleep",
             file: #file,

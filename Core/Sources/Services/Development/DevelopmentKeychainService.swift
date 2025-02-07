@@ -13,7 +13,7 @@ import Security
 /// Provides simulated keychain behaviour for development
 public final class DevelopmentKeychainService: KeychainServiceProtocol {
     // MARK: - Types
-    
+
     /// Represents a keychain item with metadata
     private struct KeychainItem {
         let data: Data
@@ -22,7 +22,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
         let accessCount: Int
         let accessGroup: String?
         let attributes: [String: Any]
-        
+
         static func create(
             data: Data,
             accessGroup: String?,
@@ -38,9 +38,9 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 attributes: attributes
             )
         }
-        
+
         func accessed() -> KeychainItem {
-            return KeychainItem(
+            KeychainItem(
                 data: data,
                 createdAt: createdAt,
                 lastAccessed: Date(),
@@ -50,7 +50,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             )
         }
     }
-    
+
     /// Tracks metrics for keychain operations
     private struct KeychainMetrics {
         private(set) var saveCount: Int = 0
@@ -59,45 +59,47 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
         private(set) var failureCount: Int = 0
         private(set) var accessGroupConfigCount: Int = 0
         private(set) var accessValidationCount: Int = 0
-        
+
         mutating func recordSave() {
             saveCount += 1
         }
-        
+
         mutating func recordRetrieval() {
             retrievalCount += 1
         }
-        
+
         mutating func recordDelete() {
             deleteCount += 1
         }
-        
-        mutating func recordFailure(operation: String) {
+
+        mutating func recordFailure(operation _: String) {
             failureCount += 1
         }
-        
+
         mutating func recordAccessGroupConfig() {
             accessGroupConfigCount += 1
         }
-        
+
         mutating func recordAccessValidation() {
             accessValidationCount += 1
         }
     }
-    
+
     // MARK: - Properties
+
     private let logger: LoggerProtocol
     private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentKeychain", attributes: .concurrent)
     private var storage: [String: KeychainItem] = [:]
     private let configuration: DevelopmentConfiguration
     private var accessGroups: Set<String> = []
     private var metrics = KeychainMetrics()
-    
+
     // MARK: - Initialization
+
     public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
         self.logger = logger
         self.configuration = configuration
-        
+
         logger.info(
             """
             Initialised DevelopmentKeychainService with configuration:
@@ -108,13 +110,13 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             line: #line
         )
     }
-    
+
     // MARK: - Private Methods
-    
+
     /// Validate access group permissions
     private func validateAccessGroup(_ group: String?) throws {
-        guard let group = group else { return }
-        
+        guard let group else { return }
+
         if !accessGroups.contains(group) {
             logger.error(
                 "Access group not configured: \(group)",
@@ -126,14 +128,14 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             throw KeychainError.noAccessForItem(group: group)
         }
     }
-    
+
     /// Simulate failure if configured
     private func simulateFailureIfNeeded(
         operation: String,
         error: Error
     ) throws {
         guard configuration.shouldSimulateAccessFailures else { return }
-        
+
         logger.error(
             "Simulating keychain \(operation) failure",
             file: #file,
@@ -143,16 +145,17 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
         metrics.recordFailure(operation: operation)
         throw error
     }
-    
+
     // MARK: - KeychainServiceProtocol Implementation with Access Groups
+
     public func save(_ data: Data, for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "save",
             error: KeychainError.saveFailed(status: errSecIO)
         )
-        
+
         try validateAccessGroup(accessGroup)
-        
+
         queue.sync(flags: .barrier) {
             let item = KeychainItem.create(
                 data: data,
@@ -161,12 +164,12 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                     "creation_date": Date(),
                     "last_modified": Date(),
                     "accessible": true,
-                    "access_control": accessGroup != nil
+                    "access_control": accessGroup != nil,
                 ]
             )
             storage[key] = item
             metrics.recordSave()
-            
+
             logger.info(
                 """
                 Saved data for key: \(key)
@@ -178,15 +181,15 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             )
         }
     }
-    
+
     public func retrieve(for key: String, accessGroup: String?) throws -> Data? {
         try simulateFailureIfNeeded(
             operation: "retrieve",
             error: KeychainError.retrievalFailed(status: errSecItemNotFound)
         )
-        
+
         try validateAccessGroup(accessGroup)
-        
+
         return try queue.sync {
             guard var item = storage[key] else {
                 logger.info(
@@ -200,10 +203,11 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 )
                 return nil
             }
-            
+
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup {
+               item.accessGroup != requiredGroup
+            {
                 logger.error(
                     """
                     Access group mismatch:
@@ -217,12 +221,12 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 metrics.recordFailure(operation: "access_group_mismatch")
                 throw KeychainError.noAccessForItem(group: requiredGroup)
             }
-            
+
             // Update access metrics
             item = item.accessed()
             storage[key] = item
             metrics.recordRetrieval()
-            
+
             logger.info(
                 """
                 Retrieved data for key: \(key)
@@ -233,19 +237,19 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 function: #function,
                 line: #line
             )
-            
+
             return item.data
         }
     }
-    
+
     public func delete(for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "delete",
             error: KeychainError.deleteFailed(status: errSecInvalidItemRef)
         )
-        
+
         try validateAccessGroup(accessGroup)
-        
+
         queue.sync(flags: .barrier) {
             guard let item = storage[key] else {
                 logger.info(
@@ -259,10 +263,11 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 )
                 return
             }
-            
+
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup {
+               item.accessGroup != requiredGroup
+            {
                 logger.error(
                     """
                     Access group mismatch for deletion:
@@ -275,10 +280,10 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 )
                 return
             }
-            
+
             storage.removeValue(forKey: key)
             metrics.recordDelete()
-            
+
             logger.info(
                 """
                 Deleted data for key: \(key)
@@ -290,18 +295,19 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             )
         }
     }
-    
+
     // MARK: - XPC Access Group Configuration
+
     public func configureXPCSharing(accessGroup: String) throws {
         try simulateFailureIfNeeded(
             operation: "xpc_config",
             error: KeychainError.xpcConfigurationFailed
         )
-        
+
         queue.sync(flags: .barrier) {
             accessGroups.insert(accessGroup)
             metrics.recordAccessGroupConfig()
-            
+
             logger.info(
                 """
                 Configured XPC sharing for access group: \(accessGroup)
@@ -313,17 +319,17 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
             )
         }
     }
-    
+
     public func validateXPCAccess(accessGroup: String) throws -> Bool {
         try simulateFailureIfNeeded(
             operation: "xpc_validation",
             error: KeychainError.accessValidationFailed
         )
-        
+
         return queue.sync {
             let isValid = accessGroups.contains(accessGroup)
             metrics.recordAccessValidation()
-            
+
             logger.info(
                 """
                 Validated XPC access for group: \(accessGroup)
@@ -334,17 +340,18 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                 function: #function,
                 line: #line
             )
-            
+
             return isValid
         }
     }
-    
+
     // MARK: - Legacy Methods (Deprecated)
+
     @available(*, deprecated, message: "Use save(_:for:accessGroup:) instead")
     public func save(_ data: Data, for key: String) throws {
         try save(data, for: key, accessGroup: nil)
     }
-    
+
     @available(*, deprecated, message: "Use retrieve(for:accessGroup:) instead")
     public func load(for key: String) throws -> Data {
         guard let data = try retrieve(for: key, accessGroup: nil) else {
@@ -352,7 +359,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
         }
         return data
     }
-    
+
     @available(*, deprecated, message: "Use delete(for:accessGroup:) instead")
     public func delete(for key: String) throws {
         try delete(for: key, accessGroup: nil)

@@ -17,7 +17,7 @@ public final class Keychain {
     private let logger: LoggerProtocol
     private let accessGroup: String?
     private let serviceName: String
-    
+
     /// Initialize a new Keychain service
     /// - Parameters:
     ///   - serviceName: The service name to use for keychain items (default: "dev.mpy.rBUM")
@@ -32,7 +32,7 @@ public final class Keychain {
         self.accessGroup = accessGroup
         self.logger = logger
     }
-    
+
     /// Save data to the keychain
     /// - Parameters:
     ///   - data: The data to save
@@ -41,22 +41,22 @@ public final class Keychain {
         // Query to check if item exists
         var query = baseQuery
         query[kSecAttrAccount as String] = account
-        
+
         // Attributes for the item
         var attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
-        
+
         // Try to update existing item
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        
+
         if status == errSecItemNotFound {
             // Item doesn't exist, add it
             query.merge(attributes) { current, _ in current }
             status = SecItemAdd(query as CFDictionary, nil)
         }
-        
+
         guard status == errSecSuccess else {
             let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
             logger.error(
@@ -67,7 +67,7 @@ public final class Keychain {
             )
             throw KeychainError.saveFailed(status)
         }
-        
+
         logger.debug(
             "Successfully saved to keychain for account: \(account)",
             file: #file,
@@ -75,7 +75,7 @@ public final class Keychain {
             line: #line
         )
     }
-    
+
     /// Retrieve data from the keychain
     /// - Parameter account: The account identifier for the data
     /// - Returns: The stored data if found
@@ -83,12 +83,13 @@ public final class Keychain {
         var query = baseQuery
         query[kSecAttrAccount as String] = account
         query[kSecReturnData as String] = true
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         guard status == errSecSuccess,
-              let data = result as? Data else {
+              let data = result as? Data
+        else {
             let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
             logger.error(
                 "Failed to retrieve keychain item: \(errorMessage)",
@@ -98,7 +99,7 @@ public final class Keychain {
             )
             throw KeychainError.retrieveFailed(status)
         }
-        
+
         logger.debug(
             "Successfully retrieved from keychain for account: \(account)",
             file: #file,
@@ -107,13 +108,13 @@ public final class Keychain {
         )
         return data
     }
-    
+
     /// Delete data from the keychain
     /// - Parameter account: The account identifier for the data to delete
     public func delete(forAccount account: String) throws {
         var query = baseQuery
         query[kSecAttrAccount as String] = account
-        
+
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
@@ -125,7 +126,7 @@ public final class Keychain {
             )
             throw KeychainError.deleteFailed(status)
         }
-        
+
         logger.debug(
             "Successfully deleted from keychain for account: \(account)",
             file: #file,
@@ -133,19 +134,20 @@ public final class Keychain {
             line: #line
         )
     }
-    
+
     /// List all accounts in the keychain for this service
     /// - Returns: Array of account identifiers
     public func listAccounts() throws -> [String] {
         var query = baseQuery
         query[kSecMatchLimit as String] = kSecMatchLimitAll
         query[kSecReturnAttributes as String] = true
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         guard status == errSecSuccess || status == errSecItemNotFound,
-              let items = result as? [[String: Any]] else {
+              let items = result as? [[String: Any]]
+        else {
             if status != errSecItemNotFound {
                 let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
                 logger.error(
@@ -157,26 +159,26 @@ public final class Keychain {
             }
             return []
         }
-        
+
         if status == errSecItemNotFound {
             logger.debug("No items found in keychain", file: #file, function: #function, line: #line)
         }
-        
+
         return items.compactMap { $0[kSecAttrAccount as String] as? String }
     }
-    
+
     // MARK: - Private Helpers
-    
+
     private var baseQuery: [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName
+            kSecAttrService as String: serviceName,
         ]
-        
-        if let accessGroup = accessGroup {
+
+        if let accessGroup {
             query[kSecAttrAccessGroup as String] = accessGroup
         }
-        
+
         return query
     }
 }
@@ -186,15 +188,15 @@ public enum KeychainError: LocalizedError {
     case saveFailed(OSStatus)
     case retrieveFailed(OSStatus)
     case deleteFailed(OSStatus)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .saveFailed(let status):
-            return "Failed to save to keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
-        case .retrieveFailed(let status):
-            return "Failed to retrieve from keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
-        case .deleteFailed(let status):
-            return "Failed to delete from keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
+        case let .saveFailed(status):
+            "Failed to save to keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
+        case let .retrieveFailed(status):
+            "Failed to retrieve from keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
+        case let .deleteFailed(status):
+            "Failed to delete from keychain: \(SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error")"
         }
     }
 }

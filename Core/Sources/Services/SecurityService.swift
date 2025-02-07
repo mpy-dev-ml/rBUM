@@ -20,7 +20,7 @@ public final class SecurityService: SecurityServiceProtocol {
     private let xpcService: ResticXPCServiceProtocol
     private var activeBookmarks: [URL: Data] = [:]
     private let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.security.bookmarks", attributes: .concurrent)
-    
+
     /// Initialize the security service
     /// - Parameters:
     ///   - logger: Logger for tracking operations
@@ -30,7 +30,7 @@ public final class SecurityService: SecurityServiceProtocol {
         self.xpcService = xpcService
         setupNotifications()
     }
-    
+
     private func setupNotifications() {
         logger.debug(
             "Setting up security notifications",
@@ -38,7 +38,7 @@ public final class SecurityService: SecurityServiceProtocol {
             function: #function,
             line: #line
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(applicationWillTerminate(_:)),
@@ -46,38 +46,38 @@ public final class SecurityService: SecurityServiceProtocol {
             object: nil
         )
     }
-    
-    @objc private func applicationWillTerminate(_ notification: Notification) {
+
+    @objc private func applicationWillTerminate(_: Notification) {
         bookmarkQueue.sync(flags: .barrier) {
             activeBookmarks.removeAll()
         }
     }
-    
+
     private func getActiveBookmark(for url: URL) -> Data? {
         bookmarkQueue.sync {
             activeBookmarks[url]
         }
     }
-    
+
     private func setActiveBookmark(_ bookmark: Data, for url: URL) {
         bookmarkQueue.sync(flags: .barrier) {
             activeBookmarks[url] = bookmark
         }
     }
-    
+
     private func removeActiveBookmark(for url: URL) {
         _ = bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
     }
-    
+
     @MainActor
     public func requestPermission(for url: URL) async throws -> Bool {
-        self.logger.debug(
+        logger.debug(
             "Requesting permission for: \(url.path)",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -85,7 +85,7 @@ public final class SecurityService: SecurityServiceProtocol {
         panel.directoryURL = url
         panel.message = "Please grant access to this location"
         panel.prompt = "Grant Access"
-        
+
         let response = await panel.beginSheetModal(
             for: NSApp.keyWindow ?? NSWindow(
                 contentRect: .zero,
@@ -94,9 +94,9 @@ public final class SecurityService: SecurityServiceProtocol {
                 defer: false
             )
         )
-        
+
         if response == .OK {
-            self.logger.debug(
+            logger.debug(
                 "Permission granted for: \(url.path)",
                 file: #file,
                 function: #function,
@@ -104,7 +104,7 @@ public final class SecurityService: SecurityServiceProtocol {
             )
             return true
         } else {
-            self.logger.debug(
+            logger.debug(
                 "Permission denied for: \(url.path)",
                 file: #file,
                 function: #function,
@@ -113,15 +113,15 @@ public final class SecurityService: SecurityServiceProtocol {
             return false
         }
     }
-    
+
     public func createBookmark(for url: URL) throws -> Data {
-        self.logger.debug(
+        logger.debug(
             "Creating bookmark for: \(url.path)",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         do {
             let bookmark = try url.bookmarkData(
                 options: .withSecurityScope,
@@ -133,15 +133,15 @@ public final class SecurityService: SecurityServiceProtocol {
             throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
         }
     }
-    
+
     public func resolveBookmark(_ bookmark: Data) throws -> URL {
-        self.logger.debug(
+        logger.debug(
             "Resolving bookmark",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         var isStale = false
         do {
             let url = try URL(
@@ -150,9 +150,9 @@ public final class SecurityService: SecurityServiceProtocol {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
-            
+
             if isStale {
-                self.logger.debug(
+                logger.debug(
                     "Bookmark is stale",
                     file: #file,
                     function: #function,
@@ -160,17 +160,17 @@ public final class SecurityService: SecurityServiceProtocol {
                 )
                 throw SecurityError.bookmarkStale("Bookmark needs to be recreated")
             }
-            
-            self.logger.debug(
+
+            logger.debug(
                 "Bookmark resolved successfully",
                 file: #file,
                 function: #function,
                 line: #line
             )
             return url
-            
+
         } catch {
-            self.logger.error(
+            logger.error(
                 "Failed to resolve bookmark: \(error.localizedDescription)",
                 file: #file,
                 function: #function,
@@ -179,9 +179,9 @@ public final class SecurityService: SecurityServiceProtocol {
             throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
         }
     }
-    
+
     public func startAccessing(_ url: URL) throws -> Bool {
-        self.logger.debug(
+        logger.debug(
             "Starting access for: \(url.path)",
             file: #file,
             function: #function,
@@ -189,9 +189,9 @@ public final class SecurityService: SecurityServiceProtocol {
         )
         return url.startAccessingSecurityScopedResource()
     }
-    
+
     public func stopAccessing(_ url: URL) async throws {
-        self.logger.debug(
+        logger.debug(
             "Stopping access for: \(url.path)",
             file: #file,
             function: #function,
@@ -199,15 +199,15 @@ public final class SecurityService: SecurityServiceProtocol {
         )
         url.stopAccessingSecurityScopedResource()
     }
-    
+
     public func validateAccess(to url: URL) async throws -> Bool {
-        self.logger.debug(
+        logger.debug(
             "Validating access to: \(url.path)",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         do {
             let bookmark = try createBookmark(for: url)
             let resolvedURL = try resolveBookmark(bookmark)
@@ -216,15 +216,15 @@ public final class SecurityService: SecurityServiceProtocol {
             return false
         }
     }
-    
+
     public func persistAccess(to url: URL) async throws -> Data {
-        self.logger.debug(
+        logger.debug(
             "Persisting access to: \(url.path)",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         let bookmark = try url.bookmarkData(
             options: .withSecurityScope,
             includingResourceValuesForKeys: nil,
@@ -233,18 +233,18 @@ public final class SecurityService: SecurityServiceProtocol {
         setActiveBookmark(bookmark, for: url)
         return bookmark
     }
-    
+
     public func validateXPCService() async throws -> Bool {
-        self.logger.debug(
+        logger.debug(
             "Validating XPC service",
             file: #file,
             function: #function,
             line: #line
         )
-        
+
         let isValid = try await xpcService.ping()
         if !isValid {
-            self.logger.error(
+            logger.error(
                 "XPC service validation failed",
                 file: #file,
                 function: #function,
@@ -254,8 +254,9 @@ public final class SecurityService: SecurityServiceProtocol {
         }
         return isValid
     }
-    
+
     // MARK: - XPC Validation
+
     public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
         logger.debug(
             "Validating XPC connection",
@@ -263,7 +264,7 @@ public final class SecurityService: SecurityServiceProtocol {
             function: #function,
             line: #line
         )
-        
+
         // Verify connection state
         guard connection.invalidationHandler != nil else {
             logger.error(
@@ -274,7 +275,7 @@ public final class SecurityService: SecurityServiceProtocol {
             )
             throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
         }
-        
+
         // Verify interface configuration
         guard connection.remoteObjectInterface != nil else {
             logger.error(
@@ -285,7 +286,7 @@ public final class SecurityService: SecurityServiceProtocol {
             )
             throw SecurityError.xpcValidationFailed("XPC connection has no remote object interface")
         }
-        
+
         // Verify audit session identifier
         guard connection.auditSessionIdentifier != 0 else {
             logger.error(
@@ -296,10 +297,10 @@ public final class SecurityService: SecurityServiceProtocol {
             )
             throw SecurityError.xpcValidationFailed("XPC connection has invalid audit session")
         }
-        
+
         // Ensure connection is still valid
         if connection.invalidationHandler == nil {
-            self.logger.error(
+            logger.error(
                 "XPC connection is invalidated",
                 file: #file,
                 function: #function,
@@ -307,7 +308,7 @@ public final class SecurityService: SecurityServiceProtocol {
             )
             throw SecurityError.xpcValidationFailed("Connection is invalidated")
         }
-        
+
         return true
     }
 }

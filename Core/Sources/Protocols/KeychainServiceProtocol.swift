@@ -30,7 +30,7 @@ public protocol KeychainServiceProtocol {
     /// - Throws: KeychainError if save fails or sandbox denies access
     /// - Note: Use appropriate access group to share with XPC service
     func save(_ data: Data, for key: String, accessGroup: String?) throws
-    
+
     /// Retrieve data from the keychain with sandbox-compliant access
     /// - Parameters:
     ///   - key: Unique identifier for the keychain item
@@ -39,7 +39,7 @@ public protocol KeychainServiceProtocol {
     /// - Throws: KeychainError if retrieval fails or sandbox denies access
     /// - Note: Must handle both main app and XPC service access patterns
     func retrieve(for key: String, accessGroup: String?) throws -> Data?
-    
+
     /// Delete data from the keychain with sandbox-compliant access
     /// - Parameters:
     ///   - key: Unique identifier for the keychain item to delete
@@ -47,13 +47,13 @@ public protocol KeychainServiceProtocol {
     /// - Throws: KeychainError if deletion fails or sandbox denies access
     /// - Note: Must clean up items from both main app and XPC service
     func delete(for key: String, accessGroup: String?) throws
-    
+
     /// Configure keychain sharing with XPC service
     /// - Parameter accessGroup: The access group to use for sharing
     /// - Throws: KeychainError if configuration fails
     /// - Note: Must be called before any XPC service operations
     func configureXPCSharing(accessGroup: String) throws
-    
+
     /// Validate XPC service keychain access
     /// - Parameter accessGroup: The access group to validate
     /// - Returns: true if XPC service has proper keychain access

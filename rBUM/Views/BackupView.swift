@@ -16,7 +16,7 @@ struct BackupView: View {
     @StateObject private var viewModel: BackupViewModel
     /// Environment value for dismissing the view
     @Environment(\.dismiss) private var dismiss
-    
+
     /// Initialize the backup view
     /// - Parameter repository: Repository to backup to
     init(repository: Repository) {
@@ -27,7 +27,7 @@ struct BackupView: View {
             logger: logger
         )
         let credentialsManager = KeychainCredentialsManager()
-        
+
         _viewModel = StateObject(
             wrappedValue: BackupViewModel(
                 repository: repository,
@@ -36,11 +36,12 @@ struct BackupView: View {
             )
         )
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
-            if case .backing = viewModel.state, 
-               let progress = viewModel.currentProgress {
+            if case .backing = viewModel.state,
+               let progress = viewModel.currentProgress
+            {
                 VStack(spacing: 8) {
                     ProgressView(
                         value: progress.percentComplete,
@@ -50,11 +51,11 @@ struct BackupView: View {
                             .font(.headline)
                     }
                     .progressViewStyle(.linear)
-                    
+
                     HStack {
                         Text(
                             "\(progress.processedFiles)/" +
-                            "\(progress.totalFiles) files"
+                                "\(progress.totalFiles) files"
                         )
                         Spacer()
                         Text("\(Int(progress.percentComplete))%")
@@ -68,7 +69,7 @@ struct BackupView: View {
                     .font(.headline)
                     .padding()
             }
-            
+
             if viewModel.selectedPaths.isEmpty {
                 Button("Select Files") {
                     Task {
@@ -80,7 +81,7 @@ struct BackupView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Selected Files:")
                         .font(.headline)
-                    
+
                     ForEach(
                         viewModel.selectedPaths,
                         id: \.absoluteString
@@ -94,7 +95,7 @@ struct BackupView: View {
                     }
                 }
                 .padding(.vertical)
-                
+
                 HStack(spacing: 20) {
                     Button(action: {
                         Task {
@@ -106,7 +107,7 @@ struct BackupView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(viewModel.state.isActive)
-                    
+
                     if viewModel.state.isActive {
                         Button(action: {
                             Task {
@@ -129,7 +130,7 @@ struct BackupView: View {
                 dismiss()
             }
         } message: {
-            if case .failed(let error) = viewModel.state {
+            if case let .failed(error) = viewModel.state {
                 Text(error.localizedDescription)
             }
         }
@@ -140,23 +141,23 @@ struct BackupView: View {
 private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     /// Initialize a new repository (no-op for preview)
     /// - Parameter credentials: Repository credentials
-    func initRepository(credentials: RepositoryCredentials) async throws {
+    func initRepository(credentials _: RepositoryCredentials) async throws {
         // No-op for preview
     }
-    
+
     /// Check if a repository is initialized (no-op for preview)
     /// - Parameter credentials: Repository credentials
-    func checkRepository(credentials: RepositoryCredentials) async throws {
+    func checkRepository(credentials _: RepositoryCredentials) async throws {
         // No-op for preview
     }
-    
+
     /// List snapshots in a repository (returns empty list for preview)
     /// - Parameter repository: Repository to list snapshots for
-    func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
+    func listSnapshots(in _: Repository) async throws -> [ResticSnapshot] {
         // Return empty list for preview
-        return []
+        []
     }
-    
+
     /// Create a backup of the given paths to the repository (simulates progress for preview)
     /// - Parameters:
     ///   - paths: Paths to backup
@@ -165,15 +166,15 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     ///   - onProgress: Optional callback for progress updates
     ///   - onStatusChange: Optional callback for status changes
     func createBackup(
-        paths: [URL],
-        to repository: Repository,
-        tags: [String]?,
+        paths _: [URL],
+        to _: Repository,
+        tags _: [String]?,
         onProgress: ((ResticBackupProgress) -> Void)?,
         onStatusChange: ((ResticBackupStatus) -> Void)?
     ) async throws {
         // Simulate backup progress
         onStatusChange?(.preparing)
-        
+
         // Simulate progress updates
         let progress = ResticBackupProgress(
             totalFiles: 100,
@@ -186,12 +187,12 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
         )
         onProgress?(progress)
         onStatusChange?(.backing(progress))
-        
+
         // Simulate completion
-        try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second delay
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
         onStatusChange?(.completed)
     }
-    
+
     /// Prune snapshots in a repository (no-op for preview)
     /// - Parameters:
     ///   - repository: Repository to prune snapshots for
@@ -201,27 +202,27 @@ private final class PreviewResticCommandService: ResticCommandServiceProtocol {
     ///   - keepMonthly: Optional number of monthly snapshots to keep
     ///   - keepYearly: Optional number of yearly snapshots to keep
     func pruneSnapshots(
-        in repository: Repository,
-        keepLast: Int?,
-        keepDaily: Int?,
-        keepWeekly: Int?,
-        keepMonthly: Int?,
-        keepYearly: Int?
+        in _: Repository,
+        keepLast _: Int?,
+        keepDaily _: Int?,
+        keepWeekly _: Int?,
+        keepMonthly _: Int?,
+        keepYearly _: Int?
     ) async throws {
         // No-op for preview
     }
-    
+
     /// Check the integrity of a repository (no-op for preview)
     /// - Parameter repository: Repository to check
-    func check(_ repository: Repository) async throws {
+    func check(_: Repository) async throws {
         // No-op for preview
     }
-    
+
     /// Initialize a new repository at the given path (no-op for preview)
     /// - Parameters:
     ///   - path: Path to initialize the repository at
     ///   - password: Password for the repository
-    func initializeRepository(at path: URL, password: String) async throws {
+    func initializeRepository(at _: URL, password _: String) async throws {
         // No-op for preview
     }
 }
@@ -232,61 +233,61 @@ private final class PreviewCredentialsManager: KeychainCredentialsManagerProtoco
     /// - Parameters:
     ///   - credentials: Credentials to store
     ///   - id: ID of the repository
-    func store(_ credentials: RepositoryCredentials, forRepositoryId id: String) async throws {
+    func store(_: RepositoryCredentials, forRepositoryId _: String) async throws {
         // No-op for preview
     }
-    
+
     /// Retrieve credentials for a repository (returns mock credentials for preview)
     /// - Parameter id: ID of the repository
-    func retrieve(forId id: String) async throws -> RepositoryCredentials {
+    func retrieve(forId _: String) async throws -> RepositoryCredentials {
         // Return mock credentials for preview
-        return RepositoryCredentials(
+        RepositoryCredentials(
             repositoryPath: "/preview/repository",
             password: "preview"
         )
     }
-    
+
     /// Delete credentials for a repository (no-op for preview)
     /// - Parameter id: ID of the repository
-    func delete(forId id: String) async throws {
+    func delete(forId _: String) async throws {
         // No-op for preview
     }
-    
+
     /// List all stored credentials (returns empty list for preview)
     func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
         // Return empty list for preview
-        return []
+        []
     }
 }
 
 #if DEBUG
-struct BackupView_Previews: PreviewProvider {
-    static var previews: some View {
-        BackupView(repository: .preview)
-            .frame(width: 400, height: 500)
+    struct BackupView_Previews: PreviewProvider {
+        static var previews: some View {
+            BackupView(repository: .preview)
+                .frame(width: 400, height: 500)
+        }
     }
-}
 
-extension Repository {
-    /// Preview repository for SwiftUI previews
-    static var preview: Repository {
-        Repository(
-            id: UUID(),
-            path: "/Users/preview/backups",
-            name: "Preview Repository",
-            description: "A repository for SwiftUI previews",
-            credentials: .preview
-        )
+    extension Repository {
+        /// Preview repository for SwiftUI previews
+        static var preview: Repository {
+            Repository(
+                id: UUID(),
+                path: "/Users/preview/backups",
+                name: "Preview Repository",
+                description: "A repository for SwiftUI previews",
+                credentials: .preview
+            )
+        }
     }
-}
 
-extension RepositoryCredentials {
-    /// Preview credentials for SwiftUI previews
-    static var preview: RepositoryCredentials {
-        RepositoryCredentials(
-            repositoryPath: "/Users/preview/backups",
-            password: "preview-password"
-        )
+    extension RepositoryCredentials {
+        /// Preview credentials for SwiftUI previews
+        static var preview: RepositoryCredentials {
+            RepositoryCredentials(
+                repositoryPath: "/Users/preview/backups",
+                password: "preview-password"
+            )
+        }
     }
-}
 #endif

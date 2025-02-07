@@ -56,7 +56,7 @@ public struct SecurityOperation: Hashable {
     /// - Properly encoded
     /// - Accessible within sandbox
     public let url: URL
-    
+
     /// The type of security operation that was performed.
     ///
     /// This indicates what kind of operation was attempted, such as:
@@ -67,7 +67,7 @@ public struct SecurityOperation: Hashable {
     ///
     /// See `SecurityOperationType` for all available types.
     public let operationType: SecurityOperationType
-    
+
     /// The timestamp when the operation was performed.
     ///
     /// This timestamp:
@@ -81,7 +81,7 @@ public struct SecurityOperation: Hashable {
     /// - Operation ordering
     /// - Rate limiting
     public let timestamp: Date
-    
+
     /// The final status of the operation.
     ///
     /// This indicates:
@@ -91,7 +91,7 @@ public struct SecurityOperation: Hashable {
     ///
     /// See `SecurityOperationStatus` for all possible states.
     public let status: SecurityOperationStatus
-    
+
     /// An optional error message if the operation failed.
     ///
     /// This message should:
@@ -102,7 +102,7 @@ public struct SecurityOperation: Hashable {
     ///
     /// The error is nil for successful operations.
     public let error: String?
-    
+
     /// Creates a new SecurityOperation instance.
     ///
     /// This initialiser creates an immutable record of a security operation
@@ -138,7 +138,7 @@ public struct SecurityOperation: Hashable {
         self.status = status
         self.error = error
     }
-    
+
     /// Compares two SecurityOperation instances for equality.
     ///
     /// Two operations are considered equal if they have the same:
@@ -161,11 +161,11 @@ public struct SecurityOperation: Hashable {
     /// let areEqual = op1 == op2 // true
     /// ```
     public static func == (lhs: SecurityOperation, rhs: SecurityOperation) -> Bool {
-        return lhs.url == rhs.url &&
-               lhs.operationType == rhs.operationType &&
-               lhs.timestamp == rhs.timestamp
+        lhs.url == rhs.url &&
+            lhs.operationType == rhs.operationType &&
+            lhs.timestamp == rhs.timestamp
     }
-    
+
     /// Hashes the essential components of the operation.
     ///
     /// This method combines:

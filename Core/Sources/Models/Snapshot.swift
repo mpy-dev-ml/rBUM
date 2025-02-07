@@ -14,16 +14,16 @@ import Foundation
 public struct Snapshot: Codable, Identifiable, Equatable {
     /// Unique identifier for the snapshot
     public let id: String
-    
+
     /// Time when the snapshot was created
     public let time: Date
-    
+
     /// Repository this snapshot belongs to
     public let repository: Repository
-    
+
     /// Optional tags associated with the snapshot
     public let tags: [String]?
-    
+
     /// Creates a new snapshot
     /// - Parameters:
     ///   - id: Unique identifier

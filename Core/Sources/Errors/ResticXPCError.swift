@@ -100,7 +100,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     /// 3. Verify system state
     /// 4. Handle user notification
     case serviceUnavailable
-    
+
     /// Indicates that establishing an XPC connection failed.
     ///
     /// This error occurs when:
@@ -123,7 +123,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     /// 3. Retry connection
     /// 4. Handle system state
     case connectionFailed
-    
+
     /// Indicates that command execution failed.
     ///
     /// This error occurs when:
@@ -148,7 +148,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     ///
     /// - Parameter reason: A description of why the execution failed
     case executionFailed(String)
-    
+
     /// Indicates that a security-scoped bookmark is invalid.
     ///
     /// This error occurs when:
@@ -173,7 +173,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     ///
     /// - Parameter path: The path that caused the invalid bookmark
     case invalidBookmark(path: String)
-    
+
     /// Indicates that a security-scoped bookmark is stale.
     ///
     /// This error occurs when:
@@ -198,7 +198,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     ///
     /// - Parameter path: The path with the stale bookmark
     case staleBookmark(path: String)
-    
+
     /// Indicates that access to a path was denied.
     ///
     /// This error occurs when:
@@ -223,7 +223,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     ///
     /// - Parameter path: The path that was denied access
     case accessDenied(path: String)
-    
+
     /// Indicates that an operation timed out.
     ///
     /// This error occurs when:
@@ -246,7 +246,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     /// 3. Adjust timeout
     /// 4. Retry operation
     case timeout
-    
+
     /// Indicates that the XPC interface versions don't match.
     ///
     /// This error occurs when:
@@ -269,7 +269,7 @@ public enum ResticXPCError: LocalizedError, Equatable {
     /// 3. Update service
     /// 4. Handle compatibility
     case interfaceVersionMismatch
-    
+
     /// A localised description of the error suitable for user display.
     ///
     /// This property provides a human-readable description of the error,
@@ -295,24 +295,24 @@ public enum ResticXPCError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .serviceUnavailable:
-            return "Restic XPC service is unavailable"
+            "Restic XPC service is unavailable"
         case .connectionFailed:
-            return "Failed to establish XPC connection"
-        case .executionFailed(let reason):
-            return "Command execution failed: \(reason)"
-        case .invalidBookmark(let path):
-            return "Invalid security-scoped bookmark for path: \(path)"
-        case .staleBookmark(let path):
-            return "Stale security-scoped bookmark for path: \(path)"
-        case .accessDenied(let path):
-            return "Access denied for path: \(path)"
+            "Failed to establish XPC connection"
+        case let .executionFailed(reason):
+            "Command execution failed: \(reason)"
+        case let .invalidBookmark(path):
+            "Invalid security-scoped bookmark for path: \(path)"
+        case let .staleBookmark(path):
+            "Stale security-scoped bookmark for path: \(path)"
+        case let .accessDenied(path):
+            "Access denied for path: \(path)"
         case .timeout:
-            return "Operation timed out"
+            "Operation timed out"
         case .interfaceVersionMismatch:
-            return "Interface version mismatch"
+            "Interface version mismatch"
         }
     }
-    
+
     /// Implementation of Equatable protocol for error comparison.
     ///
     /// This allows comparing error instances to determine if they represent
@@ -334,22 +334,22 @@ public enum ResticXPCError: LocalizedError, Equatable {
              (.connectionFailed, .connectionFailed),
              (.timeout, .timeout),
              (.interfaceVersionMismatch, .interfaceVersionMismatch):
-            return true
-            
+            true
+
         case let (.executionFailed(l), .executionFailed(r)):
-            return l == r
-            
+            l == r
+
         case let (.invalidBookmark(l), .invalidBookmark(r)):
-            return l == r
-            
+            l == r
+
         case let (.staleBookmark(l), .staleBookmark(r)):
-            return l == r
-            
+            l == r
+
         case let (.accessDenied(l), .accessDenied(r)):
-            return l == r
-            
+            l == r
+
         default:
-            return false
+            false
         }
     }
 }

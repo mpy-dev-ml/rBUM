@@ -33,17 +33,17 @@ import os.log
 /// ```swift
 /// class SecurityService {
 ///     private let logger: LoggerProtocol
-///     
+///
 ///     init(logger: LoggerProtocol) {
 ///         self.logger = logger
 ///     }
-///     
+///
 ///     func validateAccess() {
 ///         logger.info("Validating access",
 ///                    file: #file,
 ///                    function: #function,
 ///                    line: #line)
-///         
+///
 ///         guard isAccessValid else {
 ///             logger.error("Access validation failed",
 ///                         file: #file,
@@ -84,7 +84,7 @@ public protocol LoggerProtocol {
     ///             line: #line)
     /// ```
     func debug(_ message: String, file: String, function: String, line: Int)
-    
+
     /// Logs an informational message with contextual information.
     ///
     /// Info logs are used for general information about system operation.
@@ -108,7 +108,7 @@ public protocol LoggerProtocol {
     ///            line: #line)
     /// ```
     func info(_ message: String, file: String, function: String, line: Int)
-    
+
     /// Logs a warning message with contextual information.
     ///
     /// Warning logs are used for potential issues that need attention.
@@ -132,7 +132,7 @@ public protocol LoggerProtocol {
     ///               line: #line)
     /// ```
     func warning(_ message: String, file: String, function: String, line: Int)
-    
+
     /// Logs an error message with contextual information.
     ///
     /// Error logs are used for serious problems that need immediate attention.

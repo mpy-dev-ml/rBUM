@@ -20,28 +20,28 @@ public struct BackupSchedule: Codable, Equatable {
         case monthly
         case custom
     }
-    
+
     /// The frequency of the backup
     public let frequency: Frequency
-    
+
     /// The time of day to run the backup (for daily, weekly, monthly)
     public let timeOfDay: Date?
-    
+
     /// The day of week to run the backup (for weekly)
     public let dayOfWeek: Int?
-    
+
     /// The day of month to run the backup (for monthly)
     public let dayOfMonth: Int?
-    
+
     /// Custom interval in minutes (for custom frequency)
     public let customIntervalMinutes: Int?
-    
+
     /// Last successful run time
     public var lastRunTime: Date?
-    
+
     /// Next scheduled run time
     public var nextRunTime: Date?
-    
+
     /// Creates a new backup schedule
     /// - Parameters:
     ///   - frequency: The frequency of the backup
@@ -66,14 +66,14 @@ public struct BackupSchedule: Codable, Equatable {
         self.lastRunTime = lastRunTime
         self.nextRunTime = nextRunTime
     }
-    
+
     /// Creates a daily backup schedule at a specific time
     /// - Parameter timeOfDay: The time of day to run the backup
     /// - Returns: A new backup schedule
     public static func daily(at timeOfDay: Date) -> BackupSchedule {
         BackupSchedule(frequency: .daily, timeOfDay: timeOfDay)
     }
-    
+
     /// Creates a weekly backup schedule
     /// - Parameters:
     ///   - dayOfWeek: The day of week (1-7, where 1 is Monday)
@@ -82,7 +82,7 @@ public struct BackupSchedule: Codable, Equatable {
     public static func weekly(day dayOfWeek: Int, at timeOfDay: Date) -> BackupSchedule {
         BackupSchedule(frequency: .weekly, timeOfDay: timeOfDay, dayOfWeek: dayOfWeek)
     }
-    
+
     /// Creates a monthly backup schedule
     /// - Parameters:
     ///   - dayOfMonth: The day of month (1-31)
@@ -91,7 +91,7 @@ public struct BackupSchedule: Codable, Equatable {
     public static func monthly(day dayOfMonth: Int, at timeOfDay: Date) -> BackupSchedule {
         BackupSchedule(frequency: .monthly, timeOfDay: timeOfDay, dayOfMonth: dayOfMonth)
     }
-    
+
     /// Creates a custom interval backup schedule
     /// - Parameter minutes: The interval in minutes
     /// - Returns: A new backup schedule

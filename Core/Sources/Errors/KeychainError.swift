@@ -94,7 +94,7 @@ public enum KeychainError: LocalizedError {
     ///
     /// - Parameter status: The OSStatus code indicating the specific error
     case saveFailed(status: OSStatus)
-    
+
     /// Indicates that retrieving an item from the keychain failed.
     ///
     /// This error occurs when:
@@ -119,7 +119,7 @@ public enum KeychainError: LocalizedError {
     ///
     /// - Parameter status: The OSStatus code indicating the specific error
     case retrievalFailed(status: OSStatus)
-    
+
     /// Indicates that deleting an item from the keychain failed.
     ///
     /// This error occurs when:
@@ -144,7 +144,7 @@ public enum KeychainError: LocalizedError {
     ///
     /// - Parameter status: The OSStatus code indicating the specific error
     case deleteFailed(status: OSStatus)
-    
+
     /// Indicates that updating an existing keychain item failed.
     ///
     /// This error occurs when:
@@ -169,7 +169,7 @@ public enum KeychainError: LocalizedError {
     ///
     /// - Parameter status: The OSStatus code indicating the specific error
     case updateFailed(status: OSStatus)
-    
+
     /// Indicates that validating keychain access failed.
     ///
     /// This error occurs when:
@@ -192,7 +192,7 @@ public enum KeychainError: LocalizedError {
     /// 3. Verify system state
     /// 4. Handle user denial
     case accessValidationFailed
-    
+
     /// Indicates that configuring XPC sharing for the keychain failed.
     ///
     /// This error occurs when:
@@ -215,7 +215,7 @@ public enum KeychainError: LocalizedError {
     /// 3. Update configuration
     /// 4. Handle system state
     case xpcConfigurationFailed
-    
+
     /// A localised description of the error suitable for user display.
     ///
     /// This property provides a human-readable description of the error,
@@ -237,18 +237,18 @@ public enum KeychainError: LocalizedError {
     /// - Track error patterns
     public var errorDescription: String? {
         switch self {
-        case .saveFailed(let status):
-            return "Failed to save item to keychain: \(status)"
-        case .retrievalFailed(let status):
-            return "Failed to retrieve item from keychain: \(status)"
-        case .deleteFailed(let status):
-            return "Failed to delete item from keychain: \(status)"
-        case .updateFailed(let status):
-            return "Failed to update existing keychain item: \(status)"
+        case let .saveFailed(status):
+            "Failed to save item to keychain: \(status)"
+        case let .retrievalFailed(status):
+            "Failed to retrieve item from keychain: \(status)"
+        case let .deleteFailed(status):
+            "Failed to delete item from keychain: \(status)"
+        case let .updateFailed(status):
+            "Failed to update existing keychain item: \(status)"
         case .accessValidationFailed:
-            return "Failed to validate keychain access"
+            "Failed to validate keychain access"
         case .xpcConfigurationFailed:
-            return "Failed to configure XPC sharing for keychain"
+            "Failed to configure XPC sharing for keychain"
         }
     }
 }

@@ -94,7 +94,7 @@ public enum SandboxError: LocalizedError {
     ///
     /// - Parameter URL: The URL that was denied access
     case accessDenied(URL)
-    
+
     /// Indicates that a security-scoped bookmark is invalid.
     ///
     /// This error occurs when:
@@ -119,7 +119,7 @@ public enum SandboxError: LocalizedError {
     ///
     /// - Parameter URL: The URL with the invalid bookmark
     case bookmarkInvalid(URL)
-    
+
     /// Indicates that creating a security-scoped bookmark failed.
     ///
     /// This error occurs when:
@@ -146,7 +146,7 @@ public enum SandboxError: LocalizedError {
     ///
     /// - Parameter URL: The URL for which bookmark creation failed
     case bookmarkCreationFailed(URL)
-    
+
     /// A localised description of the error suitable for user display.
     ///
     /// This property provides a human-readable description of the error,
@@ -168,12 +168,12 @@ public enum SandboxError: LocalizedError {
     /// - Report system state
     public var errorDescription: String? {
         switch self {
-        case .accessDenied(let url):
-            return "Access denied to \(url.path)"
-        case .bookmarkInvalid(let url):
-            return "Invalid bookmark for \(url.path)"
-        case .bookmarkCreationFailed(let url):
-            return "Failed to create bookmark for \(url.path)"
+        case let .accessDenied(url):
+            "Access denied to \(url.path)"
+        case let .bookmarkInvalid(url):
+            "Invalid bookmark for \(url.path)"
+        case let .bookmarkCreationFailed(url):
+            "Failed to create bookmark for \(url.path)"
         }
     }
 }
@@ -221,9 +221,9 @@ public extension Error {
     var userDescription: String {
         switch self {
         case let error as LocalizedError:
-            return error.localizedDescription
+            error.localizedDescription
         default:
-            return localizedDescription
+            localizedDescription
         }
     }
 }
