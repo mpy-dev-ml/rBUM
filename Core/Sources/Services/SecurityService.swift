@@ -123,9 +123,11 @@ public final class SecurityService: SecurityServiceProtocol {
         )
         
         do {
-            let bookmark = try url.bookmarkData(options: .withSecurityScope,
-                                              includingResourceValuesForKeys: nil,
-                                              relativeTo: nil)
+            let bookmark = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
             return bookmark
         } catch {
             throw SecurityError.bookmarkCreationFailed(error.localizedDescription)
@@ -142,10 +144,12 @@ public final class SecurityService: SecurityServiceProtocol {
         
         var isStale = false
         do {
-            let url = try URL(resolvingBookmarkData: bookmark,
-                            options: .withSecurityScope,
-                            relativeTo: nil,
-                            bookmarkDataIsStale: &isStale)
+            let url = try URL(
+                resolvingBookmarkData: bookmark,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
             
             if isStale {
                 self.logger.debug(
@@ -221,7 +225,11 @@ public final class SecurityService: SecurityServiceProtocol {
             line: #line
         )
         
-        let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        let bookmark = try url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
         setActiveBookmark(bookmark, for: url)
         return bookmark
     }
