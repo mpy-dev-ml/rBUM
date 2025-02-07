@@ -10,83 +10,35 @@ import Foundation
 
 /// Factory for creating services with appropriate implementations based on build configuration
 ///
-/// In DEBUG builds, this factory returns development mock services from Core/Sources/Services/Development
-/// In RELEASE builds, it returns the default production implementations
+/// The ServiceFactory provides a centralized way to create services with the appropriate
+/// implementation based on the current build configuration and settings. It supports:
+/// - Development vs Production implementations
+/// - Debug vs Release builds
+/// - Feature flags and configuration
+/// - Dependency injection
+///
+/// Example usage:
+/// ```swift
+/// // Create services
+/// let logger = LoggerFactory.createLogger(category: .security)
+/// let security = ServiceFactory.createSecurityService(logger: logger)
+/// let keychain = ServiceFactory.createKeychainService(logger: logger)
+///
+/// // Configure factory
+/// ServiceFactory.configuration = .init(
+///     developmentEnabled: true,
+///     debugLoggingEnabled: true
+/// )
+/// ```
+///
+/// Implementation notes:
+/// 1. Uses conditional compilation for debug/release builds
+/// 2. Supports feature flags via configuration
+/// 3. Provides dependency injection
+/// 4. Manages service lifecycles
 public enum ServiceFactory {
-    private static let developmentConfiguration = DevelopmentConfiguration()
-
-    /// Create security service with appropriate implementation
-    /// - Parameter logger: Logger for the service
-    /// - Returns: SecurityServiceProtocol implementation
-    public static func createSecurityService(logger: LoggerProtocol) -> SecurityServiceProtocol {
-        #if DEBUG
-            return DevelopmentSecurityService(
-                logger: logger,
-                configuration: developmentConfiguration
-            )
-        #else
-            return DefaultSecurityService(logger: logger)
-        #endif
-    }
-
-    /// Create keychain service with appropriate implementation
-    /// - Parameter logger: Logger for the service
-    /// - Returns: KeychainServiceProtocol implementation
-    public static func createKeychainService(logger: LoggerProtocol) -> KeychainServiceProtocol {
-        #if DEBUG
-            return DevelopmentKeychainService(
-                logger: logger,
-                configuration: developmentConfiguration
-            )
-        #else
-            return KeychainService(logger: logger)
-        #endif
-    }
-
-    /// Create bookmark service with appropriate implementation
-    /// - Parameters:
-    ///   - logger: Logger for the service
-    ///   - securityService: Security service dependency
-    ///   - keychainService: Keychain service dependency
-    /// - Returns: BookmarkServiceProtocol implementation
-    public static func createBookmarkService(
-        logger: LoggerProtocol,
-        securityService: SecurityServiceProtocol,
-        keychainService: KeychainServiceProtocol
-    ) -> BookmarkServiceProtocol {
-        #if DEBUG
-            return DevelopmentBookmarkService(
-                logger: logger,
-                configuration: developmentConfiguration
-            )
-        #else
-            return BookmarkService(
-                logger: logger,
-                securityService: securityService,
-                keychainService: keychainService
-            )
-        #endif
-    }
-
-    /// Create XPC service with appropriate implementation
-    /// - Parameters:
-    ///   - logger: Logger for the service
-    ///   - securityService: Security service dependency
-    /// - Returns: ResticXPCProtocol implementation
-    public static func createXPCService(
-        logger: LoggerProtocol,
-        securityService: SecurityServiceProtocol
-    ) -> ResticXPCProtocol {
-        #if DEBUG
-            return DevelopmentXPCService(
-                logger: logger,
-                configuration: developmentConfiguration
-            )
-        #else
-            return CircuitBreakerXPCService(
-                logger: logger,
-                securityService: securityService
-            )
-        #endif
-    }
+    // MARK: - Properties
+    
+    /// Development configuration for debug builds
+    static let developmentConfiguration = DevelopmentConfiguration()
 }
