@@ -13,169 +13,43 @@ import os.log
 /// Provides controlled behaviour for development and testing
 @available(macOS 13.0, *)
 public final class DevelopmentSecurityService: SecurityServiceProtocol, @unchecked Sendable {
-    // MARK: - Types
-    
-    /// Represents a security operation with metadata
-    private struct SecurityOperation: Hashable {
-        let url: URL
-        let operationType: OperationType
-        let timestamp: Date
-        let status: OperationStatus
-        let error: String?
-        
-        enum OperationType: String {
-            case access
-            case permission
-            case bookmark
-            case xpc
-        }
-        
-        enum OperationStatus: String {
-            case success
-            case failure
-            case pending
-        }
-        
-        static func == (lhs: SecurityOperation, rhs: SecurityOperation) -> Bool {
-            return lhs.url == rhs.url &&
-                   lhs.operationType == rhs.operationType &&
-                   lhs.timestamp == rhs.timestamp
-        }
-        
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(url)
-            hasher.combine(operationType)
-            hasher.combine(timestamp)
-        }
-    }
-    
-    /// Tracks security metrics
-    private struct SecurityMetrics {
-        private(set) var accessCount: Int = 0
-        private(set) var permissionCount: Int = 0
-        private(set) var bookmarkCount: Int = 0
-        private(set) var xpcCount: Int = 0
-        private(set) var failureCount: Int = 0
-        private(set) var activeAccessCount: Int = 0
-        private(set) var operationHistory: [SecurityOperation] = []
-        
-        mutating func recordAccess(success: Bool = true, error: String? = nil) {
-            accessCount += 1
-            if !success { failureCount += 1 }
-        }
-        
-        mutating func recordPermission(success: Bool = true, error: String? = nil) {
-            permissionCount += 1
-            if !success { failureCount += 1 }
-        }
-        
-        mutating func recordBookmark(success: Bool = true, error: String? = nil) {
-            bookmarkCount += 1
-            if !success { failureCount += 1 }
-        }
-        
-        mutating func recordXPC(success: Bool = true, error: String? = nil) {
-            xpcCount += 1
-            if !success { failureCount += 1 }
-        }
-        
-        mutating func recordOperation(
-            _ operation: SecurityOperation
-        ) {
-            operationHistory.append(operation)
-            if operationHistory.count > 100 {
-                operationHistory.removeFirst()
-            }
-        }
-        
-        mutating func incrementActiveAccess() {
-            activeAccessCount += 1
-        }
-        
-        mutating func decrementActiveAccess() {
-            activeAccessCount = max(0, activeAccessCount - 1)
-        }
-    }
-    
     // MARK: - Properties
-    private let logger: LoggerProtocol
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentSecurity", attributes: .concurrent)
-    private var bookmarks: [URL: Data] = [:]
-    private var activeAccess: Set<URL> = []
+    private let logger: Logger
     private let configuration: DevelopmentConfiguration
-    private var metrics = SecurityMetrics()
+    private let queue = DispatchQueue(label: "dev.mpy.rbum.security")
+    private var bookmarks: [URL: Data] = [:]
+    
+    private let metrics: SecurityMetrics
+    private let operationRecorder: SecurityOperationRecorder
+    private let simulator: SecuritySimulator
     
     // MARK: - Initialization
-    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
-        self.logger = logger
+    public init(configuration: DevelopmentConfiguration) {
         self.configuration = configuration
-        
-        logger.info(
-            """
-            Initialised DevelopmentSecurityService with configuration:
-            \(String(describing: configuration))
-            """,
-            file: #file,
-            function: #function,
-            line: #line
-        )
+        self.logger = Logger(subsystem: "dev.mpy.rbum", category: "SecurityService")
+        self.metrics = SecurityMetrics(logger: logger)
+        self.operationRecorder = SecurityOperationRecorder(logger: logger)
+        self.simulator = SecuritySimulator(logger: logger, configuration: configuration)
     }
-    
-    // MARK: - Private Methods
-    
-    /// Record a security operation
-    private func recordOperation(
-        url: URL,
-        type: SecurityOperation.OperationType,
-        status: SecurityOperation.OperationStatus,
-        error: String? = nil
-    ) {
-        queue.async(flags: .barrier) {
-            let operation = SecurityOperation(
-                url: url,
-                operationType: type,
-                timestamp: Date(),
-                status: status,
-                error: error
-            )
-            self.metrics.recordOperation(operation)
-        }
-    }
-    
-    /// Simulate failure if configured
-    private func simulateFailureIfNeeded(
-        operation: String,
-        url: URL,
-        error: (String) -> Error
-    ) throws {
-        guard configuration.shouldSimulateAccessFailures else { return }
-        
-        let errorMessage = "\(operation) failed (simulated)"
-        logger.error(
-            """
-            Simulating \(operation) failure for URL: \
-            \(url.path)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        throw error(errorMessage)
-    }
-    
-    // MARK: - SecurityServiceProtocol Implementation
+}
+
+// MARK: - Access Control
+@available(macOS 13.0, *)
+extension DevelopmentSecurityService {
+    /// Validates access to a URL
+    /// - Parameter url: The URL to validate access for
+    /// - Returns: True if access is valid, false otherwise
+    /// - Throws: SecurityError if access validation fails
     public func validateAccess(to url: URL) async throws -> Bool {
-        try simulateFailureIfNeeded(
+        try simulator.simulateFailureIfNeeded(
             operation: "access validation",
             url: url,
             error: { SecurityError.accessDenied($0) }
         )
         
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
+        try await simulator.simulateDelay()
         
-        recordOperation(
+        operationRecorder.recordOperation(
             url: url,
             type: .access,
             status: .success
@@ -195,139 +69,32 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         return true
     }
     
-    public func persistAccess(to url: URL) async throws -> Data {
-        try simulateFailureIfNeeded(
-            operation: "bookmark creation",
-            url: url,
-            error: { SecurityError.bookmarkCreationFailed($0) }
-        )
-        
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
-        
-        return try queue.sync {
-            let string = "mock-bookmark-\(UUID().uuidString)"
-            guard let bookmark = string.data(using: .utf8) else {
-                let error = "Failed to create bookmark data"
-                recordOperation(
-                    url: url,
-                    type: .bookmark,
-                    status: .failure,
-                    error: error
-                )
-                metrics.recordBookmark(success: false, error: error)
-                
-                logger.error(
-                    error,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                throw SecurityError.bookmarkCreationFailed(error)
-            }
-            
-            bookmarks[url] = bookmark
-            recordOperation(
-                url: url,
-                type: .bookmark,
-                status: .success
-            )
-            metrics.recordBookmark()
-            
-            logger.info(
-                """
-                Created bookmark for URL: \
-                \(url.path)
-                Total Bookmarks: \(bookmarks.count)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return bookmark
-        }
-    }
-    
-    public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
-        try simulateFailureIfNeeded(
-            operation: "XPC validation",
-            url: URL(fileURLWithPath: "/"),
-            error: { SecurityError.xpcConnectionFailed($0) }
-        )
-        
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
-        
-        recordOperation(
-            url: URL(fileURLWithPath: "/"),
-            type: .xpc,
-            status: .success
-        )
-        metrics.recordXPC()
-        
-        logger.info(
-            """
-            Validated XPC connection
-            Total XPC Operations: \(metrics.xpcCount)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        return true
-    }
-    
-    public func validateXPCService() async throws -> Bool {
-        try simulateFailureIfNeeded(
-            operation: "XPC service validation",
-            url: URL(fileURLWithPath: "/"),
-            error: { SecurityError.xpcConnectionFailed($0) }
-        )
-        
-        recordOperation(
-            url: URL(fileURLWithPath: "/"),
-            type: .xpc,
-            status: .success
-        )
-        metrics.recordXPC()
-        
-        logger.info(
-            """
-            Validated XPC service
-            Total XPC Operations: \(metrics.xpcCount)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        return true
-    }
-    
-    public func requestPermission(for url: URL) async throws -> Bool {
-        try simulateFailureIfNeeded(
-            operation: "permission request",
+    /// Starts accessing a URL
+    /// - Parameter url: The URL to start accessing
+    /// - Returns: True if access was started successfully
+    /// - Throws: SecurityError if access cannot be started
+    public func startAccessing(_ url: URL) async throws -> Bool {
+        try simulator.simulateFailureIfNeeded(
+            operation: "access start",
             url: url,
             error: { SecurityError.accessDenied($0) }
         )
         
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
+        try await simulator.simulateDelay()
         
-        recordOperation(
+        operationRecorder.recordOperation(
             url: url,
-            type: .permission,
+            type: .access,
             status: .success
         )
-        metrics.recordPermission()
+        metrics.recordAccess()
+        metrics.incrementActiveAccess()
         
         logger.info(
             """
-            Granting permission for URL: \
+            Started accessing URL: \
             \(url.path)
-            Total Permission Requests: \(metrics.permissionCount)
+            Active Access Count: \(metrics.activeAccessCount)
             """,
             file: #file,
             function: #function,
@@ -336,18 +103,53 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         return true
     }
     
-    public func createBookmark(for url: URL) throws -> Data {
-        try simulateFailureIfNeeded(
+    /// Stops accessing a URL
+    /// - Parameter url: The URL to stop accessing
+    /// - Throws: SecurityError if access cannot be stopped
+    public func stopAccessing(_ url: URL) async throws {
+        try await simulator.simulateDelay()
+        
+        operationRecorder.recordOperation(
+            url: url,
+            type: .access,
+            status: .success
+        )
+        metrics.recordAccessEnd()
+        
+        logger.info(
+            """
+            Stopped accessing URL: \
+            \(url.path)
+            Active Access Count: \(metrics.activeAccessCount)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+    }
+}
+
+// MARK: - Bookmark Management
+@available(macOS 13.0, *)
+extension DevelopmentSecurityService {
+    /// Persists access to a URL by creating a security-scoped bookmark
+    /// - Parameter url: The URL to create a bookmark for
+    /// - Returns: The bookmark data
+    /// - Throws: SecurityError if bookmark creation fails
+    public func persistAccess(to url: URL) async throws -> Data {
+        try simulator.simulateFailureIfNeeded(
             operation: "bookmark creation",
             url: url,
             error: { SecurityError.bookmarkCreationFailed($0) }
         )
         
+        try await simulator.simulateDelay()
+        
         return try queue.sync {
             let string = "mock-bookmark-\(UUID().uuidString)"
             guard let bookmark = string.data(using: .utf8) else {
                 let error = "Failed to create bookmark data"
-                recordOperation(
+                operationRecorder.recordOperation(
                     url: url,
                     type: .bookmark,
                     status: .failure,
@@ -365,7 +167,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             }
             
             bookmarks[url] = bookmark
-            recordOperation(
+            operationRecorder.recordOperation(
                 url: url,
                 type: .bookmark,
                 status: .success
@@ -386,8 +188,12 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         }
     }
     
+    /// Resolves a security-scoped bookmark to its URL
+    /// - Parameter bookmark: The bookmark data to resolve
+    /// - Returns: The resolved URL
+    /// - Throws: SecurityError if bookmark resolution fails
     public func resolveBookmark(_ bookmark: Data) throws -> URL {
-        try simulateFailureIfNeeded(
+        try simulator.simulateFailureIfNeeded(
             operation: "bookmark resolution",
             url: URL(fileURLWithPath: "/"),
             error: { SecurityError.bookmarkResolutionFailed($0) }
@@ -395,7 +201,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         
         return try queue.sync {
             if let url = bookmarks.first(where: { $0.value == bookmark })?.key {
-                recordOperation(
+                operationRecorder.recordOperation(
                     url: url,
                     type: .bookmark,
                     status: .success
@@ -406,7 +212,6 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
                     """
                     Resolved bookmark to URL: \
                     \(url.path)
-                    Total Bookmarks: \(bookmarks.count)
                     """,
                     file: #file,
                     function: #function,
@@ -416,7 +221,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             }
             
             let error = "Bookmark not found"
-            recordOperation(
+            operationRecorder.recordOperation(
                 url: URL(fileURLWithPath: "/"),
                 type: .bookmark,
                 status: .failure,
@@ -433,86 +238,117 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             throw SecurityError.bookmarkResolutionFailed(error)
         }
     }
+}
+
+// MARK: - XPC Connection Management
+@available(macOS 13.0, *)
+extension DevelopmentSecurityService {
+    /// Validates an XPC connection
+    /// - Parameter connection: The XPC connection to validate
+    /// - Returns: True if the connection is valid
+    /// - Throws: SecurityError if validation fails
+    public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
+        try simulator.simulateFailureIfNeeded(
+            operation: "XPC validation",
+            url: URL(fileURLWithPath: "/"),
+            error: { SecurityError.xpcConnectionFailed($0) }
+        )
+        
+        try await simulator.simulateDelay()
+        
+        operationRecorder.recordOperation(
+            url: URL(fileURLWithPath: "/"),
+            type: .xpc,
+            status: .success
+        )
+        
+        logger.info(
+            """
+            Validated XPC connection: \
+            \(connection)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        return true
+    }
     
-    public func startAccessing(_ url: URL) async throws -> Bool {
-        try simulateFailureIfNeeded(
-            operation: "access start",
+    /// Validates the XPC service
+    /// - Returns: True if the service is valid
+    /// - Throws: SecurityError if validation fails
+    public func validateXPCService() async throws -> Bool {
+        try simulator.simulateFailureIfNeeded(
+            operation: "XPC service validation",
+            url: URL(fileURLWithPath: "/"),
+            error: { SecurityError.xpcConnectionFailed($0) }
+        )
+        
+        operationRecorder.recordOperation(
+            url: URL(fileURLWithPath: "/"),
+            type: .xpc,
+            status: .success
+        )
+        
+        logger.info(
+            """
+            Validated XPC service
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        return true
+    }
+}
+
+// MARK: - Permission Management
+@available(macOS 13.0, *)
+extension DevelopmentSecurityService {
+    /// Requests permission for a URL
+    /// - Parameter url: The URL to request permission for
+    /// - Returns: True if permission was granted
+    /// - Throws: SecurityError if permission request fails
+    public func requestPermission(for url: URL) async throws -> Bool {
+        try simulator.simulateFailureIfNeeded(
+            operation: "permission request",
             url: url,
             error: { SecurityError.accessDenied($0) }
         )
         
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
+        try await simulator.simulateDelay()
         
-        return await withCheckedContinuation { continuation in
-            queue.async(flags: .barrier) {
-                self.activeAccess.insert(url)
-                self.metrics.incrementActiveAccess()
-                
-                self.recordOperation(
-                    url: url,
-                    type: .access,
-                    status: .success
-                )
-                self.metrics.recordAccess()
-                
-                self.logger.info(
-                    """
-                    Started accessing URL: \
-                    \(url.path)
-                    Active Access Count: \(self.metrics.activeAccessCount)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                continuation.resume(returning: true)
-            }
-        }
+        operationRecorder.recordOperation(
+            url: url,
+            type: .permission,
+            status: .success
+        )
+        metrics.recordPermission()
+        
+        logger.info(
+            """
+            Requested permission for URL: \
+            \(url.path)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        return true
     }
     
-    public func stopAccessing(_ url: URL) async throws {
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
-        
-        await withCheckedContinuation { continuation in
-            queue.async(flags: .barrier) {
-                self.activeAccess.remove(url)
-                self.metrics.decrementActiveAccess()
-                
-                self.recordOperation(
-                    url: url,
-                    type: .access,
-                    status: .success
-                )
-                
-                self.logger.info(
-                    """
-                    Stopped accessing URL: \
-                    \(url.path)
-                    Active Access Count: \(self.metrics.activeAccessCount)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                continuation.resume()
-            }
-        }
-    }
-    
+    /// Validates access and starts accessing a URL in one operation
+    /// - Parameter url: The URL to validate and access
+    /// - Returns: True if validation and access were successful
+    /// - Throws: SecurityError if validation or access fails
     public func validateAndStartAccessing(_ url: URL) async throws -> Bool {
-        try simulateFailureIfNeeded(
+        try simulator.simulateFailureIfNeeded(
             operation: "validate and access start",
             url: url,
             error: { SecurityError.accessDenied($0) }
         )
         
-        if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
-        }
+        try await simulator.simulateDelay()
         
         // First validate access
         _ = try await validateAccess(to: url)
