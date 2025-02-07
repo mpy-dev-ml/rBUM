@@ -14,82 +14,194 @@
 import Core
 import Foundation
 
-/// Service for managing backup operations
+/// Service for managing backup operations.
+///
+/// BackupService provides a comprehensive solution for:
+/// 1. Creating and managing backups
+/// 2. Initialising and managing repositories
+/// 3. Managing backup state and health
+/// 4. Handling file operations safely
+/// 5. Measuring and monitoring operations
+///
+/// Example usage:
+/// ```swift
+/// let backupService = BackupService(
+///     resticService: resticService,
+///     keychainService: keychainService
+/// )
+///
+/// // Create a backup
+/// try await backupService.createBackup(
+///     to: repository,
+///     paths: ["/path/to/backup"],
+///     tags: ["important"]
+/// )
+///
+/// // List snapshots
+/// let snapshots = try await backupService.listSnapshots(in: repository)
+/// ```
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable,
     @unchecked Sendable
 {
     // MARK: - Properties
 
+    /// Service for executing Restic commands
     private let resticService: ResticServiceProtocol
+    
+    /// Service for managing secure credentials
     private let keychainService: KeychainService
+    
+    /// Queue for managing backup operations
     private let operationQueue: OperationQueue
-
-    private actor BackupState {
-        var activeBackups: Set<UUID> = []
-        var cachedHealthStatus: Bool = true
-
-        func insert(_ id: UUID) {
-            activeBackups.insert(id)
-            updateCachedHealth()
-        }
-
-        func remove(_ id: UUID) {
-            activeBackups.remove(id)
-            updateCachedHealth()
-        }
-
-        var isEmpty: Bool {
-            activeBackups.isEmpty
-        }
-
-        private func updateCachedHealth() {
-            cachedHealthStatus = activeBackups.isEmpty
-        }
-    }
-
+    
+    /// Actor for managing backup state
     private let backupState = BackupState()
-
+    
+    /// Indicates whether the service is healthy
+    @objc public private(set) var isHealthy: Bool = true
+    
+    /// Hash value for the service
     @objc override public var hash: Int {
         var hasher = Hasher()
         hasher.combine(ObjectIdentifier(resticService))
         hasher.combine(ObjectIdentifier(keychainService))
         return hasher.finalize()
     }
-
+    
+    /// Description of the service
     @objc override public var description: String {
         "BackupService"
     }
 
-    @objc public private(set) var isHealthy: Bool = true
-
-    public func updateHealthStatus() async {
-        let isEmpty = await backupState.isEmpty
-        let resticHealthy = await (try? resticService.performHealthCheck()) ?? false
-        isHealthy = isEmpty && resticHealthy
-    }
-
     // MARK: - Initialization
 
+    /// Initialises a new BackupService with the required dependencies.
+    ///
+    /// - Parameters:
+    ///   - resticService: Service for executing Restic commands
+    ///   - keychainService: Service for managing secure credentials
     public init(resticService: ResticServiceProtocol, keychainService: KeychainService) {
         self.resticService = resticService
         self.keychainService = keychainService
+        
         operationQueue = OperationQueue()
         operationQueue.maxConcurrentOperationCount = 1
-
+        
         let logger = OSLogger(category: "backup")
-
-        // Create a temporary security service for bootstrapping
-        let tempSecurityService = SecurityService(logger: logger, xpcService: MockResticXPCService())
-
-        // Now create the real XPC service with the temporary security service
-        let xpcService = ResticXPCService(logger: logger, securityService: tempSecurityService)
-
-        // Finally create the real security service with the real XPC service
-        let securityService = SecurityService(logger: logger, xpcService: xpcService as! ResticXPCServiceProtocol)
-
-        super.init(logger: logger, securityService: securityService)
+        super.init(logger: logger)
     }
+}
 
+// MARK: - Backup Errors
+
+public enum BackupError: LocalizedError {
+    case invalidRepository
+    case backupFailed
+    case restoreFailed
+    case snapshotListFailed
+    case sourceNotFound
+    case destinationNotFound
+    case insufficientSpace
+    case sourceAccessDenied
+    case destinationAccessDenied
+    case executionFailed(Error)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidRepository:
+            "Invalid repository configuration"
+        case .backupFailed:
+            "Failed to create backup"
+        case .restoreFailed:
+            "Failed to restore from snapshot"
+        case .snapshotListFailed:
+            "Failed to list snapshots"
+        case .sourceNotFound:
+            "Source directory not found"
+        case .destinationNotFound:
+            "Destination directory not found"
+        case .insufficientSpace:
+            "Insufficient space available for backup"
+        case .sourceAccessDenied:
+            "Access denied to source directory"
+        case .destinationAccessDenied:
+            "Access denied to destination directory"
+        case .executionFailed(let error):
+            "Backup execution failed: \(error.localizedDescription)"
+        }
+    }
+}
+
+struct BackupConfiguration {
+    let source: URL
+    let destination: URL
+    let excludes: [String]
+    let tags: [String]
+}
+
+struct BackupOperation {
+    let id: UUID
+    let source: URL
+    let destination: URL
+    let excludes: [String]
+    let tags: [String]
+    let startTime: Date
+}
+
+enum BackupResultStatus {
+    case completed
+    case failed
+}
+
+struct BackupResult {
+    let operationId: UUID
+    let status: BackupResultStatus
+    let startTime: Date
+    let endTime: Date
+    let duration: TimeInterval
+    let error: Error?
+}
+
+struct BackupSource {
+    let url: URL
+    let metadata: [String: String]?
+}
+
+struct BackupData {
+    let source: BackupSource
+    let timestamp: Date
+    let files: [URL]
+    let totalSize: UInt64
+    let metadata: [String: String]
+}
+
+enum BackupFilter {
+    case exclude(String)
+    case include(String)
+    case extension(String)
+    case size(SizeComparison, UInt64)
+    case date(DateComparison, Date)
+}
+
+enum SizeComparison {
+    case lessThan
+    case greaterThan
+    case equalTo
+}
+
+enum DateComparison {
+    case before
+    case after
+    case on
+}
+
+enum BackupOperationStatus {
+    case inProgress
+    case completed
+    case failed
+}
+
+extension BackupService {
     // MARK: - BackupServiceProtocol Implementation
 
     public func initializeRepository(_ repository: Repository) async throws {
@@ -166,10 +278,11 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
         // Record operation start
         let operation = BackupOperation(
             id: id,
-            source: source,
-            destination: destination,
-            timestamp: Date(),
-            status: .inProgress
+            source: source.url,
+            destination: destination.url ?? URL(fileURLWithPath: ""),
+            excludes: [],
+            tags: [],
+            startTime: Date()
         )
         operationRecorder.recordOperation(operation)
         
@@ -547,111 +660,33 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
     }
 }
 
-// MARK: - Backup Errors
+extension BackupService {
+    private actor BackupState {
+        var activeBackups: Set<UUID> = []
+        var cachedHealthStatus: Bool = true
 
-public enum BackupError: LocalizedError {
-    case invalidRepository
-    case backupFailed
-    case restoreFailed
-    case snapshotListFailed
-    case sourceNotFound
-    case destinationNotFound
-    case insufficientSpace
-    case sourceAccessDenied
-    case destinationAccessDenied
-    case executionFailed(Error)
+        func insert(_ id: UUID) {
+            activeBackups.insert(id)
+            updateCachedHealth()
+        }
 
-    public var errorDescription: String? {
-        switch self {
-        case .invalidRepository:
-            "Invalid repository configuration"
-        case .backupFailed:
-            "Failed to create backup"
-        case .restoreFailed:
-            "Failed to restore from snapshot"
-        case .snapshotListFailed:
-            "Failed to list snapshots"
-        case .sourceNotFound:
-            "Source directory not found"
-        case .destinationNotFound:
-            "Destination directory not found"
-        case .insufficientSpace:
-            "Insufficient space available for backup"
-        case .sourceAccessDenied:
-            "Access denied to source directory"
-        case .destinationAccessDenied:
-            "Access denied to destination directory"
-        case .executionFailed(let error):
-            "Backup execution failed: \(error.localizedDescription)"
+        func remove(_ id: UUID) {
+            activeBackups.remove(id)
+            updateCachedHealth()
+        }
+
+        var isEmpty: Bool {
+            activeBackups.isEmpty
+        }
+
+        private func updateCachedHealth() {
+            cachedHealthStatus = activeBackups.isEmpty
         }
     }
-}
 
-struct BackupConfiguration {
-    let source: URL
-    let destination: URL
-    let excludes: [String]
-    let tags: [String]
-}
-
-struct BackupOperation {
-    let id: UUID
-    let source: URL
-    let destination: URL
-    let excludes: [String]
-    let tags: [String]
-    let startTime: Date
-}
-
-enum BackupResultStatus {
-    case completed
-    case failed
-}
-
-struct BackupResult {
-    let operationId: UUID
-    let status: BackupResultStatus
-    let startTime: Date
-    let endTime: Date
-    let duration: TimeInterval
-    let error: Error?
-}
-
-struct BackupSource {
-    let url: URL
-    let metadata: [String: String]?
-}
-
-struct BackupData {
-    let source: BackupSource
-    let timestamp: Date
-    let files: [URL]
-    let totalSize: UInt64
-    let metadata: [String: String]
-}
-
-enum BackupFilter {
-    case exclude(String)
-    case include(String)
-    case extension(String)
-    case size(SizeComparison, UInt64)
-    case date(DateComparison, Date)
-}
-
-enum SizeComparison {
-    case lessThan
-    case greaterThan
-    case equalTo
-}
-
-enum DateComparison {
-    case before
-    case after
-    case on
-}
-
-enum BackupOperationStatus {
-    case inProgress
-    case completed
-    case failed
+    private func updateHealthStatus() async {
+        let isEmpty = await backupState.isEmpty
+        let resticHealthy = await (try? resticService.performHealthCheck()) ?? false
+        isHealthy = isEmpty && resticHealthy
+    }
 }
