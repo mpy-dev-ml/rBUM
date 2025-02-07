@@ -65,7 +65,12 @@ struct RBUMApp: App {
                 logger: logger
             )
         } catch {
-            logger.error("Failed to initialize repository storage: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            logger.error(
+                "Failed to initialize repository storage: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
         }
         
@@ -83,10 +88,12 @@ struct RBUMApp: App {
             keychainService: keychainService
         ) as! any RepositoryCreationServiceProtocol
         
-        logger.debug("App initialized",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "App initialized",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Setup app delegate
         setupAppDelegate()
@@ -99,10 +106,12 @@ struct RBUMApp: App {
                 creationService: repositoryCreationService
             )
             .onAppear {
-                logger.info("ContentView appeared",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.info(
+                    "ContentView appeared",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             }
         }
         .windowStyle(.hiddenTitleBar)
@@ -128,10 +137,12 @@ struct RBUMApp: App {
     // MARK: - Private Methods
     
     private func setupAppDelegate() {
-        logger.debug("Setting up app delegate",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "Setting up app delegate",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Register for notifications
         NotificationCenter.default.addObserver(
@@ -144,10 +155,12 @@ struct RBUMApp: App {
     }
     
     private func handleAppTermination() {
-        logger.debug("Handling app termination",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "Handling app termination",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Clean up resources
         cleanupResources()
@@ -157,24 +170,30 @@ struct RBUMApp: App {
     }
     
     private func cleanupResources() {
-        logger.debug("Cleaning up resources",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "Cleaning up resources",
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     private func saveApplicationState() {
-        logger.debug("Saving application state",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "Saving application state",
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     private func checkForUpdates() {
-        logger.debug("Checking for updates",
-                     file: #file,
-                     function: #function,
-                     line: #line)
+        logger.debug(
+            "Checking for updates",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // TODO: Implement update checking
     }
@@ -185,10 +204,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = LoggerFactory.createLogger(category: "AppDelegate")
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.info("Application did finish launching",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "Application did finish launching",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Register for sleep/wake notifications
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -207,36 +228,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        logger.info("Application will terminate",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "Application will terminate",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         // Unregister observers
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
     
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        logger.info("Application requested to terminate",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "Application requested to terminate",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         return .terminateNow
     }
     
     @objc private func handleSleepNotification(_ notification: Notification) {
-        logger.info("System is going to sleep",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "System is going to sleep",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // TODO: Handle sleep state
     }
     
     @objc private func handleWakeNotification(_ notification: Notification) {
-        logger.info("System woke from sleep",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+        logger.info(
+            "System woke from sleep",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // TODO: Handle wake state
     }
 }

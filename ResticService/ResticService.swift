@@ -58,7 +58,12 @@ enum ResticXPCErrorDomain {
                 
                 completion(result)
             } catch {
-                self.logger.error("Command execution failed: \(error.localizedDescription)")
+                self.logger.error(
+                    "Command execution failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 completion(["error": error.localizedDescription])
             }
         }
@@ -133,7 +138,7 @@ enum ResticXPCErrorDomain {
         // Validate client's code signing
         let requirement = "anchor apple generic and identifier \"\(allowedBundleIdentifier)\""
         guard let connection = NSXPCConnection.current() else {
-            logger.error(
+            self.logger.error(
                 "No XPC connection available",
                 file: #file,
                 function: #function,
@@ -148,7 +153,7 @@ enum ResticXPCErrorDomain {
         var requirementRef: SecRequirement?
         let status = SecRequirementCreateWithString(requirement as CFString, [], &requirementRef)
         guard status == errSecSuccess, let requirement = requirementRef else {
-            logger.error(
+            self.logger.error(
                 "Failed to create security requirement",
                 file: #file,
                 function: #function,
@@ -169,7 +174,7 @@ enum ResticXPCErrorDomain {
         guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &code) == errSecSuccess,
               let codeRef = code,
               SecCodeCheckValidityWithErrors(codeRef, [], requirement, nil) == errSecSuccess else {
-            logger.error(
+            self.logger.error(
                 "Failed to create SecCode from pid",
                 file: #file,
                 function: #function,
@@ -182,10 +187,12 @@ enum ResticXPCErrorDomain {
     private func validateAuditSession(_ auditSessionId: au_asid_t) throws {
         guard let connection = NSXPCConnection.current(),
               connection.auditSessionIdentifier == auditSessionId else {
-            logger.error("Audit session validation failed",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            self.logger.error(
+                "Audit session validation failed",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw makeError(.auditSessionInvalid)
         }
     }
