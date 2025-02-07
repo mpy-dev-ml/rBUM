@@ -86,10 +86,14 @@ public final class SecurityService: SecurityServiceProtocol {
         panel.message = "Please grant access to this location"
         panel.prompt = "Grant Access"
         
-        let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow(contentRect: .zero,
-                                                                                   styleMask: .borderless,
-                                                                                   backing: .buffered,
-                                                                                   defer: false))
+        let response = await panel.beginSheetModal(
+            for: NSApp.keyWindow ?? NSWindow(
+                contentRect: .zero,
+                styleMask: .borderless,
+                backing: .buffered,
+                defer: false
+            )
+        )
         
         if response == .OK {
             self.logger.debug(

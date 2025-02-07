@@ -83,7 +83,10 @@ struct RBUMApp: App {
             keychainService: keychainService
         ) as! any RepositoryCreationServiceProtocol
         
-        logger.debug("App initialized", file: #file, function: #function, line: #line)
+        logger.debug("App initialized",
+                     file: #file,
+                     function: #function,
+                     line: #line)
         
         // Setup app delegate
         setupAppDelegate()
@@ -126,9 +129,9 @@ struct RBUMApp: App {
     
     private func setupAppDelegate() {
         logger.debug("Setting up app delegate",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+                     file: #file,
+                     function: #function,
+                     line: #line)
         
         // Register for notifications
         NotificationCenter.default.addObserver(
@@ -142,9 +145,9 @@ struct RBUMApp: App {
     
     private func handleAppTermination() {
         logger.debug("Handling app termination",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+                     file: #file,
+                     function: #function,
+                     line: #line)
         
         // Clean up resources
         cleanupResources()
@@ -155,23 +158,23 @@ struct RBUMApp: App {
     
     private func cleanupResources() {
         logger.debug("Cleaning up resources",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+                     file: #file,
+                     function: #function,
+                     line: #line)
     }
     
     private func saveApplicationState() {
         logger.debug("Saving application state",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+                     file: #file,
+                     function: #function,
+                     line: #line)
     }
     
     private func checkForUpdates() {
         logger.debug("Checking for updates",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+                     file: #file,
+                     function: #function,
+                     line: #line)
         
         // TODO: Implement update checking
     }

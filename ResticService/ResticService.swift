@@ -133,10 +133,12 @@ enum ResticXPCErrorDomain {
         // Validate client's code signing
         let requirement = "anchor apple generic and identifier \"\(allowedBundleIdentifier)\""
         guard let connection = NSXPCConnection.current() else {
-            logger.error("No XPC connection available",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "No XPC connection available",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw makeError(.securityValidationFailed)
         }
         
@@ -146,10 +148,12 @@ enum ResticXPCErrorDomain {
         var requirementRef: SecRequirement?
         let status = SecRequirementCreateWithString(requirement as CFString, [], &requirementRef)
         guard status == errSecSuccess, let requirement = requirementRef else {
-            logger.error("Failed to create security requirement",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to create security requirement",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw makeError(.securityValidationFailed)
         }
         
@@ -165,10 +169,12 @@ enum ResticXPCErrorDomain {
         guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &code) == errSecSuccess,
               let codeRef = code,
               SecCodeCheckValidityWithErrors(codeRef, [], requirement, nil) == errSecSuccess else {
-            logger.error("Client validation failed",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to create SecCode from pid",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw makeError(.securityValidationFailed)
         }
     }
