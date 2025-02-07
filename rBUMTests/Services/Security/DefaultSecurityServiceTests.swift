@@ -56,8 +56,12 @@ final class DefaultSecurityServiceTests: XCTestCase {
         
         // Then
         XCTAssertTrue(hasAccess)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully validated access")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully validated access"
+            ]
+        )
     }
     
     func testValidateAccessWithoutPermissions() async throws {
@@ -72,8 +76,12 @@ final class DefaultSecurityServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.validateAccess(to: testURL)) { error in
             XCTAssertTrue(error is SecurityError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Failed to validate access")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Failed to validate access"
+            ]
+        )
     }
     
     // MARK: - Credential Management Tests
@@ -91,9 +99,13 @@ final class DefaultSecurityServiceTests: XCTestCase {
         
         // Then
         XCTAssertTrue(isValid)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully saved credentials",
-                     "Successfully validated credentials")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully saved credentials",
+                "Successfully validated credentials"
+            ]
+        )
     }
     
     func testInvalidCredentials() async throws {
@@ -107,8 +119,12 @@ final class DefaultSecurityServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.validateCredentials(for: testURL)) { error in
             XCTAssertTrue(error is SecurityError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Failed to validate credentials")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Failed to validate credentials"
+            ]
+        )
     }
     
     // MARK: - Resource Access Tests
@@ -128,9 +144,13 @@ final class DefaultSecurityServiceTests: XCTestCase {
         // Then
         XCTAssertTrue(hasAccess)
         XCTAssertTrue(hasCredentials)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully validated access",
-                     "Successfully validated credentials")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully validated access",
+                "Successfully validated credentials"
+            ]
+        )
     }
     
     func testConcurrentAccessValidation() async throws {
@@ -168,8 +188,12 @@ final class DefaultSecurityServiceTests: XCTestCase {
         try await service.cleanupResources()
         
         // Then
-        verifyLogMessages(mockLogger,
-            contains: "Successfully cleaned up resources")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully cleaned up resources"
+            ]
+        )
     }
     
     // MARK: - Health Check Tests
@@ -183,8 +207,12 @@ final class DefaultSecurityServiceTests: XCTestCase {
         
         // Then
         XCTAssertTrue(isHealthy)
-        verifyLogMessages(mockLogger,
-            contains: "Health check completed successfully")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Health check completed successfully"
+            ]
+        )
     }
     
     func testHealthCheckFailure() async {
@@ -197,7 +225,11 @@ final class DefaultSecurityServiceTests: XCTestCase {
         
         // Then
         XCTAssertFalse(isHealthy)
-        verifyLogMessages(mockLogger,
-            contains: "Health check failed")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Health check failed"
+            ]
+        )
     }
 }

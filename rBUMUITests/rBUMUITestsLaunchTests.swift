@@ -13,7 +13,7 @@
 
 import XCTest
 
-final class rBUMUITestsLaunchTests: XCTestCase {
+final class RBUMUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

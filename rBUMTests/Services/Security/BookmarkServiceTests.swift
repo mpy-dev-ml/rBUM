@@ -53,9 +53,13 @@ final class BookmarkServiceTests: XCTestCase {
         
         // Then
         XCTAssertTrue(isValid)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully created bookmark",
-                     "Successfully validated bookmark")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully created bookmark",
+                "Successfully validated bookmark"
+            ]
+        )
     }
     
     func testStartAndStopAccessing() async throws {
@@ -72,9 +76,13 @@ final class BookmarkServiceTests: XCTestCase {
         // Then
         XCTAssertTrue(startResult)
         XCTAssertTrue(stopResult)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully started accessing URL",
-                     "Successfully stopped accessing URL")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully started accessing URL",
+                "Successfully stopped accessing URL"
+            ]
+        )
     }
     
     func testBookmarkStaleness() async throws {
@@ -89,8 +97,12 @@ final class BookmarkServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.validateBookmark(bookmark, for: testURL)) { error in
             XCTAssertTrue(error is BookmarkError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Bookmark validation failed")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Bookmark validation failed"
+            ]
+        )
     }
     
     func testAccessWithInvalidBookmark() async throws {
@@ -104,8 +116,12 @@ final class BookmarkServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.startAccessing(testURL, with: invalidBookmark)) { error in
             XCTAssertTrue(error is BookmarkError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Failed to start accessing URL")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Failed to start accessing URL"
+            ]
+        )
     }
     
     func testConcurrentAccess() async throws {
@@ -143,8 +159,12 @@ final class BookmarkServiceTests: XCTestCase {
         
         // Then
         XCTAssertTrue(isHealthy)
-        verifyLogMessages(mockLogger,
-            contains: "Health check completed successfully")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Health check completed successfully"
+            ]
+        )
     }
     
     func testHealthCheckFailure() async {
@@ -156,7 +176,11 @@ final class BookmarkServiceTests: XCTestCase {
         
         // Then
         XCTAssertFalse(isHealthy)
-        verifyLogMessages(mockLogger,
-            contains: "Health check failed")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Health check failed"
+            ]
+        )
     }
 }
