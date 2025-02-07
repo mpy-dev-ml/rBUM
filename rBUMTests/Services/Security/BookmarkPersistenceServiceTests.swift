@@ -53,9 +53,13 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         
         // Then
         XCTAssertEqual(loadedBookmark, testBookmark)
-        verifyLogMessages(mockLogger,
-            contains: "Successfully saved bookmark",
-                     "Successfully loaded bookmark")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully saved bookmark",
+                "Successfully loaded bookmark"
+            ]
+        )
     }
     
     func testDeleteBookmark() async throws {
@@ -74,8 +78,12 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.loadBookmark(for: testURL)) { error in
             XCTAssertTrue(error is BookmarkError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Successfully deleted bookmark")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully deleted bookmark"
+            ]
+        )
     }
     
     func testLoadNonexistentBookmark() async {
@@ -86,8 +94,12 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         await XCTAssertThrowsError(try await service.loadBookmark(for: testURL)) { error in
             XCTAssertTrue(error is BookmarkError)
         }
-        verifyLogMessages(mockLogger,
-            contains: "Failed to load bookmark")
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Failed to load bookmark: Bookmark not found"
+            ]
+        )
     }
     
     func testSaveInvalidBookmark() async {
