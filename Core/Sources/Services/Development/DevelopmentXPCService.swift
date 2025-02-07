@@ -9,19 +9,34 @@
 import Foundation
 
 /// Development mock implementation of ResticXPCProtocol
-/// Provides simulated XPC service behaviour for development
+/// Provides simulated XPC service behaviour for development and testing
 public final class DevelopmentXPCService: ResticXPCProtocol {
     // MARK: - Properties
+    
+    /// Logger for service operations
     private let logger: LoggerProtocol
+    
+    /// Queue for synchronizing access to shared resources
     private let queue = DispatchQueue(
         label: "dev.mpy.rBUM.developmentXPC",
         attributes: .concurrent
     )
+    
+    /// Lock for thread-safe access to shared resources
+    private let lock = NSLock()
+    
+    /// Configuration for development behavior
     private let configuration: DevelopmentConfiguration
     
+    /// Current interface version
     public static let interfaceVersion: Int = 1
     
     // MARK: - Initialization
+    
+    /// Initialize the development XPC service
+    /// - Parameters:
+    ///   - logger: Logger for service operations
+    ///   - configuration: Configuration for development behavior
     public init(
         logger: LoggerProtocol,
         configuration: DevelopmentConfiguration = .default
@@ -30,27 +45,70 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         self.configuration = configuration
         
         logger.info(
-            "Initialised DevelopmentXPCService with configuration: \(String(describing: configuration))",
+            """
+            Initialised DevelopmentXPCService with configuration:
+            \(String(describing: configuration))
+            """,
             file: #file,
             function: #function,
             line: #line
         )
     }
     
+    // MARK: - Private Methods
+    
+    /// Thread-safe access to shared resources
+    /// - Parameter action: Action to perform with shared resources
+    /// - Returns: Result of the action
+    private func withThreadSafety<T>(_ action: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try action()
+    }
+    
+    /// Simulate connection failure if configured
+    /// - Parameters:
+    ///   - operation: Name of the operation
+    ///   - completion: Completion handler to call with failure result
+    private func simulateConnectionFailureIfNeeded<T>(
+        operation: String,
+        completion: @escaping (T?) -> Void
+    ) -> Bool {
+        guard configuration.shouldSimulateConnectionFailures else {
+            return false
+        }
+        
+        logger.error(
+            """
+            Simulating connection failure for operation: \
+            \(operation)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        completion(nil)
+        return true
+    }
+    
     // MARK: - ResticXPCProtocol Implementation
+    
     public func validateInterface(
         completion: @escaping ([String: Any]?) -> Void
     ) {
-        if configuration.shouldSimulateConnectionFailures {
-            logger.error(
-                "Simulating interface validation failure",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            completion(nil)
+        if simulateConnectionFailureIfNeeded(
+            operation: "interface validation",
+            completion: completion
+        ) {
             return
         }
+        
+        logger.debug(
+            "Validating interface version: \(Self.interfaceVersion)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         completion(["version": Self.interfaceVersion])
     }
@@ -60,10 +118,18 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         auditSessionId: au_asid_t,
         completion: @escaping ([String: Any]?) -> Void
     ) {
+        if simulateConnectionFailureIfNeeded(
+            operation: "access validation",
+            completion: completion
+        ) {
+            return
+        }
+        
         logger.debug(
             """
-            Validating access for bookmarks: \
-            \(bookmarks.keys.joined(separator: ", "))
+            Validating access:
+            Bookmarks: \(bookmarks.keys.joined(separator: ", "))
+            Audit Session ID: \(auditSessionId)
             """,
             file: #file,
             function: #function,
@@ -90,30 +156,40 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         auditSessionId: au_asid_t,
         completion: @escaping ([String: Any]?) -> Void
     ) {
-        if configuration.shouldSimulateConnectionFailures {
-            logger.error(
-                """
-                Simulating connection failure for command: \
-                \(command)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            completion(nil)
+        let config = XPCCommandConfig(
+            command: command,
+            arguments: arguments,
+            environment: environment,
+            workingDirectory: workingDirectory,
+            bookmarks: bookmarks,
+            timeout: timeout,
+            auditSessionId: auditSessionId
+        )
+        
+        executeCommand(config: config, completion: completion)
+    }
+    
+    public func executeCommand(
+        config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        if simulateConnectionFailureIfNeeded(
+            operation: "command execution",
+            completion: completion
+        ) {
             return
         }
         
         logger.debug(
             """
             Executing command:
-            Command: \(command)
-            Arguments: \(arguments.joined(separator: " "))
-            Working Directory: \(workingDirectory)
-            Environment Variables: \(environment.keys.joined(separator: ", "))
-            Bookmarks: \(bookmarks.keys.joined(separator: ", "))
-            Timeout: \(timeout)
-            Audit Session ID: \(auditSessionId)
+            Command: \(config.command)
+            Arguments: \(config.arguments.joined(separator: " "))
+            Working Directory: \(config.workingDirectory)
+            Environment Variables: \(config.environment.keys.joined(separator: ", "))
+            Bookmarks: \(config.bookmarks.keys.joined(separator: ", "))
+            Timeout: \(config.timeout)
+            Audit Session ID: \(config.auditSessionId)
             """,
             file: #file,
             function: #function,
@@ -134,12 +210,12 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             )
             
             // Simulate timeout if execution time exceeds timeout
-            if self.configuration.commandExecutionTime > timeout ||
+            if self.configuration.commandExecutionTime > config.timeout ||
                 self.configuration.shouldSimulateTimeoutFailures {
                 self.logger.error(
                     """
                     Simulating timeout failure for command: \
-                    \(command)
+                    \(config.command)
                     """,
                     file: #file,
                     function: #function,
@@ -154,7 +230,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
                 self.logger.error(
                     """
                     Simulating command failure for: \
-                    \(command)
+                    \(config.command)
                     """,
                     file: #file,
                     function: #function,
@@ -172,7 +248,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             self.logger.info(
                 """
                 Successfully executed command: \
-                \(command)
+                \(config.command)
                 """,
                 file: #file,
                 function: #function,
@@ -180,7 +256,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             )
             completion([
                 "success": true,
-                "output": "Simulated output for command: \(command)",
+                "output": "Simulated output for command: \(config.command)",
                 "exitCode": 0
             ])
         }
@@ -190,17 +266,33 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         auditSessionId: au_asid_t,
         completion: @escaping (Bool) -> Void
     ) {
-        if configuration.shouldSimulateConnectionFailures {
-            logger.error(
-                "Simulating connection failure for ping",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            completion(false)
+        if simulateConnectionFailureIfNeeded(
+            operation: "ping",
+            completion: { _ in completion(false) }
+        ) {
             return
         }
         
+        logger.debug(
+            """
+            Received ping request:
+            Audit Session ID: \(auditSessionId)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
         completion(true)
     }
+}
+
+struct XPCCommandConfig {
+    let command: String
+    let arguments: [String]
+    let environment: [String: String]
+    let workingDirectory: String
+    let bookmarks: [String: NSData]
+    let timeout: TimeInterval
+    let auditSessionId: au_asid_t
 }

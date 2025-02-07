@@ -21,7 +21,119 @@ public protocol LoggingService {
     var logger: LoggerProtocol { get }
 }
 
+// MARK: - Log Level
+
+/// Represents the available logging levels with their descriptions
+public enum LogLevel {
+    case debug
+    case info
+    case warning
+    case error
+    case fault
+    
+    /// Convert to OSLogType
+    var osLogType: OSLogType {
+        switch self {
+        case .debug: return .debug
+        case .info: return .info
+        case .warning: return .default
+        case .error: return .error
+        case .fault: return .fault
+        }
+    }
+    
+    /// String representation for logging
+    var description: String {
+        switch self {
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .warning: return "WARNING"
+        case .error: return "ERROR"
+        case .fault: return "FAULT"
+        }
+    }
+}
+
+// MARK: - Performance Metrics
+
+/// Structure to hold performance metrics for logging
+public struct PerformanceMetrics {
+    /// Start time of the operation
+    let startTime: Date
+    
+    /// End time of the operation
+    let endTime: Date
+    
+    /// Duration of the operation in seconds
+    var duration: TimeInterval {
+        endTime.timeIntervalSince(startTime)
+    }
+    
+    /// Memory usage in bytes
+    var memoryUsage: UInt64 {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+        
+        let kerr: kern_return_t = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(MACH_TASK_BASIC_INFO),
+                    $0,
+                    &count
+                )
+            }
+        }
+        
+        return kerr == KERN_SUCCESS ? info.resident_size : 0
+    }
+    
+    /// Format metrics as a string
+    var description: String {
+        """
+        Duration: \(String(format: "%.3f", duration))s, \
+        Memory: \(ByteCountFormatter.string(
+            fromByteCount: Int64(memoryUsage),
+            countStyle: .file
+        ))
+        """
+    }
+}
+
 public extension LoggingService {
+    /// Log a message with performance metrics
+    /// - Parameters:
+    ///   - level: Log level for the message
+    ///   - message: The message to log
+    ///   - metrics: Optional performance metrics
+    ///   - file: Source file
+    ///   - function: Function name
+    ///   - line: Line number
+    private func log(
+        level: LogLevel,
+        message: String,
+        metrics: PerformanceMetrics? = nil,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        let metricsString = metrics.map { " [\($0.description)]" } ?? ""
+        let formattedMessage = "[\(level.description)] \(message)\(metricsString)"
+        
+        switch level {
+        case .debug:
+            logger.debug(formattedMessage, file: file, function: function, line: line)
+        case .info:
+            logger.info(formattedMessage, file: file, function: function, line: line)
+        case .warning:
+            logger.warning(formattedMessage, file: file, function: function, line: line)
+        case .error:
+            logger.error(formattedMessage, file: file, function: function, line: line)
+        case .fault:
+            logger.fault(formattedMessage, file: file, function: function, line: line)
+        }
+    }
+    
     /// Logs an operation's execution time and any errors that occur during its execution.
     /// This method wraps an operation with timing information and appropriate error handling,
     /// ensuring consistent logging across all service operations.
@@ -35,44 +147,35 @@ public extension LoggingService {
     /// - Throws: Rethrows any error thrown by the operation
     func logOperation<T>(
         _ name: String,
-        level: OSLogType = .debug,
+        level: LogLevel = .debug,
         perform operation: () throws -> T
     ) rethrows -> T {
-        let start = Date()
-        defer {
-            let elapsed = Date().timeIntervalSince(start)
-            switch level {
-            case .debug:
-                logger.debug(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            case .info:
-                logger.info(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            case .error:
-                logger.error(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            default:
-                logger.debug(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            }
+        let startTime = Date()
+        
+        do {
+            let result = try operation()
+            let metrics = PerformanceMetrics(
+                startTime: startTime,
+                endTime: Date()
+            )
+            log(
+                level: level,
+                message: "\(name) completed successfully",
+                metrics: metrics
+            )
+            return result
+        } catch {
+            let metrics = PerformanceMetrics(
+                startTime: startTime,
+                endTime: Date()
+            )
+            log(
+                level: .error,
+                message: "\(name) failed with error: \(error.localizedDescription)",
+                metrics: metrics
+            )
+            throw error
         }
-        return try operation()
     }
     
     /// Logs an asynchronous operation's execution time and any errors that occur during its execution.
@@ -88,43 +191,34 @@ public extension LoggingService {
     /// - Throws: Rethrows any error thrown by the operation
     func logAsyncOperation<T>(
         _ name: String,
-        level: OSLogType = .debug,
+        level: LogLevel = .debug,
         perform operation: () async throws -> T
     ) async rethrows -> T {
-        let start = Date()
-        defer {
-            let elapsed = Date().timeIntervalSince(start)
-            switch level {
-            case .debug:
-                logger.debug(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            case .info:
-                logger.info(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            case .error:
-                logger.error(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            default:
-                logger.debug(
-                    "\(name) completed in \(elapsed)s",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            }
+        let startTime = Date()
+        
+        do {
+            let result = try await operation()
+            let metrics = PerformanceMetrics(
+                startTime: startTime,
+                endTime: Date()
+            )
+            log(
+                level: level,
+                message: "\(name) completed successfully",
+                metrics: metrics
+            )
+            return result
+        } catch {
+            let metrics = PerformanceMetrics(
+                startTime: startTime,
+                endTime: Date()
+            )
+            log(
+                level: .error,
+                message: "\(name) failed with error: \(error.localizedDescription)",
+                metrics: metrics
+            )
+            throw error
         }
-        return try await operation()
     }
 }
