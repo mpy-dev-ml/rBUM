@@ -61,7 +61,7 @@ struct Configuration: Codable, Equatable {
                 "~/Library/Caches",
                 "~/Library/Logs",
                 "**/node_modules",
-                "**/.git",
+                "**/.git"
             ]
         )
     }

@@ -328,25 +328,25 @@ public enum ResticXPCError: LocalizedError, Equatable {
     /// let error2 = ResticXPCError.timeout
     /// XCTAssertEqual(error1, error2)
     /// ```
-    public static func == (lhs: ResticXPCError, rhs: ResticXPCError) -> Bool {
-        switch (lhs, rhs) {
+    public static func == (left: ResticXPCError, right: ResticXPCError) -> Bool {
+        switch (left, right) {
         case (.serviceUnavailable, .serviceUnavailable),
              (.connectionFailed, .connectionFailed),
              (.timeout, .timeout),
              (.interfaceVersionMismatch, .interfaceVersionMismatch):
             true
 
-        case let (.executionFailed(l), .executionFailed(r)):
-            l == r
+        case let (.executionFailed(leftReason), .executionFailed(rightReason)):
+            leftReason == rightReason
 
-        case let (.invalidBookmark(l), .invalidBookmark(r)):
-            l == r
+        case let (.invalidBookmark(leftPath), .invalidBookmark(rightPath)):
+            leftPath == rightPath
 
-        case let (.staleBookmark(l), .staleBookmark(r)):
-            l == r
+        case let (.staleBookmark(leftPath), .staleBookmark(rightPath)):
+            leftPath == rightPath
 
-        case let (.accessDenied(l), .accessDenied(r)):
-            l == r
+        case let (.accessDenied(leftPath), .accessDenied(rightPath)):
+            leftPath == rightPath
 
         default:
             false

@@ -27,7 +27,7 @@ extension DevelopmentBookmarkService {
             let resourceValues = try url.resourceValues(forKeys: [
                 .fileSizeKey,
                 .fileResourceTypeKey,
-                .posixPermissionsKey,
+                .posixPermissionsKey
             ])
 
             return BookmarkEntry(

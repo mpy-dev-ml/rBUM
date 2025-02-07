@@ -49,7 +49,7 @@ public final class ProgressTracker: ProgressTrackerProtocol {
 
         let userInfo: [String: Any] = [
             "progress": progress,
-            "message": message,
+            "message": message
         ]
 
         notificationCenter.post(

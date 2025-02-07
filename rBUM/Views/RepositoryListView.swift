@@ -124,7 +124,7 @@ private class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
 
     func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
         [
-            ("mock-id", RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password")),
+            ("mock-id", RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password"))
         ]
     }
 

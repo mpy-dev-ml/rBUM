@@ -125,7 +125,7 @@ public final class KeychainService: BaseSandboxedService, Measurable {
             kSecAttrService as String: "dev.mpy.rBUM",
             kSecAttrAccount as String: key,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-            kSecAttrSynchronizable as String: false,
+            kSecAttrSynchronizable as String: false
         ]
 
         if let accessGroup {

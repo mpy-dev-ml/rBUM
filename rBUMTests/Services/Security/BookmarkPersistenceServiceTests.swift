@@ -60,7 +60,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully saved bookmark",
-                "Successfully loaded bookmark",
+                "Successfully loaded bookmark"
             ]
         )
     }
@@ -84,7 +84,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully deleted bookmark",
+                "Successfully deleted bookmark"
             ]
         )
     }
@@ -100,7 +100,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to load bookmark: Bookmark not found",
+                "Failed to load bookmark: Bookmark not found"
             ]
         )
     }

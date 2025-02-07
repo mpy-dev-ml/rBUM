@@ -19,6 +19,8 @@ final class XPCKeychainTests: XCTestCase {
     private let testKey = "test_key"
     private let testData = "test_data".data(using: .utf8)!
 
+    // MARK: - Test Setup
+
     override func setUp() async throws {
         try await super.setUp()
         mockLogger = MockLogger()
@@ -31,6 +33,35 @@ final class XPCKeychainTests: XCTestCase {
         keychainService = nil
         mockLogger = nil
         try await super.tearDown()
+    }
+
+    // MARK: - Keychain Tests
+
+    func testKeychainItemStorage() async throws {
+        let account = "test-account"
+        let service = "test-service"
+        let data = "test-data".data(using: .utf8)!
+        
+        try await keychainService.storeItem(
+            data,
+            account: account,
+            service: service
+        )
+        
+        let retrievedData = try await keychainService.retrieveItem(
+            account: account,
+            service: service
+        )
+        
+        XCTAssertEqual(data, retrievedData)
+        
+        verifyLogMessages(
+            mockLogger,
+            contains: [
+                "Successfully stored keychain item",
+                "Successfully retrieved keychain item"
+            ]
+        )
     }
 
     // MARK: - XPC Access Group Tests

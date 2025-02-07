@@ -228,41 +228,7 @@ final class BackupViewModel: ObservableObject {
         logger.info("Starting backup operation", file: #file, function: #function, line: #line)
 
         do {
-            // Get repository credentials
-            let credentials = try await credentialsService.getCredentials(for: configuration.repository)
-
-            // Create progress tracker
-            let tracker = Progress(totalUnitsOfProgress: 1)
-            progress = tracker
-
-            // Start backup
-            try await backupService.createBackup(
-                paths: configuration.sources.map(\.url),
-                to: configuration.repository,
-                credentials: credentials,
-                tags: configuration.tags,
-                onProgress: { [weak self] progress in
-                    self?.progress?.completedUnitCount = Int64(progress.processedFiles)
-                },
-                onStatusChange: { [weak self] status in
-                    switch status {
-                    case .preparing:
-                        self?.logger.info("Preparing backup", file: #file, function: #function, line: #line)
-                    case .backing:
-                        self?.logger.info("Backing up files", file: #file, function: #function, line: #line)
-                    case .completed:
-                        self?.logger.info(
-                            "Backup completed successfully",
-                            file: #file,
-                            function: #function,
-                            line: #line
-                        )
-                        self?.progress?.completedUnitCount = 1
-                    case let .failed(error):
-                        self?.handleError(error)
-                    }
-                }
-            )
+            try await handleBackupOperation()
         } catch {
             handleError(error)
         }
@@ -270,19 +236,228 @@ final class BackupViewModel: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func handleError(_ error: Error) {
-        progress?.cancel()
+    private func handleBackupOperation() async throws {
+        try await validateBackupPrerequisites()
+        try await performBackupOperation()
+        try await handleBackupCompletion()
+    }
 
-        switch error {
-        case let resticError as ResticError:
-            errorMessage = resticError.localizedDescription
-        case let securityError as SecurityError:
-            errorMessage = securityError.localizedDescription
-        default:
-            errorMessage = error.localizedDescription
+    private func validateBackupPrerequisites() async throws {
+        // Validate repository
+        try await validateRepository()
+
+        // Validate source
+        try await validateSource()
+
+        // Validate configuration
+        try await validateConfiguration()
+    }
+
+    private func validateRepository() async throws {
+        guard let repository = configuration.repository else {
+            throw BackupError.missingRepository("No repository selected")
         }
 
-        logger.error("Backup failed: \(errorMessage ?? "Unknown error")", file: #file, function: #function, line: #line)
-        showError = true
+        guard let url = repository.url else {
+            throw BackupError.invalidRepository("Repository URL is missing")
+        }
+
+        guard try await securityService.validateAccess(to: url) else {
+            throw BackupError.accessDenied("Cannot access repository")
+        }
+
+        guard try await securityService.validateWriteAccess(to: url) else {
+            throw BackupError.accessDenied("Cannot write to repository")
+        }
+    }
+
+    private func validateSource() async throws {
+        guard let source = configuration.sources.first else {
+            throw BackupError.missingSource("No source selected")
+        }
+
+        guard source.url.isFileURL else {
+            throw BackupError.invalidSource("Source must be a file URL")
+        }
+
+        guard try await securityService.validateAccess(to: source.url) else {
+            throw BackupError.accessDenied("Cannot access source")
+        }
+
+        guard try await securityService.validateReadAccess(to: source.url) else {
+            throw BackupError.accessDenied("Cannot read from source")
+        }
+    }
+
+    private func validateConfiguration() async throws {
+        guard let configuration = configuration else {
+            throw BackupError.missingConfiguration("No backup configuration")
+        }
+
+        // Validate compression settings
+        if configuration.settings.compression {
+            guard try await validateCompressionSettings() else {
+                throw BackupError.invalidConfiguration("Invalid compression settings")
+            }
+        }
+
+        // Validate encryption settings
+        if configuration.settings.encryption {
+            guard try await validateEncryptionSettings() else {
+                throw BackupError.invalidConfiguration("Invalid encryption settings")
+            }
+        }
+
+        // Validate schedule settings
+        if configuration.schedule != nil {
+            guard try await validateScheduleSettings() else {
+                throw BackupError.invalidConfiguration("Invalid schedule settings")
+            }
+        }
+    }
+
+    private func validateCompressionSettings() async throws -> Bool {
+        guard let configuration = configuration else { return false }
+
+        // Check compression level
+        guard (1...9).contains(configuration.settings.compressionLevel) else {
+            return false
+        }
+
+        // Check available system resources
+        let systemInfo = try await systemMonitor.getSystemInfo()
+        guard systemInfo.availableMemory > minimumMemoryForCompression else {
+            return false
+        }
+
+        return true
+    }
+
+    private func validateEncryptionSettings() async throws -> Bool {
+        guard let configuration = configuration else { return false }
+
+        // Check encryption key
+        guard !configuration.settings.encryptionKey.isEmpty else {
+            return false
+        }
+
+        // Validate key strength
+        guard try await securityService.validateKeyStrength(configuration.settings.encryptionKey) else {
+            return false
+        }
+
+        return true
+    }
+
+    private func validateScheduleSettings() async throws -> Bool {
+        guard let configuration = configuration else { return false }
+
+        // Check schedule interval
+        guard configuration.schedule?.interval > 0 else {
+            return false
+        }
+
+        // Check schedule time
+        guard let scheduleTime = configuration.schedule?.time else {
+            return false
+        }
+
+        // Validate schedule time is in the future
+        let now = Date()
+        guard scheduleTime > now else {
+            return false
+        }
+
+        return true
+    }
+
+    private func performBackupOperation() async throws {
+        guard let repository = configuration.repository,
+              let source = configuration.sources.first,
+              let configuration = configuration else {
+            throw BackupError.invalidState("Missing required state")
+        }
+
+        // Update UI state
+        progress = Progress(totalUnitCount: 100)
+
+        do {
+            // Get repository credentials
+            let credentials = try await credentialsService.getCredentials(for: repository)
+
+            // Create backup source
+            let backupSource = BackupSource(
+                url: source.url,
+                metadata: source.metadata
+            )
+
+            // Create backup configuration
+            let backupConfig = BackupConfiguration(
+                compression: configuration.settings.compression,
+                compressionLevel: configuration.settings.compressionLevel,
+                encryption: configuration.settings.encryption,
+                encryptionKey: configuration.settings.encryptionKey,
+                filters: configuration.settings.filters,
+                tags: configuration.tags
+            )
+
+            // Execute backup
+            try await backupService.createBackup(
+                paths: [source.url],
+                to: repository,
+                with: backupConfig,
+                credentials: credentials,
+                progress: { [weak self] progress in
+                    self?.updateProgress(progress)
+                }
+            )
+
+        } catch {
+            handleError(error)
+            throw error
+        }
+    }
+
+    private func updateProgress(_ backupProgress: BackupProgress) {
+        Task { @MainActor in
+            progress?.completedUnitCount = Int64(backupProgress.percentComplete)
+
+            // Log progress
+            logger.debug("Backup progress updated", metadata: [
+                "processed_files": .string("\(backupProgress.processedFiles)"),
+                "processed_bytes": .string("\(backupProgress.processedBytes)"),
+                "percent_complete": .string("\(backupProgress.percentComplete)")
+            ])
+        }
+    }
+
+    private func handleBackupError(_ error: Error) {
+        Task { @MainActor in
+            progress?.cancel()
+
+            switch error {
+            case let resticError as ResticError:
+                errorMessage = resticError.localizedDescription
+            case let securityError as SecurityError:
+                errorMessage = securityError.localizedDescription
+            default:
+                errorMessage = error.localizedDescription
+            }
+
+            logger.error("Backup failed: \(errorMessage ?? "Unknown error")", file: #file, function: #function, line: #line)
+            showError = true
+        }
+    }
+
+    private func handleBackupCompletion() async throws {
+        Task { @MainActor in
+            progress?.completedUnitCount = 100
+
+            // Log completion
+            logger.info("Backup completed successfully", metadata: [
+                "repository": .string(configuration.repository?.id.uuidString ?? "unknown"),
+                "source": .string(configuration.sources.first?.url.path ?? "unknown")
+            ])
+        }
     }
 }

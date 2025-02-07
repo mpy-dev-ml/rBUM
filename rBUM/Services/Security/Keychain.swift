@@ -45,7 +45,7 @@ public final class Keychain {
         // Attributes for the item
         var attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
         // Try to update existing item
@@ -172,7 +172,7 @@ public final class Keychain {
     private var baseQuery: [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
+            kSecAttrService as String: serviceName
         ]
 
         if let accessGroup {

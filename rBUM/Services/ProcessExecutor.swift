@@ -81,7 +81,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         allowedPaths: Set<String> = [
             "/usr/bin",
             "/usr/local/bin",
-            "/opt/homebrew/bin",
+            "/opt/homebrew/bin"
         ]
     ) {
         self.fileManager = fileManager

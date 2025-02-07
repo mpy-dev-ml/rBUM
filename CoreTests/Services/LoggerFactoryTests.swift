@@ -46,6 +46,11 @@ final class LoggerFactoryTests: XCTestCase {
 
         XCTAssertNotNil(logger1)
         XCTAssertNotNil(logger2)
+
+        for loggerIndex in 0..<5 {
+            let logger = factory.createLogger(category: "test\(loggerIndex)")
+            XCTAssertNotNil(logger)
+        }
     }
 
     func testLogLevels() throws {
@@ -76,9 +81,9 @@ final class LoggerFactoryTests: XCTestCase {
         let iterations = 100
 
         await withThrowingTaskGroup(of: Void.self) { group in
-            for i in 0 ..< iterations {
+            for iteration in 0 ..< iterations {
                 group.addTask {
-                    self.logger.info("Concurrent message \(i)")
+                    self.logger.info("Concurrent message \(iteration)")
                 }
             }
         }

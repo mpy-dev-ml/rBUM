@@ -60,7 +60,7 @@ final class BookmarkServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully created bookmark",
-                "Successfully validated bookmark",
+                "Successfully validated bookmark"
             ]
         )
     }
@@ -83,7 +83,7 @@ final class BookmarkServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully started accessing URL",
-                "Successfully stopped accessing URL",
+                "Successfully stopped accessing URL"
             ]
         )
     }
@@ -103,7 +103,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Bookmark validation failed",
+                "Bookmark validation failed"
             ]
         )
     }
@@ -122,7 +122,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to start accessing URL",
+                "Failed to start accessing URL"
             ]
         )
     }
@@ -166,7 +166,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check completed successfully",
+                "Health check completed successfully"
             ]
         )
     }
@@ -183,7 +183,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check failed",
+                "Health check failed"
             ]
         )
     }

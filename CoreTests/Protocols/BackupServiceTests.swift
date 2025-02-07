@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
@@ -31,6 +28,16 @@ final class BackupServiceTests: XCTestCase {
         logger = TestLogger()
         notificationCenter = TestNotificationCenter()
 
+        try setupTestEnvironment()
+    }
+
+    private func setupTestEnvironment() throws {
+        try setupTestRepository()
+        try setupTestConfiguration()
+        setupMockServices()
+    }
+
+    private func setupTestRepository() throws {
         // Create test repository
         repository = Repository(
             id: UUID(),
@@ -39,7 +46,9 @@ final class BackupServiceTests: XCTestCase {
             description: "Test Description",
             credentials: RepositoryCredentials(password: "test-password")
         )
+    }
 
+    private func setupTestConfiguration() throws {
         // Create test backup configuration
         configuration = BackupConfiguration(
             id: UUID(),
@@ -49,7 +58,9 @@ final class BackupServiceTests: XCTestCase {
             tags: ["test"],
             schedule: BackupSchedule(frequency: .daily, time: Date())
         )
+    }
 
+    private func setupMockServices() {
         backupService = TestBackupService(
             logger: logger,
             notificationCenter: notificationCenter
@@ -65,7 +76,9 @@ final class BackupServiceTests: XCTestCase {
         try await super.tearDown()
     }
 
-    // MARK: - Tests
+    // MARK: - Test Setup
+
+    // MARK: - Backup Tests
 
     func testStartBackup() async throws {
         // Test successful backup
@@ -74,10 +87,7 @@ final class BackupServiceTests: XCTestCase {
             configuration: configuration
         )
 
-        XCTAssertNotNil(result)
-        XCTAssertEqual(result.status, .completed)
-        XCTAssertEqual(result.repository.id, repository.id)
-        XCTAssertEqual(result.configuration.id, configuration.id)
+        verifyBackupResult(result)
 
         // Verify logging
         XCTAssertTrue(logger.messages.contains { $0.contains("Starting backup") })
@@ -127,11 +137,7 @@ final class BackupServiceTests: XCTestCase {
                 repository: repository,
                 configuration: configuration
             ) {
-                XCTAssertGreaterThanOrEqual(progress.percentComplete, 0)
-                XCTAssertLessThanOrEqual(progress.percentComplete, 100)
-                XCTAssertNotNil(progress.currentFile)
-                XCTAssertGreaterThanOrEqual(progress.processedFiles, 0)
-                XCTAssertGreaterThanOrEqual(progress.totalFiles, progress.processedFiles)
+                verifyBackupProgress(progress)
                 progressExpectation.fulfill()
             }
         }
@@ -177,23 +183,23 @@ final class BackupServiceTests: XCTestCase {
     }
 
     func testConcurrentBackups() async throws {
-        let concurrentBackups = 3
-        let expectations = (0 ..< concurrentBackups).map { index in
-            XCTestExpectation(description: "Backup \(index) completed")
+        let numberOfConcurrentBackups = 3
+        let expectations = (0 ..< numberOfConcurrentBackups).map { backupIndex in
+            XCTestExpectation(description: "Backup \(backupIndex) completed")
         }
 
         await withTaskGroup(of: Void.self) { group in
-            for i in 0 ..< concurrentBackups {
+            for backupIndex in 0 ..< numberOfConcurrentBackups {
                 group.addTask {
                     do {
                         let result = try await self.backupService.startBackup(
                             repository: self.repository,
                             configuration: self.configuration
                         )
-                        XCTAssertEqual(result.status, .completed)
-                        expectations[i].fulfill()
+                        self.verifyBackupResult(result)
+                        expectations[backupIndex].fulfill()
                     } catch {
-                        XCTFail("Backup \(i) failed: \(error)")
+                        XCTFail("Backup \(backupIndex) failed: \(error)")
                     }
                 }
             }
@@ -230,6 +236,63 @@ final class BackupServiceTests: XCTestCase {
         } catch {
             XCTAssertTrue(error is BackupError)
         }
+    }
+
+    // MARK: - Test Helpers
+
+    private func verifyBackupResult(_ result: BackupResult) {
+        XCTAssertEqual(result.status, .completed)
+        XCTAssertNil(result.error)
+        XCTAssertGreaterThan(result.duration, 0)
+        XCTAssertLessThan(result.duration, 5.0) // Should complete within 5 seconds
+    }
+
+    private func verifyBackupProgress(_ progress: BackupProgress) {
+        XCTAssertGreaterThanOrEqual(progress.percentComplete, 0)
+        XCTAssertLessThanOrEqual(progress.percentComplete, 100)
+        XCTAssertNotNil(progress.currentFile)
+        XCTAssertGreaterThanOrEqual(progress.processedFiles, 0)
+        XCTAssertGreaterThanOrEqual(progress.totalFiles, progress.processedFiles)
+        XCTAssertGreaterThanOrEqual(progress.processedBytes, 0)
+        XCTAssertGreaterThanOrEqual(progress.totalBytes, progress.processedBytes)
+    }
+
+    private func createBackupConfiguration(
+        source: URL,
+        destination: URL,
+        excludes: [String] = [],
+        tags: [String] = []
+    ) -> BackupConfiguration {
+        BackupConfiguration(
+            id: UUID(),
+            name: "Test Backup",
+            sourcePaths: [source.path],
+            excludePatterns: excludes,
+            tags: tags,
+            schedule: BackupSchedule(frequency: .daily, time: Date())
+        )
+    }
+
+    private func validateBackupResults(
+        source: URL,
+        destination: URL,
+        fileCount: Int,
+        expectedSize: Int64
+    ) async throws {
+        let files = try FileManager.default.contentsOfDirectory(
+            at: source,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: .skipsHiddenFiles
+        )
+
+        XCTAssertEqual(files.count, fileCount, "Incorrect number of files backed up")
+
+        let totalSize = try files.reduce(0) { sum, file in
+            let attributes = try file.resourceValues(forKeys: [.fileSizeKey])
+            return sum + Int64(attributes.fileSize ?? 0)
+        }
+
+        XCTAssertEqual(totalSize, expectedSize, "Incorrect total size of backed up files")
     }
 }
 
@@ -282,13 +345,13 @@ private final class TestBackupService: BackupServiceProtocol {
         AsyncStream { continuation in
             Task {
                 // Simulate progress updates
-                for i in stride(from: 0, through: 100, by: 50) {
+                for progressIndex in stride(from: 0, through: 100, by: 50) {
                     continuation.yield(BackupProgress(
-                        percentComplete: Double(i),
-                        currentFile: "/test/file\(i).txt",
-                        processedFiles: i,
+                        percentComplete: Double(progressIndex),
+                        currentFile: "/test/file\(progressIndex).txt",
+                        processedFiles: progressIndex,
                         totalFiles: 100,
-                        processedBytes: Int64(i * 1024 * 1024),
+                        processedBytes: Int64(progressIndex * 1024 * 1024),
                         totalBytes: Int64(100 * 1024 * 1024)
                     ))
                     try await Task.sleep(nanoseconds: 100_000_000)

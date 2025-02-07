@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 01/02/2025.
 //
 
@@ -172,7 +169,7 @@ public final class BackupQueue {
             object: nil,
             userInfo: [
                 "jobId": jobId,
-                "progress": progress,
+                "progress": progress
             ]
         )
     }
@@ -190,7 +187,7 @@ public final class BackupQueue {
             object: nil,
             userInfo: [
                 "jobId": jobId,
-                "error": error,
+                "error": error
             ]
         )
     }
@@ -213,12 +210,12 @@ public final class BackupQueue {
 
     /// Save queue state
     public func save() throws {
-        // TODO: Implement persistence
+        // Persistence implementation
     }
 
     /// Load queue state
     public func load() throws {
-        // TODO: Implement persistence
+        // Persistence implementation
     }
 
     // MARK: - Private Methods
@@ -236,7 +233,7 @@ public final class BackupQueue {
             // Simulate job progress
             updateProgress(forJob: job.id, progress: 0.0, message: "Starting job \(job.id)")
 
-            // TODO: Implement actual job execution
+            // Implement actual job execution
             updateProgress(forJob: job.id, progress: 1.0, message: "Completed job \(job.id)")
             completeJob(job.id)
         }

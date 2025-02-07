@@ -142,7 +142,7 @@ public class SandboxDiagnostics {
             "type": type.description,
             "path": path,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
-            "process": ProcessInfo.processInfo.processName,
+            "process": ProcessInfo.processInfo.processName
         ]
 
         do {

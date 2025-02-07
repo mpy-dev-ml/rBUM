@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 03/02/2025.
 //
 
@@ -51,26 +48,50 @@ final class RepositoryTests: XCTestCase {
         XCTAssertNotNil(repository.credentials)
     }
 
-    func testRepositoryEquality() throws {
-        let sameRepository = Repository(
-            id: repository.id,
-            path: repository.path,
-            name: repository.name,
-            description: repository.description,
-            credentials: repository.credentials
-        )
+    // MARK: - Equality Tests
 
-        XCTAssertEqual(repository, sameRepository)
-
-        let differentRepository = Repository(
+    func testRepositoryEquality() {
+        let repository1 = Repository(
             id: UUID(),
-            path: repository.path,
-            name: repository.name,
-            description: repository.description,
-            credentials: repository.credentials
+            name: "Test Repository 1",
+            path: "/test/path1",
+            created: Date(),
+            lastBackup: nil,
+            status: .ready
         )
-
-        XCTAssertNotEqual(repository, differentRepository)
+        
+        let repository2 = Repository(
+            id: repository1.id,
+            name: "Test Repository 1",
+            path: "/test/path1",
+            created: repository1.created,
+            lastBackup: nil,
+            status: .ready
+        )
+        
+        XCTAssertEqual(repository1, repository2)
+    }
+    
+    func testRepositoryInequality() {
+        let repository1 = Repository(
+            id: UUID(),
+            name: "Test Repository 1",
+            path: "/test/path1",
+            created: Date(),
+            lastBackup: nil,
+            status: .ready
+        )
+        
+        let repository2 = Repository(
+            id: UUID(),
+            name: "Test Repository 2",
+            path: "/test/path2",
+            created: Date(),
+            lastBackup: nil,
+            status: .ready
+        )
+        
+        XCTAssertNotEqual(repository1, repository2)
     }
 
     func testRepositoryCredentialsEncryption() throws {

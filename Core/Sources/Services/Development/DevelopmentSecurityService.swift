@@ -117,10 +117,11 @@ public extension DevelopmentSecurityService {
 
         try await simulator.simulateDelay()
 
+        let isValid = try await validateSecurityRequirements(for: url)
         operationRecorder.recordOperation(
             url: url,
             type: .access,
-            status: .success
+            status: isValid ? .success : .failure
         )
         metrics.recordAccess()
 
@@ -134,6 +135,103 @@ public extension DevelopmentSecurityService {
             function: #function,
             line: #line
         )
+        return isValid
+    }
+
+    private func validateSecurityRequirements(for url: URL) async throws -> Bool {
+        try await validateFileSystemAccess(for: url) &&
+        try await validateSandboxPermissions(for: url) &&
+        try await validateSecurityContext(for: url)
+    }
+    
+    private func validateFileSystemAccess(for url: URL) async throws -> Bool {
+        // Check basic file existence and permissions
+        guard fileManager.fileExists(atPath: url.path) else {
+            logger.error("File does not exist", metadata: [
+                "path": .string(url.path)
+            ])
+            return false
+        }
+        
+        let resourceValues = try url.resourceValues(forKeys: [
+            .isReadableKey,
+            .isWritableKey,
+            .isExecutableKey
+        ])
+        
+        guard resourceValues.isReadable else {
+            logger.error("File is not readable", metadata: [
+                "path": .string(url.path)
+            ])
+            return false
+        }
+        
+        if !resourceValues.isWritable {
+            logger.warning("File is not writable", metadata: [
+                "path": .string(url.path)
+            ])
+        }
+        
+        return true
+    }
+    
+    private func validateSandboxPermissions(for url: URL) async throws -> Bool {
+        // Check sandbox access
+        guard let bookmark = try? await bookmarkService.getBookmark(for: url) else {
+            logger.debug("No bookmark found, creating new one", metadata: [
+                "path": .string(url.path)
+            ])
+            
+            // In development mode, we'll create a bookmark if one doesn't exist
+            _ = try await bookmarkService.createBookmark(for: url)
+            return true
+        }
+        
+        // Verify bookmark is still valid
+        guard let resolvedURL = try? await bookmarkService.resolveBookmark(bookmark) else {
+            logger.error("Failed to resolve bookmark", metadata: [
+                "path": .string(url.path)
+            ])
+            return false
+        }
+        
+        return resolvedURL.path == url.path
+    }
+    
+    private func validateSecurityContext(for url: URL) async throws -> Bool {
+        // In development mode, we'll perform additional security checks
+        let resourceValues = try url.resourceValues(forKeys: [
+            .volumeIsReadOnlyKey,
+            .volumeSupportsFileCloningKey,
+            .volumeSupportsExclusiveRenamingKey,
+            .volumeSupportsSymbolicLinksKey
+        ])
+        
+        // Log all security-related capabilities
+        logger.debug("Volume capabilities", metadata: [
+            "path": .string(url.path),
+            "readOnly": .bool(resourceValues.volumeIsReadOnly ?? false),
+            "supportsCloning": .bool(resourceValues.volumeSupportsFileCloning ?? false),
+            "supportsExclusiveRenaming": .bool(resourceValues.volumeSupportsExclusiveRenaming ?? false),
+            "supportsSymbolicLinks": .bool(resourceValues.volumeSupportsSymbolicLinks ?? false)
+        ])
+        
+        // Check for development-specific requirements
+        if resourceValues.volumeIsReadOnly ?? false {
+            logger.error("Volume is read-only in development mode", metadata: [
+                "path": .string(url.path)
+            ])
+            return false
+        }
+        
+        // In development, we require symbolic link support
+        if !(resourceValues.volumeSupportsSymbolicLinks ?? true) {
+            logger.error("Volume does not support symbolic links in development mode", metadata: [
+                "path": .string(url.path)
+            ])
+            return false
+        }
+        
         return true
     }
 

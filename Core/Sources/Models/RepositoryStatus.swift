@@ -46,6 +46,28 @@ struct RepositoryStatus: Codable, Equatable {
         }
     }
 
+    public enum Status {
+        case ready
+        case error(Error)
+        case inProgress(operation: String)
+        case locked
+        case unavailable
+    }
+    
+    public let status: Status
+    public let lastCheck: Date?
+    public let errorDetails: String?
+    
+    public init(
+        status: Status,
+        lastCheck: Date? = nil,
+        errorDetails: String? = nil
+    ) {
+        self.status = status
+        self.lastCheck = lastCheck
+        self.errorDetails = errorDetails
+    }
+
     private enum CodingKeys: String, CodingKey {
         case isValid = "is_valid"
         case packsValid = "packs_valid"

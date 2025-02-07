@@ -164,7 +164,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
                     "creation_date": Date(),
                     "last_modified": Date(),
                     "accessible": true,
-                    "access_control": accessGroup != nil,
+                    "access_control": accessGroup != nil
                 ]
             )
             storage[key] = item

@@ -79,7 +79,7 @@ final class LoggerTests: XCTestCase {
         let metadata: [String: LogMetadataValue] = [
             "key1": .string("value1"),
             "key2": .int(42),
-            "key3": .bool(true),
+            "key3": .bool(true)
         ]
 
         logger.debug(

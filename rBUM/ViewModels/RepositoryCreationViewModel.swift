@@ -131,17 +131,115 @@ final class RepositoryCreationViewModel: ObservableObject, RepositoryCreationVie
         }
 
         do {
-            // Access security-scoped resource
-            let (url, cleanup) = try await securityService.validateAccess(to: url)
-            defer { cleanup() }
+            try await handleRepositoryCreation()
+        } catch {
+            logger.error("Repository operation failed: \(error.localizedDescription)")
+            state = .error(error)
+            showError = true
+            cleanupSecurityScopedAccess()
+        }
+    }
 
+    private func handleRepositoryCreation() async throws {
+        try await validateRepositoryInput()
+        try await createRepository()
+        try await handleRepositoryCreationCompletion()
+    }
+
+    private func validateRepositoryInput() async throws {
+        // Validate name
+        try validateRepositoryName()
+
+        // Validate location
+        try validateRepositoryLocation()
+
+        // Validate credentials
+        try validateRepositoryCredentials()
+
+        // Validate permissions
+        try await validateRepositoryPermissions()
+    }
+
+    private func validateRepositoryName() throws {
+        guard !name.isEmpty else {
+            throw RepositoryError.invalidName("Repository name cannot be empty")
+        }
+
+        guard name.count <= 255 else {
+            throw RepositoryError.invalidName("Repository name is too long")
+        }
+
+        // Check for invalid characters
+        let invalidCharacters = CharacterSet(charactersIn: ":/\\?*|\"<>")
+        guard name.rangeOfCharacter(from: invalidCharacters) == nil else {
+            throw RepositoryError.invalidName("Repository name contains invalid characters")
+        }
+    }
+
+    private func validateRepositoryLocation() throws {
+        guard let location = directoryURL else {
+            throw RepositoryError.invalidLocation("Repository location is not selected")
+        }
+
+        guard location.isFileURL else {
+            throw RepositoryError.invalidLocation("Repository location must be a local directory")
+        }
+    }
+
+    private func validateRepositoryCredentials() throws {
+        guard !password.isEmpty else {
+            throw RepositoryError.invalidCredentials("Repository password cannot be empty")
+        }
+
+        // Check password strength
+        try validatePasswordStrength(password)
+    }
+
+    private func validatePasswordStrength(_ password: String) throws {
+        // Check length
+        guard password.count >= 12 else {
+            throw RepositoryError.weakPassword("Password must be at least 12 characters long")
+        }
+
+        // Check complexity
+        let hasUppercase = password.contains(where: { $0.isUppercase })
+        let hasLowercase = password.contains(where: { $0.isLowercase })
+        let hasNumbers = password.contains(where: { $0.isNumber })
+        let hasSpecialCharacters = password.contains(where: { "!@#$%^&*()_+-=[]{}|;:,.<>?".contains($0) })
+
+        guard hasUppercase && hasLowercase && hasNumbers && hasSpecialCharacters else {
+            throw RepositoryError.weakPassword(
+                "Password must contain uppercase, lowercase, numbers, and special characters"
+            )
+        }
+    }
+
+    private func validateRepositoryPermissions() async throws {
+        guard let location = directoryURL else { return }
+
+        // Check directory access
+        guard try await securityService.validateAccess(to: location) else {
+            throw RepositoryError.accessDenied("Cannot access repository location")
+        }
+
+        // Check write permissions
+        guard try await securityService.validateWriteAccess(to: location) else {
+            throw RepositoryError.accessDenied("Cannot write to repository location")
+        }
+    }
+
+    private func createRepository() async throws {
+        guard let location = directoryURL else { return }
+
+        state = mode == .create ? .creating : .importing
+
+        do {
             // Create or import repository
             logger.info("Starting repository operation")
 
-            state = mode == .create ? .creating : .importing
             let repository = try await mode == .create
-                ? creationService.createRepository(name: name, at: url, password: password)
-                : creationService.importRepository(name: name, at: url, password: password)
+                ? creationService.createRepository(name: name, at: location, password: password)
+                : creationService.importRepository(name: name, at: location, password: password)
 
             logger.info("Repository operation successful")
 
@@ -154,10 +252,22 @@ final class RepositoryCreationViewModel: ObservableObject, RepositoryCreationVie
             state = .idle
 
         } catch {
-            logger.error("Repository operation failed: \(error.localizedDescription)")
-            state = .error(error)
-            showError = true
-            cleanupSecurityScopedAccess()
+            throw error
+        }
+    }
+
+    private func handleRepositoryCreationCompletion() async throws {
+        Task { @MainActor in
+            state = .idle
+
+            // Log completion
+            logger.info("Repository created successfully", metadata: [
+                "name": .string(name),
+                "location": .string(directoryURL?.path ?? "unknown")
+            ])
+
+            // Clear sensitive data
+            password = ""
         }
     }
 

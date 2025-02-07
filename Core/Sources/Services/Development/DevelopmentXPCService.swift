@@ -240,7 +240,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
                 completion([
                     "success": false,
                     "error": "Simulated command failure",
-                    "exitCode": 1,
+                    "exitCode": 1
                 ])
                 return
             }
@@ -258,7 +258,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             completion([
                 "success": true,
                 "output": "Simulated output for command: \(config.command)",
-                "exitCode": 0,
+                "exitCode": 0
             ])
         }
     }

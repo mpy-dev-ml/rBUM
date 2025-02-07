@@ -14,7 +14,7 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     // MARK: - Properties
 
     /// XPC connection to the Restic service
-    private let connection: NSXPCConnection
+    private var connection: NSXPCConnection?
 
     /// Serial queue for synchronizing operations
     private let queue: DispatchQueue
@@ -34,6 +34,9 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     /// Current interface version for XPC communication
     private let interfaceVersion = 1
 
+    /// Pending operations
+    private var pendingOperations: [ResticXPCOperation] = []
+
     // MARK: - Initialization
 
     /// Initializes a new instance of the ResticXPCService class.
@@ -44,27 +47,24 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
         queue = DispatchQueue(label: "dev.mpy.rBUM.resticxpc", qos: .userInitiated)
         isHealthy = false // Default to false until connection is established
 
-        // Configure XPC connection with enhanced security
-        connection = NSXPCConnection(serviceName: "dev.mpy.rBUM.ResticService")
-        connection.remoteObjectInterface = NSXPCInterface(with: ResticXPCProtocol.self)
-
         super.init(logger: logger, securityService: securityService)
 
-        // Set up enhanced connection handlers
-        configureConnection()
-
-        // Start the connection
-        connection.resume()
-
-        // Validate interface version and security
-        validateInterface()
+        // Set up XPC connection
+        do {
+            try setupXPCConnection()
+        } catch {
+            logger.error("Failed to set up XPC connection: \(error.localizedDescription)",
+                         file: #file,
+                         function: #function,
+                         line: #line)
+        }
     }
 
     deinit {
         cleanupResources()
-        connection.invalidationHandler = nil
-        connection.interruptionHandler = nil
-        connection.invalidate()
+        connection?.invalidationHandler = nil
+        connection?.interruptionHandler = nil
+        connection?.invalidate()
     }
 
     // MARK: - Resource Management
@@ -125,84 +125,273 @@ public final class ResticXPCService: BaseSandboxedService, Measurable, ResticSer
     private func cleanupResources() {
         stopAccessingResources()
     }
-}
 
-// MARK: - Connection Management
+    // MARK: - Connection Management
 
-extension ResticXPCService {
-    /// Configure XPC connection with error handlers and security settings
-    private func configureConnection() {
-        // Set up error handling
-        connection.interruptionHandler = { [weak self] in
-            self?.handleError(ResticXPCError.serviceUnavailable)
-        }
-
-        connection.invalidationHandler = { [weak self] in
-            self?.handleInvalidation()
-        }
+    private func setupXPCConnection() throws {
+        // Create connection
+        let connection = try createXPCConnection()
+        
+        // Configure connection
+        try configureXPCConnection(connection)
+        
+        // Set up handlers
+        setupConnectionHandlers(connection)
+        
+        // Resume connection
+        connection.resume()
+        
+        // Store connection
+        self.connection = connection
     }
-
-    /// Handle errors that occur during XPC operations
-    /// - Parameter error: The error that occurred
-    private func handleError(_ error: Error) {
-        isHealthy = false
-        logger.error(
-            "XPC service error: \(error.localizedDescription)",
-            file: #file,
-            function: #function,
-            line: #line
+    
+    private func createXPCConnection() throws -> NSXPCConnection {
+        guard let serviceName = Bundle.main.object(forInfoDictionaryKey: "XPCServiceName") as? String else {
+            throw ResticXPCError.missingServiceName
+        }
+        
+        let connection = NSXPCConnection(serviceName: serviceName)
+        
+        // Set up security attributes
+        connection.auditSessionIdentifier = au_session_self()
+        
+        return connection
+    }
+    
+    private func configureXPCConnection(_ connection: NSXPCConnection) throws {
+        // Configure interfaces
+        try configureRemoteInterface(for: connection)
+        try configureExportedInterface(for: connection)
+        
+        // Configure security
+        try configureConnectionSecurity(for: connection)
+    }
+    
+    private func configureRemoteInterface(for connection: NSXPCConnection) throws {
+        let interface = NSXPCInterface(with: ResticXPCServiceProtocol.self)
+        
+        // Configure allowed classes
+        let allowedClasses = [
+            NSArray.self,
+            NSDictionary.self,
+            NSString.self,
+            NSNumber.self,
+            NSData.self,
+            NSURL.self,
+            NSError.self
+        ]
+        
+        // Configure class requirements
+        interface.setClasses(
+            NSSet(array: allowedClasses) as! Set<AnyHashable>,
+            for: #selector(ResticXPCServiceProtocol.execute(_:arguments:environment:reply:)),
+            argumentIndex: 2,
+            ofReply: false
         )
-        // Implement recovery strategy based on error type
-        if case ResticXPCError.interfaceVersionMismatch = error {
-            // Handle version mismatch
-            connection.invalidate()
+        
+        connection.remoteObjectInterface = interface
+    }
+    
+    private func configureExportedInterface(for connection: NSXPCConnection) throws {
+        let interface = NSXPCInterface(with: ResticXPCProtocol.self)
+        
+        // Configure allowed classes for progress updates
+        interface.setClasses(
+            NSSet(array: [NSProgress.self]) as! Set<AnyHashable>,
+            for: #selector(ResticXPCProtocol.updateProgress(_:)),
+            argumentIndex: 0,
+            ofReply: false
+        )
+        
+        connection.exportedInterface = interface
+    }
+    
+    private func configureConnectionSecurity(for connection: NSXPCConnection) throws {
+        // Set entitlement requirements
+        connection.remoteObjectInterface?.setClasses(
+            NSSet(array: [NSString.self]) as! Set<AnyHashable>,
+            for: #selector(ResticXPCServiceProtocol.validateEntitlements(_:reply:)),
+            argumentIndex: 0,
+            ofReply: false
+        )
+        
+        // Validate connection security
+        try validateConnectionSecurity(connection)
+    }
+    
+    private func validateConnectionSecurity(_ connection: NSXPCConnection) throws {
+        // Validate audit session
+        guard connection.auditSessionIdentifier != AU_DEFAUDITSID else {
+            throw ResticXPCError.invalidAuditSession
+        }
+        
+        // Validate entitlements
+        guard try validateEntitlements() else {
+            throw ResticXPCError.missingEntitlements
         }
     }
-
-    /// Validate interface version and security settings
-    private func validateInterface() {
-        guard let service = connection.remoteObjectProxy as? ResticXPCServiceProtocol else {
-            handleError(ResticXPCError.connectionFailed)
-            return
+    
+    private func setupConnectionHandlers(_ connection: NSXPCConnection) {
+        // Set up invalidation handler
+        connection.invalidationHandler = { [weak self] in
+            self?.handleConnectionInvalidation()
         }
-
-        Task {
-            if await service.ping() {
-                self.isHealthy = true
-            } else {
-                handleError(ResticXPCError.serviceUnavailable)
+        
+        // Set up interruption handler
+        connection.interruptionHandler = { [weak self] in
+            self?.handleConnectionInterruption()
+        }
+    }
+    
+    private func handleConnectionInvalidation() {
+        Task { @MainActor in
+            // Log invalidation
+            logger.error("XPC connection invalidated", metadata: [
+                "service": .string("ResticXPCService")
+            ])
+            
+            // Clean up resources
+            cleanupResources()
+            
+            // Notify delegate
+            // delegate?.xpcServiceDidInvalidate(self)
+            
+            // Reset connection
+            connection = nil
+        }
+    }
+    
+    private func handleConnectionInterruption() {
+        Task { @MainActor in
+            // Log interruption
+            logger.error("XPC connection interrupted", metadata: [
+                "service": .string("ResticXPCService")
+            ])
+            
+            // Attempt reconnection
+            do {
+                try reconnect()
+            } catch {
+                logger.error("Failed to reconnect", metadata: [
+                    "error": .string(error.localizedDescription)
+                ])
+                
+                // Notify delegate of failure
+                // delegate?.xpcService(self, didFailWithError: error)
             }
         }
     }
-
-    /// Handle XPC connection invalidation
-    private func handleInvalidation() {
-        logger.error(
-            "XPC connection invalidated",
-            file: #file,
-            function: #function,
-            line: #line
+    
+    private func reconnect() throws {
+        // Clean up existing connection
+        cleanupResources()
+        
+        // Create new connection
+        try setupXPCConnection()
+        
+        // Validate connection
+        try validateConnection()
+        
+        // Log reconnection
+        logger.info("Successfully reconnected to XPC service", metadata: [
+            "service": .string("ResticXPCService")
+        ])
+        
+        // Notify delegate
+        // delegate?.xpcServiceDidReconnect(self)
+    }
+    
+    private func validateConnection() throws {
+        guard let connection = connection else {
+            throw ResticXPCError.connectionNotEstablished
+        }
+        
+        // Check connection state
+        guard connection.isValid else {
+            throw ResticXPCError.invalidConnection
+        }
+        
+        // Ping service
+        try ping()
+    }
+    
+    private func ping() throws {
+        guard let service = connection?.remoteObjectProxy as? ResticXPCServiceProtocol else {
+            throw ResticXPCError.invalidService
+        }
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        var pingError: Error?
+        
+        service.ping { error in
+            pingError = error
+            semaphore.signal()
+        }
+        
+        _ = semaphore.wait(timeout: .now() + .seconds(5))
+        
+        if let error = pingError {
+            throw error
+        }
+    }
+    
+    private func executeCommand(
+        _ command: String,
+        arguments: [String],
+        environment: [String: String]
+    ) async throws -> ProcessResult {
+        guard let service = connection?.remoteObjectProxy as? ResticXPCServiceProtocol else {
+            throw ResticXPCError.invalidService
+        }
+        
+        // Create operation
+        let operation = ResticXPCOperation(
+            command: command,
+            arguments: arguments,
+            environment: environment
         )
-        cleanupResources()
-        isHealthy = false
+        
+        // Add to pending operations
+        pendingOperations.append(operation)
+        
+        defer {
+            // Remove from pending operations
+            pendingOperations.removeAll { $0 === operation }
+        }
+        
+        // Execute command
+        return try await withCheckedThrowingContinuation { continuation in
+            service.execute(command, arguments: arguments, environment: environment) { result, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+    }
+    
+    private func validateEntitlements() throws -> Bool {
+        guard let service = connection?.remoteObjectProxy as? ResticXPCServiceProtocol else {
+            throw ResticXPCError.invalidService
+        }
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        var isValid = false
+        
+        service.validateEntitlements(requiredEntitlements) { valid in
+            isValid = valid
+            semaphore.signal()
+        }
+        
+        _ = semaphore.wait(timeout: .now() + .seconds(5))
+        
+        return isValid
     }
 
-    /// Handle XPC connection interruption
-    private func handleInterruption() {
-        logger.error("XPC connection interrupted",
-                     file: #file,
-                     function: #function,
-                     line: #line)
-        cleanupResources()
-        isHealthy = false
-    }
-}
+    // MARK: - Health Check
 
-// MARK: - Health Check
-
-public extension ResticXPCService {
-    /// Updates the health status of the service.
-    @objc func updateHealthStatus() async {
+    public func updateHealthStatus() async {
         do {
             isHealthy = try await performHealthCheck()
         } catch {
@@ -217,7 +406,7 @@ public extension ResticXPCService {
     /// Performs a health check on the service.
     /// - Returns: A boolean indicating whether the service is healthy.
     /// - Throws: An error if the health check fails.
-    @objc func performHealthCheck() async throws -> Bool {
+    func performHealthCheck() async throws -> Bool {
         logger.debug("Performing health check",
                      file: #file,
                      function: #function,
@@ -228,18 +417,15 @@ public extension ResticXPCService {
 
         // Check if connection is valid (NSXPCConnection doesn't have isValid,
         // but we can check if it's not invalidated)
-        if !isValid || connection.invalidationHandler == nil {
+        if !isValid || connection?.invalidationHandler == nil {
             throw SecurityError.xpcValidationFailed("XPC connection is invalidated")
         }
 
         return true
     }
-}
 
-// MARK: - Command Execution
+    // MARK: - Command Execution
 
-@available(macOS 13.0, *)
-extension ResticXPCService {
     /// Executes a Restic command with the specified parameters.
     /// - Parameters:
     ///   - command: The Restic command to execute.
@@ -259,7 +445,7 @@ extension ResticXPCService {
         retryCount: Int
     ) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
-            guard let service = connection.remoteObjectProxy as? ResticXPCProtocol else {
+            guard let service = connection?.remoteObjectProxy as? ResticXPCProtocol else {
                 continuation.resume(
                     throwing: ResticXPCError.serviceUnavailable
                 )
@@ -307,69 +493,8 @@ extension ResticXPCService {
         }
     }
 
-    /// Create a security-scoped bookmark for a URL
-    /// - Parameter url: The URL to create a bookmark for
-    /// - Returns: The created bookmark data
-    /// - Throws: SecurityError if bookmark creation fails
-    private func createBookmark(for url: URL) throws -> NSData {
-        // Create security-scoped bookmark
-        var error: NSError?
-        let bookmark = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil,
-            error: &error
-        )
+    // MARK: - ResticServiceProtocol Implementation
 
-        if let error {
-            throw SecurityError.bookmarkCreationFailed("Failed to create bookmark: \(error.localizedDescription)")
-        }
-
-        return bookmark as NSData? ?? NSData()
-    }
-
-    /// Execute a command with retry logic
-    /// - Parameters:
-    ///   - command: Command configuration
-    ///   - retryCount: Number of retry attempts remaining
-    /// - Returns: Process execution result
-    /// - Throws: ProcessError if execution fails
-    private func executeWithRetry(
-        _ command: XPCCommandConfig,
-        retryCount: Int
-    ) async throws -> ProcessResult {
-        // Execute command with retry logic
-        var lastError: Error?
-        var attempts = 0
-
-        repeat {
-            do {
-                let result = try await executeCommand(
-                    command.command,
-                    arguments: command.arguments,
-                    environment: command.environment,
-                    workingDirectory: command.workingDirectory,
-                    bookmarks: command.bookmarks,
-                    retryCount: retryCount
-                )
-                return result
-            } catch {
-                lastError = error
-                attempts += 1
-
-                if attempts <= retryCount {
-                    try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempts)) * 1_000_000_000))
-                }
-            }
-        } while attempts <= retryCount
-
-        throw lastError ?? ProcessError.executionFailed("Unknown error")
-    }
-}
-
-// MARK: - ResticServiceProtocol Implementation
-
-public extension ResticXPCService {
     /// Initializes a new repository at the specified URL.
     /// - Parameter url: The URL where the repository will be initialized.
     /// - Throws: An error if the repository initialization fails.

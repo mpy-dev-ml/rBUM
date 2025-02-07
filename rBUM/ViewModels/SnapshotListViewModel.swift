@@ -89,28 +89,7 @@ final class SnapshotListViewModel: ObservableObject {
         )
 
         do {
-            // Create progress tracker
-            let tracker = Progress(totalUnitCount: 1)
-            progress = tracker
-
-            // Get repository credentials
-            let credentials = try await credentialsService.getCredentials(for: repository)
-
-            // List snapshots
-            let snapshots = try await repositoryService.listSnapshots(repository, credentials: credentials)
-
-            // Update snapshots
-            self.snapshots = snapshots.sorted { $0.time > $1.time }
-
-            // Complete progress
-            progress?.completedUnitCount = 1
-
-            logger.info(
-                "Loaded \(snapshots.count) snapshots from repository: \(repository.id)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
+            try await handleSnapshotOperation()
         } catch {
             progress?.cancel()
             self.error = error
@@ -130,23 +109,7 @@ final class SnapshotListViewModel: ObservableObject {
         logger.debug("Deleting snapshot: \(snapshot.id)", file: #file, function: #function, line: #line)
 
         do {
-            // Create progress tracker
-            let tracker = Progress(totalUnitCount: 1)
-            progress = tracker
-
-            // Get repository credentials
-            let credentials = try await credentialsService.getCredentials(for: repository)
-
-            // Delete snapshot
-            try await repositoryService.deleteSnapshot(snapshot, from: repository, credentials: credentials)
-
-            // Complete progress
-            progress?.completedUnitCount = 1
-
-            // Refresh snapshots
-            await loadSnapshots()
-
-            logger.info("Successfully deleted snapshot: \(snapshot.id)", file: #file, function: #function, line: #line)
+            try await handleSnapshotDeletion(snapshot)
         } catch {
             progress?.cancel()
             self.error = error
@@ -168,39 +131,7 @@ final class SnapshotListViewModel: ObservableObject {
         logger.debug("Restoring snapshot \(snapshot.id) to \(path.path)", file: #file, function: #function, line: #line)
 
         do {
-            // Create progress tracker
-            let tracker = Progress(totalUnitCount: Int64(snapshot.paths.count))
-            progress = tracker
-
-            // Validate restore path access
-            try await securityService.validateAccess(to: path)
-
-            // Get repository credentials
-            let credentials = try await credentialsService.getCredentials(for: repository)
-
-            // Create bookmark for restore path
-            try await bookmarkService.createBookmark(for: path)
-
-            // Start restore
-            try await repositoryService.restoreSnapshot(
-                snapshot,
-                to: path,
-                from: repository,
-                credentials: credentials,
-                progress: { [weak self] progress in
-                    self?.progress?.completedUnitCount = Int64(progress.processedFiles)
-                }
-            )
-
-            // Complete progress
-            progress?.completedUnitCount = Int64(snapshot.paths.count)
-
-            logger.info(
-                "Successfully restored snapshot \(snapshot.id) to \(path.path)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
+            try await handleSnapshotRestoration(snapshot, to: path)
         } catch {
             progress?.cancel()
             self.error = error
@@ -210,6 +141,231 @@ final class SnapshotListViewModel: ObservableObject {
                 file: #file,
                 function: #function,
                 line: #line
+            )
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func handleSnapshotOperation() async throws {
+        try await validateSnapshotPrerequisites()
+        try await loadSnapshotsFromRepository()
+        try await processSnapshots()
+    }
+
+    private func validateSnapshotPrerequisites() async throws {
+        guard let repository = repository else {
+            throw SnapshotError.missingRepository
+        }
+
+        // Validate repository access
+        try await validateRepositoryAccess(repository)
+
+        // Validate repository health
+        try await validateRepositoryHealth(repository)
+    }
+
+    private func validateRepositoryAccess(_ repository: Repository) async throws {
+        guard let url = repository.url else {
+            throw SnapshotError.invalidRepository("Repository URL is missing")
+        }
+
+        guard try await securityService.validateAccess(to: url) else {
+            throw SnapshotError.accessDenied("Cannot access repository")
+        }
+
+        guard try await securityService.validateReadAccess(to: url) else {
+            throw SnapshotError.accessDenied("Cannot read from repository")
+        }
+    }
+
+    private func validateRepositoryHealth(_ repository: Repository) async throws {
+        let health = try await healthCheckService.checkHealth(of: repository)
+        guard health.status == .healthy else {
+            throw SnapshotError.unhealthyRepository(
+                "Repository is not healthy: \(health.message ?? "Unknown error")"
+            )
+        }
+    }
+
+    private func loadSnapshotsFromRepository() async throws {
+        guard let repository = repository else { return }
+
+        isLoading = true
+        currentOperation = .loading
+
+        do {
+            let credentials = try await credentialsService.getCredentials(for: repository)
+            snapshots = try await repositoryService.listSnapshots(repository, credentials: credentials)
+        } catch {
+            handleSnapshotError(error)
+            throw error
+        }
+    }
+
+    private func processSnapshots() async throws {
+        guard !snapshots.isEmpty else {
+            snapshots = []
+            return
+        }
+
+        // Apply filters
+        var filtered = snapshots
+
+        if !searchText.isEmpty {
+            let searchLower = searchText.lowercased()
+            filtered = filtered.filter { snapshot in
+                let nameMatch = snapshot.hostname.lowercased().contains(searchLower)
+                let pathMatch = snapshot.paths.contains { $0.lowercased().contains(searchLower) }
+                let tagMatch = snapshot.tags?.contains { $0.lowercased().contains(searchLower) } ?? false
+
+                return nameMatch || pathMatch || tagMatch
+            }
+        }
+
+        // Apply time filter
+        switch selectedFilter {
+        case .all:
+            break
+        case .today:
+            filtered = filtered.filter { calendar.isDateInToday($0.time) }
+        case .thisWeek:
+            filtered = filtered.filter { calendar.isDate($0.time, equalTo: Date(), toGranularity: .weekOfYear) }
+        case .thisMonth:
+            filtered = filtered.filter { calendar.isDate($0.time, equalTo: Date(), toGranularity: .month) }
+        case .thisYear:
+            filtered = filtered.filter { calendar.isDate($0.time, equalTo: Date(), toGranularity: .year) }
+        case .tagged:
+            filtered = filtered.filter { !($0.tags?.isEmpty ?? true) }
+        }
+
+        // Sort snapshots
+        filtered.sort { $0.time > $1.time }
+
+        snapshots = filtered
+    }
+
+    private func handleSnapshotDeletion(_ snapshot: ResticSnapshot) async throws {
+        guard let repository = repository else { return }
+
+        isDeletingSnapshot = true
+        currentOperation = .deleting
+
+        do {
+            // Get credentials
+            let credentials = try await credentialsService.getCredentials(for: repository)
+
+            // Delete snapshot
+            try await repositoryService.deleteSnapshot(snapshot, from: repository, credentials: credentials)
+
+            // Remove from lists
+            snapshots.removeAll { $0.id == snapshot.id }
+
+            // Log success
+            logger.info("Snapshot deleted successfully", metadata: [
+                "snapshot": .string(snapshot.id),
+                "repository": .string(repository.id.uuidString)
+            ])
+
+            // Show success notification
+            notificationCenter.post(
+                name: .snapshotDeleted,
+                object: nil,
+                userInfo: [
+                    "snapshot": snapshot,
+                    "repository": repository
+                ]
+            )
+
+        } catch {
+            handleSnapshotError(error)
+            throw error
+        }
+
+        isDeletingSnapshot = false
+        currentOperation = .idle
+    }
+
+    private func handleSnapshotRestoration(_ snapshot: ResticSnapshot, to destination: URL) async throws {
+        guard let repository = repository else { return }
+
+        isRestoringSnapshot = true
+        currentOperation = .restoring
+
+        do {
+            // Validate destination
+            try await validateRestoreDestination(destination)
+
+            // Get credentials
+            let credentials = try await credentialsService.getCredentials(for: repository)
+
+            // Restore snapshot
+            try await repositoryService.restoreSnapshot(
+                snapshot,
+                from: repository,
+                to: destination,
+                credentials: credentials
+            )
+
+            // Log success
+            logger.info("Snapshot restored successfully", metadata: [
+                "snapshot": .string(snapshot.id),
+                "repository": .string(repository.id.uuidString),
+                "destination": .string(destination.path)
+            ])
+
+            // Show success notification
+            notificationCenter.post(
+                name: .snapshotRestored,
+                object: nil,
+                userInfo: [
+                    "snapshot": snapshot,
+                    "repository": repository,
+                    "destination": destination
+                ]
+            )
+
+        } catch {
+            handleSnapshotError(error)
+            throw error
+        }
+
+        isRestoringSnapshot = false
+        currentOperation = .idle
+    }
+
+    private func validateRestoreDestination(_ destination: URL) async throws {
+        // Check destination access
+        guard try await securityService.validateAccess(to: destination) else {
+            throw SnapshotError.accessDenied("Cannot access restore destination")
+        }
+
+        // Check write permissions
+        guard try await securityService.validateWriteAccess(to: destination) else {
+            throw SnapshotError.accessDenied("Cannot write to restore destination")
+        }
+    }
+
+    private func handleSnapshotError(_ error: Error) {
+        Task { @MainActor in
+            isLoading = false
+            currentOperation = .failed
+            lastError = error
+
+            // Log error
+            logger.error("Snapshot operation failed", metadata: [
+                "error": .string(error.localizedDescription),
+                "repository": .string(repository.id.uuidString)
+            ])
+
+            // Show error notification
+            notificationCenter.post(
+                name: .snapshotOperationFailed,
+                object: nil,
+                userInfo: [
+                    "error": error,
+                    "repository": repository as Any
+                ]
             )
         }
     }

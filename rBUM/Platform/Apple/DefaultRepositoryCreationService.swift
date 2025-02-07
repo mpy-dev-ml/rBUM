@@ -81,11 +81,7 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
                 let repositoryURL = appSupport.appendingPathComponent("Repositories", isDirectory: true)
                     .appendingPathComponent("Default", isDirectory: true)
 
-                try FileManager.default.createDirectory(
-                    at: repositoryURL,
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
+                try await initializeRepository(at: repositoryURL)
 
                 // Create and store bookmark
                 let bookmark = try await bookmarkService.createBookmark(for: repositoryURL)
@@ -98,6 +94,24 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
                 throw RepositoryCreationError.creationFailed(error.localizedDescription)
             }
         }
+    }
+
+    private func initializeRepository(at url: URL) async throws {
+        try await createRepositoryDirectory(at: url)
+        try await createSecurityBookmark(for: url)
+    }
+
+    private func createRepositoryDirectory(at url: URL) async throws {
+        try FileManager.default.createDirectory(
+            at: url,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+    }
+
+    private func createSecurityBookmark(for url: URL) async throws {
+        let bookmark = try await bookmarkService.createBookmark(for: url)
+        try keychainService.storeBookmark(bookmark, for: url)
     }
 
     public func getDefaultRepositoryLocation() async throws -> URL? {
@@ -147,7 +161,7 @@ public final class DefaultRepositoryCreationService: BaseSandboxedService, Defau
                 }
 
                 // Verify we can access the repository
-                guard try bookmarkService.startAccessing(repositoryURL) else {
+                guard try await bookmarkService.startAccessing(repositoryURL) else {
                     return false
                 }
                 defer { try? bookmarkService.stopAccessing(repositoryURL) }

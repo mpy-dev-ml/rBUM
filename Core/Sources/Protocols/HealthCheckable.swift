@@ -83,6 +83,58 @@ import Foundation
     /// - Clear error counts
     /// - Reset performance measurements
     @objc optional func resetHealthState()
+
+    /// Represents the current health status of a service or component
+    public enum HealthStatus {
+        /// Service is operating normally
+        case healthy
+        /// Service is experiencing issues but still functional
+        case degraded(String)
+        /// Service is not operational
+        case unhealthy(String)
+    }
+
+    /// Represents a health check result with detailed metrics
+    public struct HealthCheckResult {
+        /// Current status of the service
+        public let status: HealthStatus
+        /// Time when the check was performed
+        public let timestamp: Date
+        /// Duration of the health check in seconds
+        public let duration: TimeInterval
+        /// Additional metrics collected during the check
+        public let metrics: [String: Any]
+        /// Detailed message about the health check result
+        public let message: String?
+    }
+
+    /// Performs a health check on the service or component
+    ///
+    /// This method performs a comprehensive health check, including:
+    /// - Service availability
+    /// - Resource usage
+    /// - Error rates
+    /// - Performance metrics
+    /// - System dependencies
+    ///
+    /// - Returns: A health check result containing status and metrics
+    /// - Throws: If the health check operation fails
+    public func checkHealth() async throws -> HealthCheckResult
+
+    /// Validates the service's configuration and dependencies
+    ///
+    /// This method checks the service's configuration and dependencies to ensure they are valid and correctly set up.
+    ///
+    /// - Returns: A boolean indicating if the validation was successful
+    /// - Throws: If the validation process fails
+    public func validateConfiguration() async throws -> Bool
+
+    /// Performs cleanup of any resources used by the service
+    ///
+    /// This method releases any resources held by the service, such as file handles, network connections, or memory.
+    ///
+    /// - Throws: If the cleanup operation fails
+    public func cleanup() async throws
 }
 
 /// Represents the possible health states of a service
@@ -195,4 +247,24 @@ public extension HealthCheckable {
     func updateHealthStatus() async {}
 
     func resetHealthState() {}
+
+    func checkHealth() async throws -> HealthCheckResult {
+        // Default implementation for checkHealth
+        return HealthCheckResult(
+            status: .healthy,
+            timestamp: Date(),
+            duration: 0,
+            metrics: [:],
+            message: nil
+        )
+    }
+
+    func validateConfiguration() async throws -> Bool {
+        // Default implementation for validateConfiguration
+        return true
+    }
+
+    func cleanup() async throws {
+        // Default implementation for cleanup
+    }
 }

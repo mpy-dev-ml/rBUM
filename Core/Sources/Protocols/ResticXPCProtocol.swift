@@ -76,6 +76,29 @@ import Foundation
         auditSessionId: au_asid_t,
         completion: @escaping ([String: Any]?) -> Void
     )
+
+    /// Executes a Restic command with the provided arguments and environment
+    /// - Parameters:
+    ///   - command: The Restic command to execute
+    ///   - environment: Environment variables for the command
+    /// - Returns: The result of the command execution
+    /// - Throws: If the command execution fails
+    func executeCommand(_ command: ResticCommand) async throws -> ProcessResult
+
+    /// Validates the connection to the XPC service
+    /// - Returns: True if the connection is valid and operational
+    /// - Throws: If the validation fails or connection is invalid
+    func validateConnection() async throws -> Bool
+
+    /// Performs a health check of the XPC service
+    /// - Returns: The current health status of the service
+    /// - Throws: If the health check fails
+    func checkHealth() async throws -> HealthStatus
+
+    /// Cleans up resources used by the XPC service
+    /// - Parameter force: If true, forces cleanup even if resources are in use
+    /// - Throws: If the cleanup operation fails
+    func cleanup(force: Bool) async throws
 }
 
 /// Error domain and codes for ResticXPC operations

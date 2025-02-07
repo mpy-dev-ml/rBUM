@@ -20,11 +20,16 @@ class ResticXPCServiceTests: XCTestCase {
     var testDirectory: URL!
     var testRepository: Repository!
 
+    // MARK: - Test Setup
+
     override func setUp() async throws {
         try await super.setUp()
-
         mockLogger = MockLogger()
         mockSecurityService = MockSecurityService()
+        commandService = ResticCommandService(
+            logger: mockLogger,
+            securityService: mockSecurityService
+        )
 
         // Create test directory in sandbox-safe location
         testDirectory = FileManager.default.temporaryDirectory
@@ -41,11 +46,6 @@ class ResticXPCServiceTests: XCTestCase {
         testRepository = Repository(
             path: testDirectory.appendingPathComponent("test-repo"),
             password: "test-password"
-        )
-
-        commandService = ResticCommandService(
-            logger: mockLogger,
-            securityService: mockSecurityService
         )
     }
 
