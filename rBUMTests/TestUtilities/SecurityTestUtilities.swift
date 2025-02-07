@@ -32,7 +32,7 @@ extension URL {
 
 extension Data {
     static func testBookmark(for url: URL) -> Data {
-        "test-bookmark-\(url.lastPathComponent)".data(using: .utf8)!
+        Data("test-bookmark-\(url.lastPathComponent)".utf8)
     }
 }
 
@@ -271,7 +271,7 @@ extension XCTestCase {
     
     private static func configureMockKeychainService(_ service: MockKeychainService) {
         service.saveHandler = { _, _, _ in true }
-        service.loadHandler = { _, _ in "test-data".data(using: .utf8) }
+        service.loadHandler = { _, _ in Data("test-data".utf8) }
         service.deleteHandler = { _, _ in true }
     }
     
@@ -311,7 +311,7 @@ extension XCTestCase {
 }
 
 enum FilePermission: String {
-    case readable = "readable"
-    case writable = "writable"
-    case executable = "executable"
+    case readable
+    case writable
+    case executable
 }

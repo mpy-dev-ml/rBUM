@@ -61,7 +61,7 @@ final class DefaultRepositoryCreationServiceTests: XCTestCase {
         let expectedURL = appSupport.appendingPathComponent("Repositories/Default", isDirectory: true)
         defer { cleanupTemporaryDirectory(expectedURL) }
 
-        let testBookmark = "testBookmark".data(using: .utf8)!
+        let testBookmark = Data("testBookmark".utf8)
         mockBookmarkService.bookmarkToReturn = testBookmark
         mockBookmarkService.canStartAccessing = true
 

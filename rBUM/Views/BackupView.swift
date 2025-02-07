@@ -40,8 +40,7 @@ struct BackupView: View {
     var body: some View {
         VStack(spacing: 20) {
             if case .backing = viewModel.state,
-               let progress = viewModel.currentProgress
-            {
+               let progress = viewModel.currentProgress {
                 VStack(spacing: 8) {
                     ProgressView(
                         value: progress.percentComplete,
@@ -71,11 +70,18 @@ struct BackupView: View {
             }
 
             if viewModel.selectedPaths.isEmpty {
-                Button("Select Files") {
-                    Task {
-                        await viewModel.selectPaths()
+                Button(
+                    role: .none,
+                    action: {
+                        Task {
+                            await viewModel.selectPaths()
+                        }
+                    },
+                    label: {
+                        Text("Select Files")
+                            .frame(maxWidth: .infinity)
                     }
-                }
+                )
                 .buttonStyle(.borderedProminent)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
@@ -97,26 +103,34 @@ struct BackupView: View {
                 .padding(.vertical)
 
                 HStack(spacing: 20) {
-                    Button(action: {
-                        Task {
-                            await viewModel.startBackup()
+                    Button(
+                        role: .none,
+                        action: {
+                            Task {
+                                await viewModel.startBackup()
+                            }
+                        },
+                        label: {
+                            Text("Start Backup")
+                                .frame(maxWidth: .infinity)
                         }
-                    }) {
-                        Text("Start Backup")
-                            .frame(maxWidth: .infinity)
-                    }
+                    )
                     .buttonStyle(.borderedProminent)
                     .disabled(viewModel.state.isActive)
 
                     if viewModel.state.isActive {
-                        Button(action: {
-                            Task {
-                                await viewModel.cancelBackup()
+                        Button(
+                            role: .cancel,
+                            action: {
+                                Task {
+                                    await viewModel.cancelBackup()
+                                }
+                            },
+                            label: {
+                                Text("Cancel")
+                                    .frame(maxWidth: .infinity)
                             }
-                        }) {
-                            Text("Cancel")
-                                .frame(maxWidth: .infinity)
-                        }
+                        )
                         .buttonStyle(.bordered)
                     }
                 }

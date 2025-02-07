@@ -177,6 +177,12 @@ struct RepositoryCredentials {
 extension ResticCommandService {
     // MARK: - HealthCheckable Implementation
 
+    /// Performs a health check on the Restic command service.
+    /// This verifies that:
+    /// 1. The XPC service is responsive and healthy
+    /// 2. The service can execute basic restic commands
+    /// 3. All required resources are accessible
+    /// - Returns: A boolean indicating whether the service is healthy
     public func performHealthCheck() async -> Bool {
         await measure("Restic Command Service Health Check") {
             do {

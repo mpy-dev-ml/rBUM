@@ -16,8 +16,7 @@ import Foundation
 
 /// Service for creating and managing default repository locations on macOS
 public final class DefaultRepositoryCreationService: BaseSandboxedService, DefaultRepositoryCreationProtocol,
-    HealthCheckable
-{
+    HealthCheckable {
     // MARK: - Properties
 
     private let bookmarkService: BookmarkServiceProtocol

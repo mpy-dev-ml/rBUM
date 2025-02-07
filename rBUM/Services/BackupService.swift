@@ -36,8 +36,7 @@ import Foundation
 /// let snapshots = try await backupService.listSnapshots(in: repository)
 /// ```
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable,
-    @unchecked Sendable
-{
+    @unchecked Sendable {
     // MARK: - Properties
 
     /// Service for executing Restic commands

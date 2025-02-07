@@ -111,10 +111,8 @@ extension ResticXPCService {
         }
         
         // Check pending operations
-        for operation in pendingOperations {
-            if operation.isCancelled {
-                pendingOperations.removeAll { $0 === operation }
-            }
+        for operation in pendingOperations where operation.isCancelled {
+            pendingOperations.removeAll { $0 === operation }
         }
     }
 }

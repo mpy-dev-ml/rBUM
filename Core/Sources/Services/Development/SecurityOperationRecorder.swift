@@ -58,6 +58,8 @@ public final class SecurityOperationRecorder {
     private let queue = DispatchQueue(label: "dev.mpy.rbum.security.operations")
     private var operations: Set<SecurityOperation> = []
 
+    /// Creates a new security operation recorder
+    /// - Parameter logger: The logger to use for recording operations
     public init(logger: Logger) {
         self.logger = logger
     }

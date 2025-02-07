@@ -23,7 +23,7 @@ public extension DevelopmentBookmarkService {
                 throw BookmarkError.creationFailed
             }
 
-            let data = "simulated_bookmark_\(UUID().uuidString)".data(using: .utf8)!
+            let data = Data("simulated_bookmark_\(UUID().uuidString)".utf8)
             bookmarks[url] = BookmarkEntry(data: data)
 
             logger.debug("Created bookmark", metadata: [

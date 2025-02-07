@@ -77,7 +77,7 @@ extension DefaultSecurityService {
         }
         
         // Resolve bookmark to validate it
-        let _ = try await resolveBookmark(bookmark)
+        _ = try await resolveBookmark(bookmark)
         return true
     }
 }

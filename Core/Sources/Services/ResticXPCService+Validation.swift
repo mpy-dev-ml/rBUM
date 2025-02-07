@@ -72,17 +72,13 @@ extension ResticXPCService {
         }
         
         // Check arguments
-        for argument in command.arguments {
-            if argument.contains("..") {
-                throw ResticXPCError.invalidCommand("Arguments cannot contain path traversal")
-            }
+        for argument in command.arguments where argument.contains("..") {
+            throw ResticXPCError.invalidCommand("Arguments cannot contain path traversal")
         }
         
         // Check environment
-        for (key, value) in command.environment {
-            if key.isEmpty || value.isEmpty {
-                throw ResticXPCError.invalidCommand("Environment variables cannot be empty")
-            }
+        for (key, value) in command.environment where key.isEmpty || value.isEmpty {
+            throw ResticXPCError.invalidCommand("Environment variables cannot be empty")
         }
     }
     

@@ -50,8 +50,7 @@ public class SandboxDiagnostics {
 
         // Check if path is within sandbox
         if !url.path.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.path),
-           !url.path.hasPrefix("/private/tmp")
-        {
+           !url.path.hasPrefix("/private/tmp") {
             logger.error(
                 "Potential sandbox violation: Accessing path outside sandbox",
                 file: #file,
@@ -157,8 +156,7 @@ public class SandboxDiagnostics {
             // Read existing violations or create new array
             var violations: [[String: String]] = []
             if let data = try? Data(contentsOf: violationsURL),
-               let existingViolations = try? JSONDecoder().decode([[String: String]].self, from: data)
-            {
+               let existingViolations = try? JSONDecoder().decode([[String: String]].self, from: data) {
                 violations = existingViolations
             }
 
@@ -193,8 +191,7 @@ public class SandboxDiagnostics {
             create: false
         ).appendingPathComponent("SandboxViolations.json"),
             let data = try? Data(contentsOf: violationsURL),
-            let violations = try? JSONDecoder().decode([[String: String]].self, from: data)
-        {
+            let violations = try? JSONDecoder().decode([[String: String]].self, from: data) {
             return violations
         }
         return []

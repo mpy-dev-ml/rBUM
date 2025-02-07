@@ -132,7 +132,7 @@ extension DefaultSecurityService {
         
         // Resolve bookmark
         var isStale = false
-        let _ = try? URL(
+        _ = try? URL(
             resolvingBookmarkData: bookmark,
             options: .withSecurityScope,
             relativeTo: nil,

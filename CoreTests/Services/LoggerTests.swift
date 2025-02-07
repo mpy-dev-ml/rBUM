@@ -117,15 +117,28 @@ final class LoggerTests: XCTestCase {
 
 // MARK: - Test Helpers
 
+private struct LogContext {
+    let level: LogLevel
+    let message: String
+    let metadata: [String: LogMetadataValue]?
+    let privacy: LogPrivacy
+    let error: Error?
+    let file: String
+    let function: String
+    let line: Int
+}
+
 private final class TestLogOutput {
-    var lastLevel: LogLevel?
-    var lastMessage: String?
-    var lastMetadata: [String: LogMetadataValue]?
-    var lastPrivacy: LogPrivacy?
-    var lastError: Error?
-    var lastFile: String?
-    var lastFunction: String?
-    var lastLine: Int?
+    var lastContext: LogContext?
+    
+    var lastLevel: LogLevel? { lastContext?.level }
+    var lastMessage: String? { lastContext?.message }
+    var lastMetadata: [String: LogMetadataValue]? { lastContext?.metadata }
+    var lastPrivacy: LogPrivacy? { lastContext?.privacy }
+    var lastError: Error? { lastContext?.error }
+    var lastFile: String? { lastContext?.file }
+    var lastFunction: String? { lastContext?.function }
+    var lastLine: Int? { lastContext?.line }
 }
 
 private final class TestLogger: LoggerProtocol {
@@ -145,13 +158,16 @@ private final class TestLogger: LoggerProtocol {
         function: String,
         line: Int
     ) {
-        output.lastLevel = level
-        output.lastMessage = message
-        output.lastMetadata = metadata
-        output.lastPrivacy = privacy
-        output.lastError = error
-        output.lastFile = file
-        output.lastFunction = function
-        output.lastLine = line
+        let context = LogContext(
+            level: level,
+            message: message,
+            metadata: metadata,
+            privacy: privacy,
+            error: error,
+            file: file,
+            function: function,
+            line: line
+        )
+        output.lastContext = context
     }
 }

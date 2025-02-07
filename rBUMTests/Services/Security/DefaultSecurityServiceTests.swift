@@ -152,7 +152,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
 
         mockKeychainService.loadHandler = { _, _ in
             // Return test data
-            return "test-data".data(using: .utf8)
+            return Data("test-data".utf8)
         }
     }
 

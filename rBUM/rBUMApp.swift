@@ -27,12 +27,60 @@ struct RBUMApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        // Initialize dependencies
-        let fileManager: FileManagerProtocol = DefaultFileManager()
-        let dateProvider: DateProviderProtocol = DateProvider()
-        let notificationCenter = NotificationCenter.default
-
-        // Initialize security-related services
+        let dependencies = setupCoreDependencies()
+        let securityServices = setupSecurityServices(dependencies)
+        
+        credentialsManager = setupCredentialsManager(
+            dependencies: dependencies,
+            keychainService: securityServices.keychainService
+        )
+        
+        repositoryStorage = setupRepositoryStorage(dependencies.fileManager)
+        
+        resticService = setupResticService(
+            dependencies: dependencies,
+            securityServices: securityServices
+        )
+        
+        repositoryCreationService = setupRepositoryCreationService(
+            dependencies: dependencies,
+            securityServices: securityServices
+        )
+        
+        logger.debug(
+            "App initialized",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
+        // Setup app delegate
+        setupAppDelegate()
+    }
+    
+    private struct CoreDependencies {
+        let fileManager: FileManagerProtocol
+        let dateProvider: DateProviderProtocol
+        let notificationCenter: NotificationCenter
+    }
+    
+    private struct SecurityServices {
+        let securityService: SecurityServiceProtocol
+        let keychainService: KeychainServiceProtocol
+        let bookmarkService: BookmarkServiceProtocol
+        let sandboxMonitor: SandboxMonitor
+        let xpcService: ResticXPCServiceProtocol
+    }
+    
+    private func setupCoreDependencies() -> CoreDependencies {
+        CoreDependencies(
+            fileManager: DefaultFileManager(),
+            dateProvider: DateProvider(),
+            notificationCenter: .default
+        )
+    }
+    
+    private func setupSecurityServices(_ dependencies: CoreDependencies) -> SecurityServices {
         let securityService = ServiceFactory.createSecurityService(logger: logger)
         let keychainService = ServiceFactory.createKeychainService(logger: logger)
         let bookmarkService = ServiceFactory.createBookmarkService(
@@ -40,27 +88,43 @@ struct RBUMApp: App {
             securityService: securityService,
             keychainService: keychainService
         )
-
+        
         let sandboxMonitor = SandboxMonitor(
             logger: logger,
             securityService: securityService
         )
-
+        
         let xpcService = ServiceFactory.createXPCService(
             logger: logger,
             securityService: securityService
+        ) as! ResticXPCServiceProtocol
+        
+        return SecurityServices(
+            securityService: securityService,
+            keychainService: keychainService,
+            bookmarkService: bookmarkService,
+            sandboxMonitor: sandboxMonitor,
+            xpcService: xpcService
         )
-
-        // Initialize repository services
-        credentialsManager = KeychainCredentialsManager(
+    }
+    
+    private func setupCredentialsManager(
+        dependencies: CoreDependencies,
+        keychainService: KeychainServiceProtocol
+    ) -> KeychainCredentialsManagerProtocol {
+        KeychainCredentialsManager(
             logger: logger,
             keychainService: keychainService,
-            dateProvider: dateProvider,
-            notificationCenter: notificationCenter
+            dateProvider: dependencies.dateProvider,
+            notificationCenter: dependencies.notificationCenter
         )
-
+    }
+    
+    private func setupRepositoryStorage(
+        _ fileManager: FileManagerProtocol
+    ) -> RepositoryStorageProtocol {
         do {
-            repositoryStorage = try DefaultRepositoryStorage(
+            return try DefaultRepositoryStorage(
                 fileManager: fileManager,
                 logger: logger
             )
@@ -73,68 +137,30 @@ struct RBUMApp: App {
             )
             fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
         }
-
-        resticService = ResticCommandService(
+    }
+    
+    private func setupResticService(
+        dependencies: CoreDependencies,
+        securityServices: SecurityServices
+    ) -> ResticCommandServiceProtocol {
+        ResticCommandService(
             logger: logger,
-            securityService: securityService,
-            xpcService: ServiceFactory.createXPCService(
-                logger: logger,
-                securityService: securityService
-            ) as! ResticXPCServiceProtocol,
-            keychainService: keychainService
+            securityService: securityServices.securityService,
+            xpcService: securityServices.xpcService,
+            keychainService: securityServices.keychainService
         ) as! any ResticCommandServiceProtocol
-
-        repositoryCreationService = DefaultRepositoryCreationService(
+    }
+    
+    private func setupRepositoryCreationService(
+        dependencies: CoreDependencies,
+        securityServices: SecurityServices
+    ) -> RepositoryCreationServiceProtocol {
+        DefaultRepositoryCreationService(
             logger: logger,
             securityService: resticService as! SecurityServiceProtocol,
-            bookmarkService: bookmarkService,
-            keychainService: keychainService
+            bookmarkService: securityServices.bookmarkService,
+            keychainService: securityServices.keychainService
         ) as! any RepositoryCreationServiceProtocol
-
-        logger.debug(
-            "App initialized",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        // Setup app delegate
-        setupAppDelegate()
-    }
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView(
-                credentialsManager: credentialsManager,
-                creationService: repositoryCreationService
-            )
-            .onAppear {
-                logger.info(
-                    "ContentView appeared",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            }
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 900, height: 600)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates...") {
-                    checkForUpdates()
-                }
-                .keyboardShortcut("U", modifiers: [.command, .shift])
-            }
-            SidebarCommands()
-        }
-
-        #if os(macOS)
-            Settings {
-                SettingsView()
-            }
-        #endif
     }
 
     // MARK: - Private Methods
@@ -199,6 +225,41 @@ struct RBUMApp: App {
         )
 
         // TODO: Implement update checking
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView(
+                credentialsManager: credentialsManager,
+                creationService: repositoryCreationService
+            )
+            .onAppear {
+                logger.info(
+                    "ContentView appeared",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 900, height: 600)
+        .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    checkForUpdates()
+                }
+                .keyboardShortcut("U", modifiers: [.command, .shift])
+            }
+            SidebarCommands()
+        }
+
+        #if os(macOS)
+            Settings {
+                SettingsView()
+            }
+        #endif
     }
 }
 

@@ -91,6 +91,126 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         return true
     }
 
+    // MARK: - Command Execution
+
+    public func executeCommand(
+        config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        if simulateConnectionFailureIfNeeded(
+            operation: "command execution",
+            completion: completion
+        ) {
+            return
+        }
+
+        logCommandExecution(config)
+        
+        queue.async {
+            self.processCommand(config, completion: completion)
+        }
+    }
+    
+    private func processCommand(
+        _ config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        simulateArtificialDelay()
+        simulateExecutionTime()
+        
+        if shouldSimulateTimeout(config) {
+            handleTimeout(config, completion: completion)
+            return
+        }
+        
+        if configuration.shouldSimulateCommandFailures {
+            handleCommandFailure(config, completion: completion)
+            return
+        }
+        
+        handleSuccessfulExecution(config, completion: completion)
+    }
+    
+    private func logCommandExecution(_ config: XPCCommandConfig) {
+        logger.debug(
+            """
+            Executing command:
+            Command: \(config.command)
+            Arguments: \(config.arguments.joined(separator: " "))
+            Working Directory: \(config.workingDirectory)
+            Environment Variables: \(config.environment.keys.joined(separator: ", "))
+            Bookmarks: \(config.bookmarks.keys.joined(separator: ", "))
+            Timeout: \(config.timeout)
+            Audit Session ID: \(config.auditSessionId)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+    }
+    
+    private func simulateArtificialDelay() {
+        if configuration.artificialDelay > 0 {
+            Thread.sleep(forTimeInterval: configuration.artificialDelay)
+        }
+    }
+    
+    private func simulateExecutionTime() {
+        Thread.sleep(forTimeInterval: configuration.commandExecutionTime)
+    }
+    
+    private func shouldSimulateTimeout(_ config: XPCCommandConfig) -> Bool {
+        configuration.commandExecutionTime > config.timeout ||
+        configuration.shouldSimulateTimeoutFailures
+    }
+    
+    private func handleTimeout(
+        _ config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        logger.error(
+            "Simulating timeout failure for command: \(config.command)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        completion(nil)
+    }
+    
+    private func handleCommandFailure(
+        _ config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        logger.error(
+            "Simulating command failure for: \(config.command)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        completion([
+            "success": false,
+            "error": "Simulated command failure",
+            "exitCode": 1
+        ])
+    }
+    
+    private func handleSuccessfulExecution(
+        _ config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        logger.info(
+            "Successfully executed command: \(config.command)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        completion([
+            "success": true,
+            "output": "Simulated command output",
+            "exitCode": 0
+        ])
+    }
+
     // MARK: - ResticXPCProtocol Implementation
 
     public func validateInterface(
@@ -167,100 +287,6 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         )
 
         executeCommand(config: config, completion: completion)
-    }
-
-    public func executeCommand(
-        config: XPCCommandConfig,
-        completion: @escaping ([String: Any]?) -> Void
-    ) {
-        if simulateConnectionFailureIfNeeded(
-            operation: "command execution",
-            completion: completion
-        ) {
-            return
-        }
-
-        logger.debug(
-            """
-            Executing command:
-            Command: \(config.command)
-            Arguments: \(config.arguments.joined(separator: " "))
-            Working Directory: \(config.workingDirectory)
-            Environment Variables: \(config.environment.keys.joined(separator: ", "))
-            Bookmarks: \(config.bookmarks.keys.joined(separator: ", "))
-            Timeout: \(config.timeout)
-            Audit Session ID: \(config.auditSessionId)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        queue.async {
-            // Simulate artificial delay
-            if self.configuration.artificialDelay > 0 {
-                Thread.sleep(
-                    forTimeInterval: self.configuration.artificialDelay
-                )
-            }
-
-            // Simulate command execution time
-            Thread.sleep(
-                forTimeInterval: self.configuration.commandExecutionTime
-            )
-
-            // Simulate timeout if execution time exceeds timeout
-            if self.configuration.commandExecutionTime > config.timeout ||
-                self.configuration.shouldSimulateTimeoutFailures
-            {
-                self.logger.error(
-                    """
-                    Simulating timeout failure for command: \
-                    \(config.command)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                completion(nil)
-                return
-            }
-
-            // Simulate command failure if configured
-            if self.configuration.shouldSimulateCommandFailures {
-                self.logger.error(
-                    """
-                    Simulating command failure for: \
-                    \(config.command)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                completion([
-                    "success": false,
-                    "error": "Simulated command failure",
-                    "exitCode": 1
-                ])
-                return
-            }
-
-            // Simulate successful command execution
-            self.logger.info(
-                """
-                Successfully executed command: \
-                \(config.command)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            completion([
-                "success": true,
-                "output": "Simulated output for command: \(config.command)",
-                "exitCode": 0
-            ])
-        }
     }
 
     public func ping(

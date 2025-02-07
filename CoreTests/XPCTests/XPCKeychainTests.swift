@@ -17,7 +17,7 @@ final class XPCKeychainTests: XCTestCase {
     private var mockLogger: MockLogger!
     private let testAccessGroup = "dev.mpy.rBUM.test"
     private let testKey = "test_key"
-    private let testData = "test_data".data(using: .utf8)!
+    private let testData = Data("test_data".utf8)
 
     // MARK: - Test Setup
 
@@ -40,7 +40,7 @@ final class XPCKeychainTests: XCTestCase {
     func testKeychainItemStorage() async throws {
         let account = "test-account"
         let service = "test-service"
-        let data = "test-data".data(using: .utf8)!
+        let data = Data("test-data".utf8)
         
         try await keychainService.storeItem(
             data,

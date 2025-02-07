@@ -78,7 +78,7 @@ extension DefaultSecurityService {
         for (url, bookmark) in bookmarks {
             // Try to resolve bookmark
             var isStale = false
-            let _ = try? URL(
+            _ = try? URL(
                 resolvingBookmarkData: bookmark,
                 options: .withSecurityScope,
                 relativeTo: nil,
@@ -146,7 +146,7 @@ extension DefaultSecurityService {
         for (url, bookmark) in bookmarks {
             // Try to resolve bookmark
             var isStale = false
-            let _ = try? URL(
+            _ = try? URL(
                 resolvingBookmarkData: bookmark,
                 options: .withSecurityScope,
                 relativeTo: nil,

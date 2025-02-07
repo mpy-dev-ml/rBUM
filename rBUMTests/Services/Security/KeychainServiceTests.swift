@@ -45,7 +45,7 @@ final class KeychainServiceTests: XCTestCase {
 
     func testStoreAndRetrieveGenericPassword() throws {
         // Given
-        let password = "test-password".data(using: .utf8)!
+        let password = Data("test-password".utf8)
         let serviceName = "test-service"
         let accountName = "test-account"
 
@@ -61,7 +61,7 @@ final class KeychainServiceTests: XCTestCase {
 
     func testDeleteGenericPassword() throws {
         // Given
-        let password = "test-password".data(using: .utf8)!
+        let password = Data("test-password".utf8)
         let serviceName = "test-service"
         let accountName = "test-account"
 
@@ -97,7 +97,7 @@ final class KeychainServiceTests: XCTestCase {
     func testStoreAndRetrieveBookmark() throws {
         // Given
         let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
-        let bookmark = "test-bookmark".data(using: .utf8)!
+        let bookmark = Data("test-bookmark".utf8)
 
         // When
         try service.storeBookmark(bookmark, for: testURL)
@@ -112,7 +112,7 @@ final class KeychainServiceTests: XCTestCase {
     func testDeleteBookmark() throws {
         // Given
         let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
-        let bookmark = "test-bookmark".data(using: .utf8)!
+        let bookmark = Data("test-bookmark".utf8)
 
         // Store bookmark first
         try service.storeBookmark(bookmark, for: testURL)
@@ -145,7 +145,7 @@ final class KeychainServiceTests: XCTestCase {
     func testHealthCheck() async {
         // Given
         let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
-        let bookmark = "test-bookmark".data(using: .utf8)!
+        let bookmark = Data("test-bookmark".utf8)
         try? service.storeBookmark(bookmark, for: testURL)
 
         // When
@@ -162,7 +162,7 @@ final class KeychainServiceTests: XCTestCase {
     func testHealthCheckWithInvalidKeychain() async {
         // Given
         let testURL = FileManager.default.temporaryDirectory.appendingPathComponent("test")
-        let bookmark = "test-bookmark".data(using: .utf8)!
+        let bookmark = Data("test-bookmark".utf8)
         try? service.storeBookmark(bookmark, for: testURL)
         try? service.deleteBookmark(for: testURL)
 
@@ -178,7 +178,7 @@ final class KeychainServiceTests: XCTestCase {
 
     func testDuplicateItemError() {
         // Given
-        let password = "test-password".data(using: .utf8)!
+        let password = Data("test-password".utf8)
         let serviceName = "test-service"
         let accountName = "test-account"
 

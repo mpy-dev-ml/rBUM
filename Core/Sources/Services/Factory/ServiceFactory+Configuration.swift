@@ -32,7 +32,7 @@ extension ServiceFactory {
             #endif
         )
         
-        /// Creates a new configuration
+        /// Creates a new configuration with the specified settings
         /// - Parameters:
         ///   - developmentEnabled: Whether to enable development features
         ///   - debugLoggingEnabled: Whether to enable debug logging

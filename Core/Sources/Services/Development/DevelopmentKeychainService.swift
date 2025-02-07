@@ -206,8 +206,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
 
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup
-            {
+               item.accessGroup != requiredGroup {
                 logger.error(
                     """
                     Access group mismatch:
@@ -266,8 +265,7 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
 
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup
-            {
+               item.accessGroup != requiredGroup {
                 logger.error(
                     """
                     Access group mismatch for deletion:

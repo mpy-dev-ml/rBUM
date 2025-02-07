@@ -167,11 +167,9 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         let staleThreshold: TimeInterval = 3600 // 1 hour
 
         withThreadSafety {
-            for (url, entry) in bookmarks {
-                if now.timeIntervalSince(entry.lastAccessed) > staleThreshold {
-                    bookmarks[url] = entry.markStale()
-                    metrics.recordStaleBookmark()
-                }
+            for (url, entry) in bookmarks where now.timeIntervalSince(entry.lastAccessed) > staleThreshold {
+                bookmarks[url] = entry.markStale()
+                metrics.recordStaleBookmark()
             }
         }
     }
@@ -185,7 +183,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
                 details: [
                     "activeBookmarks": bookmarks.count,
                     "activeAccesses": activeAccess.count,
-                    "metrics": metrics,
+                    "metrics": metrics
                     // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
                     // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
                 ]

@@ -30,6 +30,35 @@ enum ResticXPCErrorDomain {
     }
 }
 
+// MARK: - Command Configuration
+
+@objc(ResticCommandConfig)
+final class ResticCommandConfig: NSObject {
+    @objc let command: String
+    @objc let arguments: [String]
+    @objc let environment: [String: String]
+    @objc let workingDirectory: String
+    @objc let bookmarks: [String: NSData]
+    @objc let auditSessionId: au_asid_t
+    
+    @objc init(
+        command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData],
+        auditSessionId: au_asid_t
+    ) {
+        self.command = command
+        self.arguments = arguments
+        self.environment = environment
+        self.workingDirectory = workingDirectory
+        self.bookmarks = bookmarks
+        self.auditSessionId = auditSessionId
+        super.init()
+    }
+}
+
 // MARK: - Restic Service Implementation
 
 @objc final class ResticService: BaseService, ResticXPCProtocol {
@@ -72,23 +101,21 @@ enum ResticXPCErrorDomain {
     }
 
     @objc func executeResticCommand(
-        command _: String,
-        arguments _: [String],
-        environment _: [String: String],
-        workingDirectory _: String,
-        bookmarks: [String: NSData],
-        auditSessionId: au_asid_t,
+        config: ResticCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
     ) {
-        queue.async {
+        // Implementation using config object
+        Task {
             do {
-                try self.validateClient()
-                try self.validateAuditSession(auditSessionId)
-                try self.validateBookmarks(bookmarks)
-
-                // Execute command implementation here
-                // This is a placeholder for the actual command execution
-                completion(["success": true])
+                let result = try await executeCommand(
+                    command: config.command,
+                    arguments: config.arguments,
+                    environment: config.environment,
+                    workingDirectory: config.workingDirectory,
+                    bookmarks: config.bookmarks,
+                    auditSessionId: config.auditSessionId
+                )
+                completion(result)
             } catch {
                 completion(nil)
             }
