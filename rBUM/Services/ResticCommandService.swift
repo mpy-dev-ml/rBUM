@@ -20,6 +20,7 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
 
     private let xpcService: ResticXPCServiceProtocol
     private let keychainService: KeychainServiceProtocol
+    private let fileManager: FileManagerProtocol
     private let operationQueue: OperationQueue
     private var activeOperations: Set<UUID> = []
     private let accessQueue = DispatchQueue(label: "dev.mpy.rBUM.resticCommand", attributes: .concurrent)
@@ -37,10 +38,12 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         xpcService: ResticXPCServiceProtocol,
-        keychainService: KeychainServiceProtocol
+        keychainService: KeychainServiceProtocol,
+        fileManager: FileManagerProtocol
     ) {
         self.xpcService = xpcService
         self.keychainService = keychainService
+        self.fileManager = fileManager
 
         operationQueue = OperationQueue()
         operationQueue.name = "dev.mpy.rBUM.resticQueue"
@@ -84,7 +87,7 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         )
     }
 
-    // MARK: - Private Functions
+    // MARK: - Command Handling
 
     private func handleResticCommand(
         command: ResticCommand,
@@ -99,28 +102,95 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
             try await startResticOperation(operationId, command: command, repository: repository)
             
             // Validate prerequisites
-            try await validateResticPrerequisites(repository: repository)
+            try await validateCommandPrerequisites(
+                command: command,
+                repository: repository,
+                credentials: credentials
+            )
+            
+            // Build command
+            let arguments = try await buildCommandArguments(for: command, repository: repository)
+            let commandEnvironment = try await buildCommandEnvironment(
+                for: repository,
+                credentials: credentials,
+                additional: environment
+            )
             
             // Execute command
-            let result = try await executeResticCommand(
-                command,
-                repository: repository,
-                credentials: credentials,
-                environment: environment
+            let result = try await xpcService.execute(
+                command: "restic",
+                arguments: arguments,
+                environment: commandEnvironment
             )
             
             // Complete operation
-            try await completeResticOperation(operationId, success: true)
+            await completeResticOperation(operationId, success: true)
             
-            return result
+            return ResticCommandResult(
+                output: result.output,
+                exitCode: result.exitCode,
+                error: result.error
+            )
             
         } catch {
             // Handle failure
-            try await completeResticOperation(operationId, success: false, error: error)
+            await completeResticOperation(operationId, success: false, error: error)
             throw error
         }
     }
+}
+
+// MARK: - ResticCommand
+
+/// Commands supported by the Restic service
+enum ResticCommand: String {
+    case `init`
+    case backup
+    case restore
+    case list
+}
+
+// MARK: - ResticCommandError
+
+/// Errors that can occur during Restic command execution
+public enum ResticCommandError: LocalizedError {
+    case resticNotInstalled
+    case repositoryNotFound
+    case repositoryExists
+    case invalidRepository(String)
+    case invalidSettings(String)
+    case invalidCredentials(String)
+    case insufficientPermissions
+    case operationNotFound
+    case operationFailed(String)
     
+    public var errorDescription: String? {
+        switch self {
+        case .resticNotInstalled:
+            return "Restic is not installed"
+        case .repositoryNotFound:
+            return "Repository not found"
+        case .repositoryExists:
+            return "Repository already exists"
+        case .invalidRepository(let message):
+            return "Invalid repository: \(message)"
+        case .invalidSettings(let message):
+            return "Invalid settings: \(message)"
+        case .invalidCredentials(let message):
+            return "Invalid credentials: \(message)"
+        case .insufficientPermissions:
+            return "Insufficient permissions"
+        case .operationNotFound:
+            return "Operation not found"
+        case .operationFailed(let message):
+            return "Operation failed: \(message)"
+        }
+    }
+}
+
+extension ResticCommandService {
+    // MARK: - Private Functions
+
     private func startResticOperation(
         _ id: UUID,
         command: ResticCommand,
@@ -144,10 +214,14 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         ])
     }
     
-    private func validateResticPrerequisites(repository: Repository) async throws {
+    private func validateCommandPrerequisites(
+        command: ResticCommand,
+        repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws {
         // Check restic installation
         guard try await validateResticInstallation() else {
-            throw ResticError.resticNotInstalled("Restic is not installed")
+            throw ResticCommandError.resticNotInstalled
         }
         
         // Validate repository access
@@ -169,15 +243,15 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
     
     private func validateRepositoryAccess(_ repository: Repository) async throws {
         guard let url = repository.url else {
-            throw ResticError.invalidRepository("Repository URL is missing")
+            throw ResticCommandError.invalidRepository("Repository URL is missing")
         }
         
         guard try await securityService.validateAccess(to: url) else {
-            throw ResticError.accessDenied("Cannot access repository")
+            throw ResticCommandError.insufficientPermissions
         }
         
         guard try await securityService.validateWriteAccess(to: url) else {
-            throw ResticError.accessDenied("Cannot write to repository")
+            throw ResticCommandError.insufficientPermissions
         }
     }
     
@@ -190,68 +264,7 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         // }
     }
     
-    private func executeResticCommand(
-        _ command: ResticCommand,
-        repository: Repository,
-        credentials: RepositoryCredentials,
-        environment: [String: String]? = nil
-    ) async throws -> ResticCommandResult {
-        // Build command environment
-        let commandEnvironment = try await buildCommandEnvironment(
-            repository: repository,
-            credentials: credentials,
-            additionalEnvironment: environment
-        )
-        
-        // Build command arguments
-        let arguments = try await buildCommandArguments(
-            command: command,
-            repository: repository
-        )
-        
-        // Execute command
-        let result = try await xpcService.execute(
-            command: "restic",
-            arguments: arguments,
-            environment: commandEnvironment
-        )
-        
-        // Parse result
-        return try await parseCommandResult(result)
-    }
-    
-    private func buildCommandEnvironment(
-        repository: Repository,
-        credentials: RepositoryCredentials,
-        additionalEnvironment: [String: String]? = nil
-    ) async throws -> [String: String] {
-        var environment = ProcessInfo.processInfo.environment
-        
-        // Add repository environment
-        environment["RESTIC_REPOSITORY"] = repository.url?.path
-        environment["RESTIC_PASSWORD"] = credentials.password
-        
-        // Add cache directory
-        let cacheDirectory = try await getCacheDirectory(for: repository)
-        environment["RESTIC_CACHE_DIR"] = cacheDirectory.path
-        
-        // Add compression settings
-        // if repository.settings.compression {
-        //     environment["RESTIC_COMPRESSION"] = "max"
-        // }
-        
-        // Add additional environment
-        if let additionalEnvironment = additionalEnvironment {
-            environment.merge(additionalEnvironment) { current, _ in current }
-        }
-        
-        return environment
-    }
-    
-    private func buildCommandArguments(
-        command: ResticCommand,
-        repository: Repository
-    ) async throws -> [String] {
+    private func buildCommandArguments(for command: ResticCommand, repository: Repository) async throws -> [String] {
         var arguments = [command.rawValue]
         
         // Add common arguments
@@ -266,12 +279,8 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
             arguments.append(contentsOf: try await buildBackupArguments(for: repository))
         case .restore:
             arguments.append(contentsOf: try await buildRestoreArguments(for: repository))
-        case .check:
-            arguments.append(contentsOf: try await buildCheckArguments(for: repository))
         case .list:
             arguments.append(contentsOf: try await buildListArguments(for: repository))
-        case .stats:
-            arguments.append(contentsOf: try await buildStatsArguments(for: repository))
         }
         
         return arguments
@@ -314,21 +323,6 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         return arguments
     }
     
-    private func buildCheckArguments(for repository: Repository) async throws -> [String] {
-        var arguments: [String] = []
-        
-        // Add check options
-        // if repository.settings.checkData {
-        //     arguments.append("--read-data")
-        // }
-        
-        // if repository.settings.checkUnused {
-        //     arguments.append("--check-unused")
-        // }
-        
-        return arguments
-    }
-    
     private func buildListArguments(for repository: Repository) async throws -> [String] {
         var arguments: [String] = []
         
@@ -344,19 +338,27 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         return arguments
     }
     
-    private func buildStatsArguments(for repository: Repository) async throws -> [String] {
-        var arguments: [String] = []
+    private func buildCommandEnvironment(
+        for repository: Repository,
+        credentials: RepositoryCredentials,
+        additional: [String: String]? = nil
+    ) async throws -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
         
-        // Add stats options
-        // if repository.settings.statsDetailed {
-        //     arguments.append("--detailed")
-        // }
+        // Add repository environment
+        environment["RESTIC_REPOSITORY"] = repository.url?.path
+        environment["RESTIC_PASSWORD"] = credentials.password
         
-        // if repository.settings.statsMode == .raw {
-        //     arguments.append("--raw")
-        // }
+        // Add cache directory
+        let cacheDirectory = try await getCacheDirectory(for: repository)
+        environment["RESTIC_CACHE_DIR"] = cacheDirectory.path
         
-        return arguments
+        // Add additional environment
+        if let additional = additional {
+            environment.merge(additional) { current, _ in current }
+        }
+        
+        return environment
     }
     
     private func getCacheDirectory(for repository: Repository) async throws -> URL {
@@ -379,31 +381,11 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
         return repositoryCache
     }
     
-    private func parseCommandResult(_ result: ProcessResult) async throws -> ResticCommandResult {
-        guard result.exitCode == 0 else {
-            throw ResticError.commandFailed(result.error)
-        }
-        
-        // Parse JSON output
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        do {
-            let output = try decoder.decode(ResticOutput.self, from: result.output.data(using: .utf8) ?? Data())
-            return ResticCommandResult(
-                output: output,
-                error: nil
-            )
-        } catch {
-            throw ResticError.outputParsingFailed(error)
-        }
-    }
-    
     private func completeResticOperation(
         _ id: UUID,
         success: Bool,
         error: Error? = nil
-    ) async throws {
+    ) async {
         // Update operation status
         let status: ResticOperationStatus = success ? .completed : .failed
         // operationRecorder.updateOperation(id, status: status, error: error)
@@ -422,7 +404,9 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
             // metrics.recordFailure()
         }
     }
+}
 
+extension ResticCommandService {
     // MARK: - HealthCheckable Implementation
 
     public func performHealthCheck() async -> Bool {
@@ -449,17 +433,6 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
             }
         }
     }
-}
-
-// MARK: - ResticCommand
-
-enum ResticCommand: String {
-    case init = "init"
-    case backup = "backup"
-    case restore = "restore"
-    case check = "check"
-    case list = "list"
-    case stats = "stats"
 }
 
 // MARK: - Repository
@@ -521,7 +494,8 @@ enum ResticOperationStatus: String {
 // MARK: - ResticCommandResult
 
 struct ResticCommandResult {
-    let output: ResticOutput
+    let output: String
+    let exitCode: Int
     let error: Error?
 }
 
@@ -535,15 +509,4 @@ struct ResticOutput: Codable {
 
 struct Snapshot: Codable {
     let id: String
-}
-
-// MARK: - ResticError
-
-enum ResticError: Error {
-    case resticNotInstalled(String)
-    case invalidRepository(String)
-    case accessDenied(String)
-    case unhealthyRepository(String)
-    case commandFailed(Error)
-    case outputParsingFailed(Error)
 }

@@ -19,12 +19,14 @@ import Foundation
     static let shared = RestoreActor()
 }
 
+/// Service responsible for restoring files from Restic snapshots
 @RestoreActor
 final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, HealthCheckable, Measurable {
     // MARK: - Properties
 
     private let resticService: ResticServiceProtocol
     private let keychainService: KeychainServiceProtocol
+    private let fileManager: FileManagerProtocol
     private let operationQueue: OperationQueue
     private var activeRestores: Set<UUID> = []
     private var _isHealthy: Bool = true
@@ -43,10 +45,12 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         resticService: ResticServiceProtocol,
-        keychainService: KeychainServiceProtocol
+        keychainService: KeychainServiceProtocol,
+        fileManager: FileManagerProtocol
     ) {
         self.resticService = resticService
         self.keychainService = keychainService
+        self.fileManager = fileManager
 
         operationQueue = OperationQueue()
         operationQueue.name = "dev.mpy.rBUM.restoreQueue"
@@ -60,35 +64,56 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
     public func restore(
         snapshot: ResticSnapshot,
         from repository: Repository,
-        paths _: [String],
+        paths: [String],
         to target: String
     ) async throws {
         try await measure("Restore Files") {
-            // Track restore operation
+            // Create operation ID
             let operationId = UUID()
-            activeRestores.insert(operationId)
-
-            defer {
-                activeRestores.remove(operationId)
+            
+            do {
+                // Start operation
+                try await startRestoreOperation(
+                    operationId,
+                    snapshot: snapshot,
+                    repository: repository,
+                    target: target
+                )
+                
+                // Validate prerequisites
+                try await validateRestorePrerequisites(
+                    snapshot: snapshot,
+                    repository: repository,
+                    target: target
+                )
+                
+                // Execute restore
+                try await resticService.restore(
+                    from: URL(fileURLWithPath: repository.path),
+                    to: URL(fileURLWithPath: target)
+                )
+                
+                // Complete operation
+                await completeRestoreOperation(operationId, success: true)
+                
+                logger.info(
+                    "Restore completed",
+                    metadata: [
+                        "snapshot": .string(snapshot.id),
+                        "repository": .string(repository.id.uuidString),
+                        "target": .string(target),
+                        "paths": .string(paths.joined(separator: ", "))
+                    ],
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+                
+            } catch {
+                // Handle failure
+                await completeRestoreOperation(operationId, success: false, error: error)
+                throw error
             }
-
-            // Verify permissions
-            guard try await verifyPermissions(for: URL(fileURLWithPath: target)) else {
-                throw RestoreError.insufficientPermissions
-            }
-
-            // Execute restore
-            try await resticService.restore(
-                from: URL(fileURLWithPath: repository.path),
-                to: URL(fileURLWithPath: target)
-            )
-
-            logger.info(
-                "Restore completed for snapshot \(snapshot.id) to \(target)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
         }
     }
 
@@ -99,25 +124,10 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
                 ResticSnapshot(
                     id: id,
                     time: Date(),
-                    hostname: ProcessInfo.processInfo.hostName,
-                    paths: [repository.path]
+                    paths: [],
+                    tags: []
                 )
             }
-        }
-    }
-
-    public func verifyPermissions(for url: URL) async throws -> Bool {
-        try await measure("Verify Permissions") {
-            try await securityService.validateAccess(to: url)
-        }
-    }
-
-    // MARK: - HealthCheckable Implementation
-
-    public func performHealthCheck() async throws -> Bool {
-        await measure("Restore Service Health Check") {
-            await updateHealthStatus()
-            return isHealthy
         }
     }
 }
@@ -125,15 +135,33 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
 // MARK: - Restore Errors
 
 public enum RestoreError: LocalizedError {
+    case snapshotNotFound
+    case snapshotInaccessible
+    case targetNotFound
+    case targetNotWritable
+    case insufficientSpace
     case insufficientPermissions
-    case restoreFailed(Error)
-
+    case operationNotFound
+    case operationFailed(String)
+    
     public var errorDescription: String? {
         switch self {
+        case .snapshotNotFound:
+            return "Snapshot not found in repository"
+        case .snapshotInaccessible:
+            return "Snapshot is not accessible"
+        case .targetNotFound:
+            return "Restore target not found"
+        case .targetNotWritable:
+            return "Restore target is not writable"
+        case .insufficientSpace:
+            return "Insufficient space at restore target"
         case .insufficientPermissions:
-            "Insufficient permissions to restore to destination"
-        case let .restoreFailed(error):
-            "Restore failed: \(error.localizedDescription)"
+            return "Insufficient permissions for restore target"
+        case .operationNotFound:
+            return "Restore operation not found"
+        case .operationFailed(let message):
+            return "Restore operation failed: \(message)"
         }
     }
 }
