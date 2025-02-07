@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
@@ -35,12 +32,34 @@ public final class SandboxMonitor: BaseSandboxedService {
         super.init(logger: logger, securityService: securityService)
         setupNotifications()
     }
+    
+    private func setupNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleApplicationWillTerminate),
+            name: NSApplication.willTerminateNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleApplicationWillTerminate() {
+        // Clean up all monitored resources
+        let resources = monitorQueue.sync { Array(activeResources) }
+        resources.forEach { stopMonitoring(for: $0) }
+    }
 }
 
 // MARK: - SandboxMonitorProtocol Implementation
 extension SandboxMonitor: SandboxMonitorProtocol {
     public var isMonitoring: Bool {
-        <#code#>
+        get {
+            monitorQueue.sync {
+                !activeResources.isEmpty
+            }
+        }
+        set {
+            // Read-only property
+        }
     }
     
     public func startMonitoring(url: URL) -> Bool {
@@ -52,31 +71,37 @@ extension SandboxMonitor: SandboxMonitorProtocol {
                     if try await startAccessing(url) {
                         activeResources.insert(url)
                         delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
-                        return true
-                    } else {
-                        delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
-                        return false
+                        
+                        // Schedule access expiration
+                        scheduleAccessExpiration(for: url)
                     }
                 } catch {
                     logger.error("Failed to start monitoring: \(error.localizedDescription)",
-                               file: #file,
-                               function: #function,
-                               line: #line)
+                        file: #file,
+                        function: #function,
+                        line: #line)
                     delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
-                    return false
                 }
             }
-            return false
+            return true
         }
     }
     
     public func stopMonitoring(for url: URL) {
-        monitorQueue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
+        monitorQueue.sync(flags: .barrier) {
+            guard activeResources.contains(url) else { return }
             
-            if self.activeResources.contains(url) {
-                self.activeResources.remove(url)
-                self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+            Task {
+                do {
+                    try await stopAccessing(url)
+                    activeResources.remove(url)
+                    delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
+                } catch {
+                    logger.error("Failed to stop monitoring: \(error.localizedDescription)",
+                        file: #file,
+                        function: #function,
+                        line: #line)
+                }
             }
         }
     }
@@ -86,49 +111,12 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             activeResources.contains(url)
         }
     }
-}
-
-// MARK: - Private Methods
-private extension SandboxMonitor {
-    func setupNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleResourceAccessChange(_:)),
-            name: NSApplication.didBecomeActiveNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleResourceAccessChange(_:)),
-            name: NSApplication.willResignActiveNotification,
-            object: nil
-        )
-    }
     
-    @objc func handleResourceAccessChange(_ notification: Notification) {
-        monitorQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            Task {
-                for url in self.activeResources {
-                    do {
-                        if try await self.startAccessing(url) {
-                            self.delegate?.sandboxMonitor(self, didReceive: .accessGranted, for: url)
-                        } else {
-                            self.activeResources.remove(url)
-                            self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
-                        }
-                    } catch {
-                        self.logger.error("Failed to access resource: \(error.localizedDescription)",
-                                        file: #file,
-                                        function: #function,
-                                        line: #line)
-                        self.activeResources.remove(url)
-                        self.delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
-                    }
-                }
-            }
+    private func scheduleAccessExpiration(for url: URL) {
+        Task {
+            try await Task.sleep(nanoseconds: UInt64(maxResourceAccessDuration * 1_000_000_000))
+            delegate?.sandboxMonitor(self, didReceive: .accessExpired, for: url)
+            stopMonitoring(for: url)
         }
     }
 }

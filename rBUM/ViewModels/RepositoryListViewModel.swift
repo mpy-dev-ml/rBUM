@@ -46,14 +46,14 @@ final class RepositoryListViewModel: ObservableObject {
         self.securityService = securityService
         self.logger = logger
         
-        logger.debug("Initialized RepositoryListViewModel", file: #file, function: #function, line: #line)
+        logger.debug("Initialized RepositoryListViewModel")
     }
     
     // MARK: - Public Methods
     
     /// Load all repositories
     func loadRepositories() async {
-        logger.debug("Loading repositories", file: #file, function: #function, line: #line)
+        logger.debug("Loading repositories")
         
         do {
             try await loadRepositoriesAsync()
@@ -62,7 +62,7 @@ final class RepositoryListViewModel: ObservableObject {
                 self.error = error
                 self.showError = true
                 self.progress?.cancel()
-                self.logger.error("Failed to load repositories: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+                self.logger.error("Failed to load repositories: \(error.localizedDescription)")
             }
         }
     }
@@ -92,10 +92,10 @@ final class RepositoryListViewModel: ObservableObject {
                 group.addTask {
                     do {
                         // Validate repository access
-                        try await self.securityService.validateAccess(to: repository.path)
+                        try await self.securityService.validateAccess(to: URL(fileURLWithPath: repository.path))
                         
                         // Check repository status
-                        _ = try await self.repositoryService.checkRepository(repository)
+                        try await self.repositoryService.updateRepository(repository)
                         
                         // Update progress
                         await MainActor.run {
@@ -105,10 +105,7 @@ final class RepositoryListViewModel: ObservableObject {
                         return (repository, nil)
                     } catch {
                         let message = "Repository validation failed: \(error.localizedDescription)"
-                        self.logger.error(message,
-                            file: #file,
-                            function: #function,
-                            line: #line)
+                        self.logger.error("\(message)")
                         return (nil, error)
                     }
                 }
@@ -128,7 +125,7 @@ final class RepositoryListViewModel: ObservableObject {
             
             // Log any errors
             if !errors.isEmpty {
-                self.logger.warning("\(errors.count) repositories failed validation", file: #file, function: #function, line: #line)
+                self.logger.warning("\(errors.count) repositories failed validation")
             }
             
             return repos
@@ -137,14 +134,14 @@ final class RepositoryListViewModel: ObservableObject {
         await MainActor.run {
             self.repositories = validRepos
             self.progress?.completedUnitCount = Int64(validRepos.count)
-            self.logger.info("Loaded \(validRepos.count) valid repositories", file: #file, function: #function, line: #line)
+            self.logger.info("Loaded \(validRepos.count) valid repositories")
         }
     }
     
     /// Delete a repository
     /// - Parameter repository: Repository to delete
     func deleteRepository(_ repository: Repository) async {
-        logger.info("Deleting repository: \(repository.id)", file: #file, function: #function, line: #line)
+        logger.info("Deleting repository: \(repository.id)")
         
         do {
             // Create progress tracker
@@ -155,10 +152,10 @@ final class RepositoryListViewModel: ObservableObject {
             try await repositoryService.deleteRepository(repository)
             
             // Delete credentials
-            try await credentialsService.deleteCredentials(for: repository)
+            try await credentialsService.delete(forId: repository.id.uuidString)
             
             // Delete bookmark
-            try await bookmarkService.deleteBookmark(for: repository.path)
+            try await bookmarkService.stopAccessing(URL(fileURLWithPath: repository.path))
             
             // Update progress
             progress?.completedUnitCount = 1
@@ -166,12 +163,12 @@ final class RepositoryListViewModel: ObservableObject {
             // Refresh list
             await loadRepositories()
             
-            logger.info("Successfully deleted repository: \(repository.id)", file: #file, function: #function, line: #line)
+            logger.info("Successfully deleted repository: \(repository.id)")
         } catch {
             progress?.cancel()
             self.error = error
             self.showError = true
-            logger.error("Failed to delete repository: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            logger.error("Failed to delete repository: \(error.localizedDescription)")
         }
     }
 }

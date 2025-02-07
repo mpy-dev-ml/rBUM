@@ -89,7 +89,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
         }
         
-        return queue.sync {
+        return try queue.sync {
             let string = "mock-bookmark-\(UUID().uuidString)"
             guard let bookmark = string.data(using: .utf8) else {
                 logger.error(
@@ -175,7 +175,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             throw SecurityError.bookmarkCreationFailed("Failed to create bookmark (simulated)")
         }
         
-        return queue.sync {
+        return try queue.sync {
             let string = "mock-bookmark-\(UUID().uuidString)"
             guard let bookmark = string.data(using: .utf8) else {
                 logger.error(

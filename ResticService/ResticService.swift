@@ -31,6 +31,50 @@ enum ResticXPCErrorDomain {
 
 // MARK: - Restic Service Implementation
 @objc final class ResticService: BaseService, ResticXPCProtocol {
+    func executeCommand(
+        _ command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData],
+        timeout: TimeInterval,
+        auditSessionId: au_asid_t,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        queue.async {
+            do {
+                // Validate audit session
+                try self.validateAuditSession(auditSessionId)
+                
+                // Start accessing bookmarked locations
+                let accessedURLs = try self.startAccessingBookmarkedLocations(bookmarks)
+                defer {
+                    // Ensure we stop accessing locations even if an error occurs
+                    self.stopAccessingBookmarkedLocations(accessedURLs)
+                }
+                
+                // Execute the command
+                let result = try self.executeResticCommand(
+                    command: command,
+                    arguments: arguments,
+                    environment: environment,
+                    workingDirectory: workingDirectory,
+                    timeout: timeout
+                )
+                
+                completion(result)
+            } catch {
+                self.logger.error(
+                    "Command execution failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+                completion(["error": error.localizedDescription])
+            }
+        }
+    }
+    
     @objc func executeResticCommand(
         command: String,
         arguments: [String],
@@ -121,7 +165,16 @@ enum ResticXPCErrorDomain {
         }
         
         // Validate the client's code
-        guard let codeRef = SecCodeCreateWithAuditToken(pid),
+        try validateClientCode(pid, requirement: requirement)
+    }
+    
+    private func validateClientCode(_ pid: pid_t, requirement: SecRequirement) throws {
+        // Create SecCode from pid
+        var code: SecCode?
+        let attributes = [kSecGuestAttributePid: pid] as CFDictionary
+        
+        guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &code) == errSecSuccess,
+              let codeRef = code,
               SecCodeCheckValidityWithErrors(codeRef, [], requirement, nil) == errSecSuccess else {
             logger.error("Client validation failed",
                         file: #file,
@@ -159,7 +212,10 @@ enum ResticXPCErrorDomain {
         var code: SecCode?
         let attributes = [kSecGuestAttributePid: token] as CFDictionary
         let status = SecCodeCopyGuestWithAttributes(nil, attributes, [], &code)
-        return status == errSecSuccess ? code : nil
+        guard status == errSecSuccess else {
+            throw makeError(.securityValidationFailed)
+        }
+        return code
     }
     
     // MARK: - Private Methods
@@ -183,6 +239,46 @@ enum ResticXPCErrorDomain {
             }
             url.stopAccessingSecurityScopedResource()
         }
+    }
+    
+    private func startAccessingBookmarkedLocations(_ bookmarks: [String: NSData]) throws -> [URL] {
+        var accessedURLs = [URL]()
+        
+        for (_, bookmark) in bookmarks {
+            var isStale = false
+            guard let url = try? URL(resolvingBookmarkData: bookmark as Data,
+                                   options: .withSecurityScope,
+                                   relativeTo: nil,
+                                   bookmarkDataIsStale: &isStale),
+                  !isStale else {
+                throw makeError(.bookmarkValidationFailed)
+            }
+            
+            guard url.startAccessingSecurityScopedResource() else {
+                throw makeError(.accessDenied)
+            }
+            accessedURLs.append(url)
+        }
+        
+        return accessedURLs
+    }
+    
+    private func stopAccessingBookmarkedLocations(_ urls: [URL]) {
+        for url in urls {
+            url.stopAccessingSecurityScopedResource()
+        }
+    }
+    
+    private func executeResticCommand(
+        command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        timeout: TimeInterval
+    ) throws -> [String: Any] {
+        // Execute command implementation here
+        // This is a placeholder for the actual command execution
+        return ["success": true]
     }
 }
 
