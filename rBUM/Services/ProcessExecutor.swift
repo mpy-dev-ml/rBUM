@@ -74,19 +74,30 @@ final class ProcessExecutor: ProcessExecutorProtocol {
     
     init(
         fileManager: FileManager = .default,
-        logger: LoggerProtocol = LoggerFactory.createLogger(category: "ProcessExecutor") as! LoggerProtocol,
+        logger: LoggerProtocol = LoggerFactory.createLogger(
+            category: "ProcessExecutor"
+        ) as! LoggerProtocol,
         defaultTimeout: TimeInterval = 300,
-        allowedPaths: Set<String> = ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]
+        allowedPaths: Set<String> = [
+            "/usr/bin",
+            "/usr/local/bin",
+            "/opt/homebrew/bin"
+        ]
     ) {
         self.fileManager = fileManager
         self.logger = logger
         self.defaultTimeout = defaultTimeout
         self.allowedPaths = allowedPaths
         
-        logger.debug("Initialized ProcessExecutor with allowed paths: \(allowedPaths)",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.debug(
+            """
+            Initialized ProcessExecutor with allowed paths: \
+            \(allowedPaths)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
     
     func execute(
@@ -104,11 +115,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments
-        
-        // Set up environment with sanitization
-        if let environment = environment {
-            process.environment = try sanitizeEnvironment(environment)
-        }
+        process.environment = try sanitizeEnvironment(environment)
         
         // Set up pipes for output capture
         let outputPipe = Pipe()
@@ -117,6 +124,18 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         process.standardError = errorPipe
         
         // Start process with timeout
+        logger.debug(
+            """
+            Executing process:
+            Command: \(command)
+            Arguments: \(arguments.joined(separator: " "))
+            Environment: \(environment?.description ?? "default")
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
         return try await withThrowingTaskGroup(of: ProcessResult.self) { group in
             group.addTask {
                 return try await self.runProcess(
@@ -129,11 +148,17 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             
             group.addTask {
                 try await self.enforceTimeout(process)
-                throw ProcessError.timeout("Process exceeded timeout of \(self.defaultTimeout) seconds")
+                throw ProcessError.timeout(
+                    "Process exceeded timeout of \(self.defaultTimeout) seconds"
+                )
             }
             
             // Return first completed result (success or error)
-            return try await group.next() ?? ProcessResult(output: "", error: "", exitCode: -1)
+            return try await group.next() ?? ProcessResult(
+                output: "",
+                error: "",
+                exitCode: -1
+            )
         }
     }
     
@@ -144,27 +169,39 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         
         // Check if path is in allowed directories
         guard allowedPaths.contains(where: { url.path.hasPrefix($0) }) else {
-            logger.error("Executable path not in allowed directories: \(path)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                """
+                Executable path not in allowed directories: \
+                \(path)
+                """,
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return nil
         }
         
         // Validate executable exists and is executable
         guard fileManager.fileExists(atPath: url.path),
               fileManager.isExecutableFile(atPath: url.path) else {
-            logger.error("Executable not found or not executable: \(path)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                """
+                Executable not found or not executable: \
+                \(path)
+                """,
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return nil
         }
         
         return url
     }
     
-    private func sanitizeEnvironment(_ environment: [String: String]) throws -> [String: String] {
+    private func sanitizeEnvironment(
+        _ environment: [String: String]?
+    ) throws -> [String: String] {
         var sanitized = ProcessInfo.processInfo.environment
         
         // Remove sensitive environment variables
@@ -174,12 +211,18 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         }
         
         // Add provided environment variables after validation
-        for (key, value) in environment {
-            guard !key.isEmpty else { continue }
-            guard !sensitiveKeys.contains(where: { key.uppercased().contains($0) }) else {
-                throw ProcessError.environmentError("Attempted to set sensitive environment variable: \(key)")
+        if let environment = environment {
+            for (key, value) in environment {
+                guard !key.isEmpty else { continue }
+                guard !sensitiveKeys.contains(
+                    where: { key.uppercased().contains($0) }
+                ) else {
+                    throw ProcessError.environmentError(
+                        "Attempted to set sensitive environment variable: \(key)"
+                    )
+                }
+                sanitized[key] = value
             }
-            sanitized[key] = value
         }
         
         return sanitized
@@ -196,26 +239,46 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                 process.terminationHandler = { process in
                     Task {
                         do {
-                            let output = try outputPipe.fileHandleForReading.readToEnd() ?? Data()
-                            let error = try errorPipe.fileHandleForReading.readToEnd() ?? Data()
+                            let output = try outputPipe.fileHandleForReading
+                                .readToEnd() ?? Data()
+                            let error = try errorPipe.fileHandleForReading
+                                .readToEnd() ?? Data()
                             
-                            let outputString = String(data: output, encoding: .utf8) ?? ""
-                            let errorString = String(data: error, encoding: .utf8) ?? ""
+                            let outputString = String(
+                                data: output,
+                                encoding: .utf8
+                            ) ?? ""
+                            let errorString = String(
+                                data: error,
+                                encoding: .utf8
+                            ) ?? ""
                             
                             if process.terminationStatus != 0 {
-                                self.logger.error("Process failed with status \(process.terminationStatus): \(errorString)",
-                                                file: #file,
-                                                function: #function,
-                                                line: #line)
+                                self.logger.error(
+                                    """
+                                    Process failed with status \
+                                    \(process.terminationStatus): \
+                                    \(errorString)
+                                    """,
+                                    file: #file,
+                                    function: #function,
+                                    line: #line
+                                )
                             }
                             
-                            continuation.resume(returning: ProcessResult(
-                                output: outputString,
-                                error: errorString,
-                                exitCode: Int(process.terminationStatus)
-                            ))
+                            continuation.resume(
+                                returning: ProcessResult(
+                                    output: outputString,
+                                    error: errorString,
+                                    exitCode: Int(process.terminationStatus)
+                                )
+                            )
                         } catch {
-                            continuation.resume(throwing: ProcessError.executionFailed(error.localizedDescription))
+                            continuation.resume(
+                                throwing: ProcessError.executionFailed(
+                                    error.localizedDescription
+                                )
+                            )
                         }
                     }
                 }
@@ -232,19 +295,30 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                     }
                 }
             } catch {
-                continuation.resume(throwing: ProcessError.executionFailed(error.localizedDescription))
+                continuation.resume(
+                    throwing: ProcessError.executionFailed(
+                        error.localizedDescription
+                    )
+                )
             }
         }
     }
     
     private func enforceTimeout(_ process: Process) async throws {
-        try await Task.sleep(nanoseconds: UInt64(defaultTimeout * 1_000_000_000))
+        try await Task.sleep(
+            nanoseconds: UInt64(defaultTimeout * 1_000_000_000)
+        )
         if process.isRunning {
             process.terminate()
-            self.logger.error("Process terminated by timeout after \(self.defaultTimeout) seconds",
-                            file: #file,
-                            function: #function,
-                            line: #line)
+            self.logger.error(
+                """
+                Process terminated by timeout after \
+                \(self.defaultTimeout) seconds
+                """,
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
 }

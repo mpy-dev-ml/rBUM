@@ -44,7 +44,9 @@ import Foundation
     
     /// Validate interface version and security requirements
     /// - Parameter completion: Completion handler with validation result and interface version
-    func validateInterface(completion: @escaping ([String: Any]?) -> Void)
+    func validateInterface(
+        completion: @escaping ([String: Any]?) -> Void
+    )
     
     /// Execute a command through XPC
     /// - Parameters:
@@ -83,11 +85,11 @@ public enum ResticXPCErrorDomain {
     public enum Code: Int {
         case interfaceVersionMismatch = 1000
         case securityValidationFailed = 1001
-        case auditSessionInvalid = 1002
+        case auditSessionInvalid     = 1002
         case bookmarkValidationFailed = 1003
-        case serviceUnavailable = 1004
-        case commandExecutionFailed = 1005
-        case timeoutExceeded = 1006
-        case accessDenied = 1007
+        case serviceUnavailable      = 1004
+        case commandExecutionFailed  = 1005
+        case timeoutExceeded        = 1006
+        case accessDenied           = 1007
     }
 }

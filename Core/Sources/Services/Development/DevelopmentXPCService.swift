@@ -13,13 +13,19 @@ import Foundation
 public final class DevelopmentXPCService: ResticXPCProtocol {
     // MARK: - Properties
     private let logger: LoggerProtocol
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentXPC", attributes: .concurrent)
+    private let queue = DispatchQueue(
+        label: "dev.mpy.rBUM.developmentXPC",
+        attributes: .concurrent
+    )
     private let configuration: DevelopmentConfiguration
     
     public static let interfaceVersion: Int = 1
     
     // MARK: - Initialization
-    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .default) {
+    public init(
+        logger: LoggerProtocol,
+        configuration: DevelopmentConfiguration = .default
+    ) {
         self.logger = logger
         self.configuration = configuration
         
@@ -32,7 +38,9 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     }
     
     // MARK: - ResticXPCProtocol Implementation
-    public func validateInterface(completion: @escaping ([String: Any]?) -> Void) {
+    public func validateInterface(
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
         if configuration.shouldSimulateConnectionFailures {
             logger.error(
                 "Simulating interface validation failure",
@@ -95,6 +103,22 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             completion(nil)
             return
         }
+        
+        logger.debug(
+            """
+            Executing command:
+            Command: \(command)
+            Arguments: \(arguments.joined(separator: " "))
+            Working Directory: \(workingDirectory)
+            Environment Variables: \(environment.keys.joined(separator: ", "))
+            Bookmarks: \(bookmarks.keys.joined(separator: ", "))
+            Timeout: \(timeout)
+            Audit Session ID: \(auditSessionId)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
         
         queue.async {
             // Simulate artificial delay
@@ -162,7 +186,10 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         }
     }
     
-    public func ping(auditSessionId: au_asid_t, completion: @escaping (Bool) -> Void) {
+    public func ping(
+        auditSessionId: au_asid_t,
+        completion: @escaping (Bool) -> Void
+    ) {
         if configuration.shouldSimulateConnectionFailures {
             logger.error(
                 "Simulating connection failure for ping",
@@ -174,19 +201,6 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             return
         }
         
-        queue.async {
-            // Simulate artificial delay
-            if self.configuration.artificialDelay > 0 {
-                Thread.sleep(forTimeInterval: self.configuration.artificialDelay)
-            }
-            
-            self.logger.info(
-                "Successfully responded to ping",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            completion(true)
-        }
+        completion(true)
     }
 }

@@ -25,11 +25,13 @@ struct RepositoryDetailView: View {
         resticService: ResticCommandServiceProtocol = ResticCommandService(),
         credentialsManager: KeychainCredentialsManagerProtocol = KeychainCredentialsManager()
     ) {
-        _viewModel = StateObject(wrappedValue: RepositoryDetailViewModel(
-            repository: repository,
-            resticService: resticService,
-            credentialsManager: credentialsManager
-        ))
+        _viewModel = StateObject(
+            wrappedValue: RepositoryDetailViewModel(
+                repository: repository,
+                resticService: resticService,
+                credentialsManager: credentialsManager
+            )
+        )
     }
     
     var body: some View {
@@ -40,7 +42,10 @@ struct RepositoryDetailView: View {
                     backupButton
                 }
             }
-            .alert("Error", isPresented: $viewModel.showError) {
+            .alert(
+                "Error",
+                isPresented: $viewModel.showError
+            ) {
                 Button("OK") {
                     viewModel.showError = false
                 }
@@ -72,16 +77,26 @@ struct RepositoryDetailView: View {
     }
     
     private var backupButton: some View {
-        NavigationLink(destination: BackupView(repository: viewModel.repository)) {
-            Label("Backup", systemImage: "arrow.clockwise.circle")
+        NavigationLink(
+            destination: BackupView(
+                repository: viewModel.repository
+            )
+        ) {
+            Label(
+                "Backup",
+                systemImage: "arrow.clockwise.circle"
+            )
         }
         .accessibilityLabel("Start backup")
         .accessibilityHint("Navigate to backup creation screen")
     }
     
     private func tabLabel(for tab: RepositoryDetailViewModel.Tab) -> some View {
-        Label(tab.rawValue, systemImage: tab.icon)
-            .labelStyle(.iconOnly)
+        Label(
+            tab.rawValue,
+            systemImage: tab.icon
+        )
+        .labelStyle(.iconOnly)
     }
 }
 

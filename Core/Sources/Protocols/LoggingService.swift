@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
@@ -36,31 +33,43 @@ public extension LoggingService {
     ///
     /// - Returns: The result of the operation
     /// - Throws: Rethrows any error thrown by the operation
-    func logOperation<T>(_ name: String, level: OSLogType = .debug, perform operation: () throws -> T) rethrows -> T {
+    func logOperation<T>(
+        _ name: String,
+        level: OSLogType = .debug,
+        perform operation: () throws -> T
+    ) rethrows -> T {
         let start = Date()
         defer {
             let elapsed = Date().timeIntervalSince(start)
             switch level {
             case .debug:
-                logger.debug("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.debug(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             case .info:
-                logger.info("\(name) completed in \(elapsed)s",
-                          file: #file,
-                          function: #function,
-                          line: #line)
+                logger.info(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             case .error:
-                logger.error("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             default:
-                logger.debug("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.debug(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             }
         }
         return try operation()
@@ -77,31 +86,43 @@ public extension LoggingService {
     ///
     /// - Returns: The result of the operation
     /// - Throws: Rethrows any error thrown by the operation
-    func logAsyncOperation<T>(_ name: String, level: OSLogType = .debug, perform operation: () async throws -> T) async rethrows -> T {
+    func logAsyncOperation<T>(
+        _ name: String,
+        level: OSLogType = .debug,
+        perform operation: () async throws -> T
+    ) async rethrows -> T {
         let start = Date()
         defer {
             let elapsed = Date().timeIntervalSince(start)
             switch level {
             case .debug:
-                logger.debug("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.debug(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             case .info:
-                logger.info("\(name) completed in \(elapsed)s",
-                          file: #file,
-                          function: #function,
-                          line: #line)
+                logger.info(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             case .error:
-                logger.error("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             default:
-                logger.debug("\(name) completed in \(elapsed)s",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.debug(
+                    "\(name) completed in \(elapsed)s",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             }
         }
         return try await operation()

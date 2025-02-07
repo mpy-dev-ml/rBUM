@@ -14,7 +14,10 @@ import Foundation
 public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @unchecked Sendable {
     // MARK: - Properties
     private let logger: LoggerProtocol
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.developmentBookmark", attributes: .concurrent)
+    private let queue = DispatchQueue(
+        label: "dev.mpy.rBUM.developmentBookmark",
+        attributes: .concurrent
+    )
     private var bookmarks: [URL: Data] = [:]
     private var activeAccess: Set<URL> = []
     private let configuration: DevelopmentConfiguration
@@ -39,7 +42,9 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
     }
     
     // MARK: - BookmarkServiceProtocol Implementation
-    public func createBookmark(for url: URL) throws -> Data {
+    public func createBookmark(
+        for url: URL
+    ) throws -> Data {
         if configuration.shouldSimulateBookmarkFailures {
             logger.error(
                 """
@@ -66,11 +71,13 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         }
     }
     
-    public func resolveBookmark(_ bookmark: Data) throws -> URL {
+    public func resolveBookmark(
+        _ bookmark: Data
+    ) throws -> URL {
         if configuration.shouldSimulateBookmarkFailures {
-            let urlString = bookmarks.first(where: { $0.value == bookmark })
-                .map { $0.key.path }
-                ?? "unknown"
+            let urlString = bookmarks.first(
+                where: { $0.value == bookmark }
+            ).map { $0.key.path } ?? "unknown"
                 
             logger.error(
                 """
@@ -97,18 +104,21 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
                     function: #function,
                     line: #line
                 )
-                return try! url.checkResourceIsReachable() ? 
-                    url : URL(fileURLWithPath: "/")
+                return try! url.checkResourceIsReachable() 
+                    ? url 
+                    : URL(fileURLWithPath: "/")
             }
             return URL(fileURLWithPath: "/")
         }
     }
     
-    private func validateBookmarkSync(_ bookmark: Data) throws -> Bool {
+    private func validateBookmarkSync(
+        _ bookmark: Data
+    ) throws -> Bool {
         if configuration.shouldSimulateBookmarkFailures {
-            let urlString = bookmarks.first(where: { $0.value == bookmark })
-                .map { $0.key.path }
-                ?? "unknown"
+            let urlString = bookmarks.first(
+                where: { $0.value == bookmark }
+            ).map { $0.key.path } ?? "unknown"
                 
             logger.error(
                 """
@@ -128,8 +138,9 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         
         return queue.sync {
             // Check if bookmark exists and get corresponding URL
-            guard let url = bookmarks.first(where: { $0.value == bookmark })?.key 
-            else {
+            guard let url = bookmarks.first(
+                where: { $0.value == bookmark }
+            )?.key else {
                 return false
             }
             
@@ -142,11 +153,15 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         }
     }
     
-    public func validateBookmark(_ bookmark: Data) throws -> Bool {
+    public func validateBookmark(
+        _ bookmark: Data
+    ) throws -> Bool {
         return try validateBookmarkSync(bookmark)
     }
     
-    private func startAccessingSync(_ url: URL) throws -> Bool {
+    private func startAccessingSync(
+        _ url: URL
+    ) throws -> Bool {
         if configuration.shouldSimulateAccessFailures {
             logger.error(
                 "Simulating access failure for URL: \(url.path)",
@@ -169,13 +184,19 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         }
     }
     
-    public func startAccessing(_ url: URL) throws -> Bool {
+    public func startAccessing(
+        _ url: URL
+    ) throws -> Bool {
         return try startAccessingSync(url)
     }
     
-    public func stopAccessing(_ url: URL) async throws {
+    public func stopAccessing(
+        _ url: URL
+    ) async throws {
         if configuration.artificialDelay > 0 {
-            try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
+            try await Task.sleep(
+                nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000)
+            )
         }
         
         queue.async(flags: .barrier) {

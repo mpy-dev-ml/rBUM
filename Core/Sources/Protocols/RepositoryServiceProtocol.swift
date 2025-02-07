@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
@@ -18,7 +15,9 @@ public protocol RepositoryServiceProtocol {
     /// Create a new repository
     /// - Parameter repository: Repository to create
     /// - Throws: RepositoryError if creation fails
-    func createRepository(_ repository: Repository) async throws
+    func createRepository(
+        _ repository: Repository
+    ) async throws
     
     /// List all repositories
     /// - Returns: Array of repositories
@@ -28,12 +27,16 @@ public protocol RepositoryServiceProtocol {
     /// Delete a repository
     /// - Parameter repository: Repository to delete
     /// - Throws: RepositoryError if deletion fails
-    func deleteRepository(_ repository: Repository) async throws
+    func deleteRepository(
+        _ repository: Repository
+    ) async throws
     
     /// Update repository information
     /// - Parameter repository: Repository to update
     /// - Throws: RepositoryError if update fails
-    func updateRepository(_ repository: Repository) async throws
+    func updateRepository(
+        _ repository: Repository
+    ) async throws
 }
 
 /// Error types for repository operations

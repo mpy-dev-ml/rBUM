@@ -24,7 +24,10 @@ public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
     public private(set) var isHealthy: Bool = true
     
     // MARK: - Initialization
-    public init(subsystem: String = "dev.mpy.rBUM", category: String) {
+    public init(
+        subsystem: String = "dev.mpy.rBUM",
+        category: String
+    ) {
         self.subsystem = subsystem
         self.category = category
         self.logger = os.Logger(subsystem: subsystem, category: category)
@@ -40,29 +43,84 @@ public final class OSLogger: NSObject, LoggerProtocol, HealthCheckable {
         // Logger health check:
         // 1. Verify we can write to system log
         // 2. Verify subsystem and category are valid
-        logger.debug("Health check: \(self.subsystem).\(self.category)")
+        logger.debug(
+            """
+            Health check: \
+            \(self.subsystem).\(self.category)
+            """
+        )
         return true
     }
     
     // MARK: - LoggerProtocol Implementation
-    public func debug(_ message: String, file: String, function: String, line: Int) {
-        logger.debug("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    public func debug(
+        _ message: String,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        logger.debug(
+            """
+            \(message, privacy: .public) \
+            [\(file):\(line) \(function)]
+            """
+        )
     }
     
-    public func info(_ message: String, file: String, function: String, line: Int) {
-        logger.info("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    public func info(
+        _ message: String,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        logger.info(
+            """
+            \(message, privacy: .public) \
+            [\(file):\(line) \(function)]
+            """
+        )
     }
     
-    public func warning(_ message: String, file: String, function: String, line: Int) {
-        logger.warning("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    public func warning(
+        _ message: String,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        logger.warning(
+            """
+            \(message, privacy: .public) \
+            [\(file):\(line) \(function)]
+            """
+        )
     }
     
-    public func error(_ message: String, file: String, function: String, line: Int) {
-        logger.error("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    public func error(
+        _ message: String,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        logger.error(
+            """
+            \(message, privacy: .public) \
+            [\(file):\(line) \(function)]
+            """
+        )
     }
     
-    public func fault(_ message: String, file: String, function: String, line: Int) {
-        logger.fault("\(message, privacy: .public) [\(file):\(line) \(function)]")
+    public func fault(
+        _ message: String,
+        file: String,
+        function: String,
+        line: Int
+    ) {
+        logger.fault(
+            """
+            \(message, privacy: .public) \
+            [\(file):\(line) \(function)]
+            """
+        )
     }
 }
 #endif
