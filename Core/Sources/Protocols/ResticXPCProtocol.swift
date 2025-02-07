@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 import Foundation
 
 /// Configuration for XPC command execution
@@ -62,16 +59,21 @@ import Foundation
     /// - Parameters:
     ///   - auditSessionId: Audit session identifier for security validation
     ///   - completion: Completion handler with validation result
-    func ping(auditSessionId: au_asid_t, completion: @escaping (Bool) -> Void)
+    func ping(
+        auditSessionId: au_asid_t,
+        completion: @escaping (Bool) -> Void
+    )
     
     /// Validate access permissions with enhanced security
     /// - Parameters:
     ///   - bookmarks: Security-scoped bookmarks for validation
     ///   - auditSessionId: Audit session identifier for security validation
     ///   - completion: Completion handler with validation result
-    func validateAccess(bookmarks: [String: NSData],
-                       auditSessionId: au_asid_t,
-                       completion: @escaping ([String: Any]?) -> Void)
+    func validateAccess(
+        bookmarks: [String: NSData],
+        auditSessionId: au_asid_t,
+        completion: @escaping ([String: Any]?) -> Void
+    )
 }
 
 /// Error domain and codes for ResticXPC operations

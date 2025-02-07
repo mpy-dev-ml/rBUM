@@ -29,17 +29,25 @@ public enum ServiceError: LocalizedError {
         switch self {
         case .operationFailed:
             return "The operation failed to complete"
+            
         case .notInitialized:
             return "The service is not initialised"
+            
         case .alreadyInitialized:
             return "The service is already initialised"
+            
         case .invalidState(let state):
             return "Invalid service state: \(state)"
+            
         case .dependencyError(let dependency):
             return "Dependency error: \(dependency)"
+            
         case .retryFailed(let operation, let error):
             if let error = error {
-                return "Operation '\(operation)' failed after multiple attempts: \(error.localizedDescription)"
+                return """
+                    Operation '\(operation)' failed after multiple attempts: \
+                    \(error.localizedDescription)
+                    """
             }
             return "Operation '\(operation)' failed after multiple attempts"
         }

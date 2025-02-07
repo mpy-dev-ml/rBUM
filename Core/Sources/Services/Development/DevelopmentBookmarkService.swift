@@ -20,12 +20,18 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
     private let configuration: DevelopmentConfiguration
     
     // MARK: - Initialization
-    public init(logger: LoggerProtocol, configuration: DevelopmentConfiguration = .init()) {
+    public init(
+        logger: LoggerProtocol,
+        configuration: DevelopmentConfiguration = .init()
+    ) {
         self.logger = logger
         self.configuration = configuration
         
         logger.info(
-            "Initialised DevelopmentBookmarkService with configuration: \(String(describing: configuration))",
+            """
+            Initialised DevelopmentBookmarkService with configuration: \
+            \(String(describing: configuration))
+            """,
             file: #file,
             function: #function,
             line: #line
@@ -36,7 +42,10 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
     public func createBookmark(for url: URL) throws -> Data {
         if configuration.shouldSimulateBookmarkFailures {
             logger.error(
-                "Simulating bookmark creation failure for URL: \(url.path)",
+                """
+                Simulating bookmark creation failure for URL: \
+                \(url.path)
+                """,
                 file: #file,
                 function: #function,
                 line: #line
@@ -64,7 +73,10 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
                 ?? "unknown"
                 
             logger.error(
-                "Simulating bookmark resolution failure for URL: \(urlString)",
+                """
+                Simulating bookmark resolution failure for URL: \
+                \(urlString)
+                """,
                 file: #file,
                 function: #function,
                 line: #line
@@ -85,7 +97,8 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
                     function: #function,
                     line: #line
                 )
-                return try! url.checkResourceIsReachable() ? url : URL(fileURLWithPath: "/")
+                return try! url.checkResourceIsReachable() ? 
+                    url : URL(fileURLWithPath: "/")
             }
             return URL(fileURLWithPath: "/")
         }
@@ -98,7 +111,10 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
                 ?? "unknown"
                 
             logger.error(
-                "Simulating bookmark validation failure for URL: \(urlString)",
+                """
+                Simulating bookmark validation failure for URL: \
+                \(urlString)
+                """,
                 file: #file,
                 function: #function,
                 line: #line
@@ -112,7 +128,8 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, @uncheck
         
         return queue.sync {
             // Check if bookmark exists and get corresponding URL
-            guard let url = bookmarks.first(where: { $0.value == bookmark })?.key else {
+            guard let url = bookmarks.first(where: { $0.value == bookmark })?.key 
+            else {
                 return false
             }
             

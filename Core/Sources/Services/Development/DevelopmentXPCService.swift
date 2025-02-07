@@ -47,16 +47,25 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         completion(["version": Self.interfaceVersion])
     }
     
-    public func validateAccess(bookmarks: [String: NSData], auditSessionId: au_asid_t, completion: @escaping ([String: Any]?) -> Void) {
+    public func validateAccess(
+        bookmarks: [String: NSData],
+        auditSessionId: au_asid_t,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
         logger.debug(
-            "Validating access for bookmarks: \(bookmarks.keys.joined(separator: ", "))",
+            """
+            Validating access for bookmarks: \
+            \(bookmarks.keys.joined(separator: ", "))
+            """,
             file: #file,
             function: #function,
             line: #line
         )
         
         // In development mode, we always validate access successfully
-        let result = bookmarks.keys.reduce(into: [String: Bool]()) { dict, key in
+        let result = bookmarks.keys.reduce(
+            into: [String: Bool]()
+        ) { dict, key in
             dict[key] = true
         }
         
@@ -75,7 +84,10 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     ) {
         if configuration.shouldSimulateConnectionFailures {
             logger.error(
-                "Simulating connection failure for command: \(command)",
+                """
+                Simulating connection failure for command: \
+                \(command)
+                """,
                 file: #file,
                 function: #function,
                 line: #line
@@ -87,16 +99,24 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         queue.async {
             // Simulate artificial delay
             if self.configuration.artificialDelay > 0 {
-                Thread.sleep(forTimeInterval: self.configuration.artificialDelay)
+                Thread.sleep(
+                    forTimeInterval: self.configuration.artificialDelay
+                )
             }
             
             // Simulate command execution time
-            Thread.sleep(forTimeInterval: self.configuration.commandExecutionTime)
+            Thread.sleep(
+                forTimeInterval: self.configuration.commandExecutionTime
+            )
             
             // Simulate timeout if execution time exceeds timeout
-            if self.configuration.commandExecutionTime > timeout || self.configuration.shouldSimulateTimeoutFailures {
+            if self.configuration.commandExecutionTime > timeout ||
+                self.configuration.shouldSimulateTimeoutFailures {
                 self.logger.error(
-                    "Simulating timeout failure for command: \(command)",
+                    """
+                    Simulating timeout failure for command: \
+                    \(command)
+                    """,
                     file: #file,
                     function: #function,
                     line: #line
@@ -108,7 +128,10 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             // Simulate command failure if configured
             if self.configuration.shouldSimulateCommandFailures {
                 self.logger.error(
-                    "Simulating command failure for: \(command)",
+                    """
+                    Simulating command failure for: \
+                    \(command)
+                    """,
                     file: #file,
                     function: #function,
                     line: #line
@@ -123,7 +146,10 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             
             // Simulate successful command execution
             self.logger.info(
-                "Successfully executed command: \(command)",
+                """
+                Successfully executed command: \
+                \(command)
+                """,
                 file: #file,
                 function: #function,
                 line: #line

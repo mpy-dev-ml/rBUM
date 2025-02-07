@@ -5,9 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 04/02/2025.
 //
 
@@ -37,17 +34,27 @@ open class BaseService: NSObject, LoggingService {
                 return try await action()
             } catch {
                 lastError = error
-                logger.warning("Attempt \(attempt)/\(attempts) failed for operation '\(operation)': \(error.localizedDescription)",
-                             file: #file,
-                             function: #function,
-                             line: #line)
+                logger.warning(
+                    """
+                    Attempt \(attempt)/\(attempts) failed for operation '\(operation)': \
+                    \(error.localizedDescription)
+                    """,
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 
                 if attempt < attempts {
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Task.sleep(
+                        nanoseconds: UInt64(delay * 1_000_000_000)
+                    )
                 }
             }
         }
         
-        throw ServiceError.retryFailed(operation: operation, underlyingError: lastError)
+        throw ServiceError.retryFailed(
+            operation: operation,
+            underlyingError: lastError
+        )
     }
 }

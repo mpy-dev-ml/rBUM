@@ -12,8 +12,8 @@ import Foundation
 
 /// Protocol defining security operations with sandbox compliance
 ///
-/// This protocol defines the interface for security-related operations that must be performed
-/// within the app sandbox. All implementations must:
+/// This protocol defines the interface for security-related operations that must be
+/// performed within the app sandbox. All implementations must:
 /// 1. Use security-scoped bookmarks for persistent resource access
 /// 2. Properly start/stop resource access
 /// 3. Handle permission expiration and renewal
@@ -53,7 +53,7 @@ public protocol SecurityServiceProtocol {
     /// Validate access to a URL, ensuring sandbox compliance
     /// - Parameter url: The URL to validate access for
     /// - Returns: true if access is valid and the security scope is established
-    /// - Throws: SecurityError if access cannot be validated or if sandbox violation occurs
+    /// - Throws: SecurityError if access cannot be validated or sandbox violation occurs
     func validateAccess(to url: URL) async throws -> Bool
     
     /// Persist access to a URL by creating a security-scoped bookmark

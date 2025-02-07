@@ -67,14 +67,19 @@ public enum ResticXPCError: LocalizedError, Equatable {
              (.timeout, .timeout),
              (.interfaceVersionMismatch, .interfaceVersionMismatch):
             return true
-        case (.executionFailed(let l), .executionFailed(let r)):
+            
+        case let (.executionFailed(l), .executionFailed(r)):
             return l == r
-        case (.invalidBookmark(let l), .invalidBookmark(let r)):
+            
+        case let (.invalidBookmark(l), .invalidBookmark(r)):
             return l == r
-        case (.staleBookmark(let l), .staleBookmark(let r)):
+            
+        case let (.staleBookmark(l), .staleBookmark(r)):
             return l == r
-        case (.accessDenied(let l), .accessDenied(let r)):
+            
+        case let (.accessDenied(l), .accessDenied(r)):
             return l == r
+            
         default:
             return false
         }

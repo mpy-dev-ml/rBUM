@@ -29,10 +29,12 @@ open class BaseSandboxedService: BaseService {
         do {
             return try await securityService.validateAccess(to: url)
         } catch {
-            logger.error("Failed to start accessing \(url.path): \(error.localizedDescription)",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.error(
+                "Failed to start accessing \(url.path): \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             throw error
         }
     }

@@ -5,22 +5,6 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 05/02/2025.
-//
-
-//
-//  RestoreServiceProtocol.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
@@ -35,7 +19,12 @@ public protocol RestoreServiceProtocol {
     ///   - paths: Specific paths to restore (empty means restore all)
     ///   - target: Target directory for restored files
     /// - Throws: RestoreError if restore fails
-    func restore(snapshot: ResticSnapshot, from repository: Repository, paths: [String], to target: String) async throws
+    func restore(
+        snapshot: ResticSnapshot,
+        from repository: Repository,
+        paths: [String],
+        to target: String
+    ) async throws
     
     /// List available snapshots in a repository
     /// - Parameter repository: Repository to list snapshots from

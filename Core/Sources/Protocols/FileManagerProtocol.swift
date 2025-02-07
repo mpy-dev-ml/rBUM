@@ -16,7 +16,11 @@ public protocol FileManagerProtocol {
     func fileExists(atPath path: String) -> Bool
     
     /// Create a directory at the given URL
-    func createDirectory(at url: URL, withIntermediateDirectories createIntermediates: Bool, attributes: [FileAttributeKey: Any]?) throws
+    func createDirectory(
+        at url: URL,
+        withIntermediateDirectories createIntermediates: Bool,
+        attributes: [FileAttributeKey: Any]?
+    ) throws
     
     /// Remove item at the given URL
     func removeItem(at url: URL) throws
@@ -25,7 +29,11 @@ public protocol FileManagerProtocol {
     func contents(atPath path: String) -> Data?
     
     /// Write data to a file at the given URL
-    func createFile(atPath path: String, contents data: Data?, attributes attr: [FileAttributeKey: Any]?) -> Bool
+    func createFile(
+        atPath path: String,
+        contents data: Data?,
+        attributes attr: [FileAttributeKey: Any]?
+    ) -> Bool
 }
 
 /// Default implementation of FileManagerProtocol using FileManager
@@ -38,8 +46,16 @@ public struct DefaultFileManager: FileManagerProtocol {
         return fileManager.fileExists(atPath: path)
     }
     
-    public func createDirectory(at url: URL, withIntermediateDirectories createIntermediates: Bool, attributes: [FileAttributeKey: Any]?) throws {
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: createIntermediates, attributes: attributes)
+    public func createDirectory(
+        at url: URL,
+        withIntermediateDirectories createIntermediates: Bool,
+        attributes: [FileAttributeKey: Any]?
+    ) throws {
+        try fileManager.createDirectory(
+            at: url,
+            withIntermediateDirectories: createIntermediates,
+            attributes: attributes
+        )
     }
     
     public func removeItem(at url: URL) throws {
@@ -50,7 +66,15 @@ public struct DefaultFileManager: FileManagerProtocol {
         return fileManager.contents(atPath: path)
     }
     
-    public func createFile(atPath path: String, contents data: Data?, attributes attr: [FileAttributeKey: Any]?) -> Bool {
-        return fileManager.createFile(atPath: path, contents: data, attributes: attr)
+    public func createFile(
+        atPath path: String,
+        contents data: Data?,
+        attributes attr: [FileAttributeKey: Any]?
+    ) -> Bool {
+        return fileManager.createFile(
+            atPath: path,
+            contents: data,
+            attributes: attr
+        )
     }
 }
