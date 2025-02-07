@@ -3,11 +3,11 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
+//  Last updated: 7 February 2025
 //
 
+import Core
+import OSLog
 import SwiftUI
 
 /// View for managing backup operations to a Restic repository
@@ -20,27 +20,61 @@ struct BackupView: View {
     /// Initialize the backup view
     /// - Parameter repository: Repository to backup to
     init(repository: Repository) {
-        let logger = Logging.logger(for: .repository)
+        let logger = Logger(subsystem: "dev.mpy.rBUM", category: "backup")
         let fileManager = FileManager.default
-        let resticService = ResticCommandService(
-            fileManager: fileManager,
-            logger: logger
+        
+        let keychainService = KeychainService(
+            logger: logger as LoggerProtocol
         )
-        let credentialsManager = KeychainCredentialsManager()
+        
+        let bookmarkService = BookmarkService(
+            logger: logger as LoggerProtocol
+        )
+        
+        let securityService = DefaultSecurityService(
+            logger: logger as LoggerProtocol,
+            bookmarkService: bookmarkService,
+            keychainService: keychainService
+        )
+        
+        let xpcService = ResticXPCService(
+            logger: logger as LoggerProtocol,
+            securityService: securityService
+        )
+        
+        let resticService = ResticCommandService(
+            logger: logger as LoggerProtocol,
+            securityService: securityService,
+            xpcService: xpcService,
+            keychainService: keychainService,
+            fileManager: fileManager
+        )
+        
+        let backupService = BackupService(
+            resticService: resticService,
+            logger: logger as LoggerProtocol
+        )
+        
+        let credentialsManager = KeychainCredentialsManager(
+            keychainService: keychainService,
+            logger: logger as LoggerProtocol
+        )
 
         _viewModel = StateObject(
             wrappedValue: BackupViewModel(
                 repository: repository,
-                resticService: resticService,
-                credentialsManager: credentialsManager
+                backupService: backupService,
+                credentialsService: credentialsManager,
+                securityService: securityService,
+                bookmarkService: bookmarkService,
+                logger: logger as LoggerProtocol
             )
         )
     }
 
     var body: some View {
         VStack(spacing: 20) {
-            if case .backing = viewModel.state,
-               let progress = viewModel.currentProgress {
+            if case .inProgress(let progress) = viewModel.state {
                 VStack(spacing: 8) {
                     ProgressView(
                         value: progress.percentComplete,
@@ -116,9 +150,9 @@ struct BackupView: View {
                         }
                     )
                     .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.state.isActive)
+                    .disabled(viewModel.isBackupInProgress)
 
-                    if viewModel.state.isActive {
+                    if viewModel.isBackupInProgress {
                         Button(
                             role: .cancel,
                             action: {
@@ -151,157 +185,18 @@ struct BackupView: View {
     }
 }
 
-/// Preview implementation of ResticCommandService for SwiftUI previews
-private final class PreviewResticCommandService: ResticCommandServiceProtocol {
-    /// Initialize a new repository (no-op for preview)
-    /// - Parameter credentials: Repository credentials
-    func initRepository(credentials _: RepositoryCredentials) async throws {
-        // No-op for preview
-    }
-
-    /// Check if a repository is initialized (no-op for preview)
-    /// - Parameter credentials: Repository credentials
-    func checkRepository(credentials _: RepositoryCredentials) async throws {
-        // No-op for preview
-    }
-
-    /// List snapshots in a repository (returns empty list for preview)
-    /// - Parameter repository: Repository to list snapshots for
-    func listSnapshots(in _: Repository) async throws -> [ResticSnapshot] {
-        // Return empty list for preview
-        []
-    }
-
-    /// Create a backup of the given paths to the repository (simulates progress for preview)
-    /// - Parameters:
-    ///   - paths: Paths to backup
-    ///   - repository: Repository to backup to
-    ///   - tags: Optional tags for the backup
-    ///   - onProgress: Optional callback for progress updates
-    ///   - onStatusChange: Optional callback for status changes
-    func createBackup(
-        paths _: [URL],
-        to _: Repository,
-        tags _: [String]?,
-        onProgress: ((ResticBackupProgress) -> Void)?,
-        onStatusChange: ((ResticBackupStatus) -> Void)?
-    ) async throws {
-        // Simulate backup progress
-        onStatusChange?(.preparing)
-
-        // Simulate progress updates
-        let progress = ResticBackupProgress(
-            totalFiles: 100,
-            processedFiles: 50,
-            totalBytes: 1024 * 1024,
-            processedBytes: 512 * 1024,
-            currentFile: "/test/file.txt",
-            startTime: Date(),
-            updatedAt: Date()
-        )
-        onProgress?(progress)
-        onStatusChange?(.backing(progress))
-
-        // Simulate completion
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
-        onStatusChange?(.completed)
-    }
-
-    /// Prune snapshots in a repository (no-op for preview)
-    /// - Parameters:
-    ///   - repository: Repository to prune snapshots for
-    ///   - keepLast: Optional number of last snapshots to keep
-    ///   - keepDaily: Optional number of daily snapshots to keep
-    ///   - keepWeekly: Optional number of weekly snapshots to keep
-    ///   - keepMonthly: Optional number of monthly snapshots to keep
-    ///   - keepYearly: Optional number of yearly snapshots to keep
-    func pruneSnapshots(
-        in _: Repository,
-        keepLast _: Int?,
-        keepDaily _: Int?,
-        keepWeekly _: Int?,
-        keepMonthly _: Int?,
-        keepYearly _: Int?
-    ) async throws {
-        // No-op for preview
-    }
-
-    /// Check the integrity of a repository (no-op for preview)
-    /// - Parameter repository: Repository to check
-    func check(_: Repository) async throws {
-        // No-op for preview
-    }
-
-    /// Initialize a new repository at the given path (no-op for preview)
-    /// - Parameters:
-    ///   - path: Path to initialize the repository at
-    ///   - password: Password for the repository
-    func initializeRepository(at _: URL, password _: String) async throws {
-        // No-op for preview
-    }
-}
-
-/// Preview implementation of KeychainCredentialsManager for SwiftUI previews
-private final class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
-    /// Store credentials for a repository (no-op for preview)
-    /// - Parameters:
-    ///   - credentials: Credentials to store
-    ///   - id: ID of the repository
-    func store(_: RepositoryCredentials, forRepositoryId _: String) async throws {
-        // No-op for preview
-    }
-
-    /// Retrieve credentials for a repository (returns mock credentials for preview)
-    /// - Parameter id: ID of the repository
-    func retrieve(forId _: String) async throws -> RepositoryCredentials {
-        // Return mock credentials for preview
-        RepositoryCredentials(
-            repositoryPath: "/preview/repository",
-            password: "preview"
-        )
-    }
-
-    /// Delete credentials for a repository (no-op for preview)
-    /// - Parameter id: ID of the repository
-    func delete(forId _: String) async throws {
-        // No-op for preview
-    }
-
-    /// List all stored credentials (returns empty list for preview)
-    func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
-        // Return empty list for preview
-        []
-    }
-}
-
-#if DEBUG
-    struct BackupView_Previews: PreviewProvider {
-        static var previews: some View {
-            BackupView(repository: .preview)
-                .frame(width: 400, height: 500)
-        }
-    }
-
-    extension Repository {
-        /// Preview repository for SwiftUI previews
-        static var preview: Repository {
-            Repository(
-                id: UUID(),
-                path: "/Users/preview/backups",
-                name: "Preview Repository",
-                description: "A repository for SwiftUI previews",
-                credentials: .preview
+#Preview {
+    BackupView(
+        repository: Repository(
+            id: UUID(),
+            name: "Test Repository",
+            path: "/tmp/test",
+            url: URL(fileURLWithPath: "/tmp/test"),
+            credentials: RepositoryCredentials(
+                username: "test",
+                password: "test"
             )
-        }
-    }
-
-    extension RepositoryCredentials {
-        /// Preview credentials for SwiftUI previews
-        static var preview: RepositoryCredentials {
-            RepositoryCredentials(
-                repositoryPath: "/Users/preview/backups",
-                password: "preview-password"
-            )
-        }
-    }
-#endif
+        )
+    )
+    .frame(width: 400, height: 500)
+}

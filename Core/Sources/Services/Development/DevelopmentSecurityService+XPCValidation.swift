@@ -9,6 +9,13 @@
 import Foundation
 import os.log
 
+// Import security-related models
+@_implementationOnly import struct Core.SecurityMetrics
+@_implementationOnly import struct Core.SecurityOperationRecorder
+@_implementationOnly import struct Core.SecuritySimulator
+@_implementationOnly import enum Core.SecurityOperationType
+@_implementationOnly import enum Core.SecurityOperationStatus
+
 @available(macOS 13.0, *)
 public extension DevelopmentSecurityService {
     /// Validates an XPC connection.

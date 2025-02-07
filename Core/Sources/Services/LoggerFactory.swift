@@ -3,9 +3,7 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
+//  Last updated: 7 February 2025
 //
 
 import Foundation
@@ -24,9 +22,6 @@ import os.log
 /// // Create a logger with string category
 /// let securityLogger = LoggerFactory.createLogger(category: "Security")
 ///
-/// // Create a logger with enum category
-/// let backupLogger = LoggerFactory.createLogger(category: .backup)
-///
 /// // Configure logging options
 /// LoggerFactory.configuration = .init(includeSourceInfo: true)
 /// ```
@@ -36,14 +31,17 @@ import os.log
 /// 2. Provides consistent configuration across loggers
 /// 3. Supports categorized logging domains
 public enum LoggerFactory {
+    /// The subsystem identifier for all loggers
+    private static let subsystem = "dev.mpy.rBUM"
+    
     // MARK: - Public Methods
 
     /// Create a new logger for the given category
-    /// - Parameter category: Category for the logger
+    /// - Parameter category: String category for the logger
     /// - Returns: A new logger instance conforming to LoggerProtocol
     public static func createLogger(category: String) -> LoggerProtocol {
         #if os(macOS)
-            return OSLogger(subsystem: Configuration.subsystem, category: category)
+            return OSLogger(subsystem: subsystem, category: category)
         #else
             #error("Platform not supported")
         #endif

@@ -15,7 +15,6 @@
 		8D386F4D2D54D6AE00FAFA66 /* DevelopmentXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F482D54D6AE00FAFA66 /* DevelopmentXPCService.swift */; };
 		8D386F4E2D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F452D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift */; };
 		8D386F4F2D54D6AE00FAFA66 /* DevelopmentKeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F462D54D6AE00FAFA66 /* DevelopmentKeychainService.swift */; };
-		8D386F512D54DC6E00FAFA66 /* DevelopmentConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */; };
 		8D386F532D54F08800FAFA66 /* BookmarkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D386F522D54F08800FAFA66 /* BookmarkError.swift */; };
 		8D3E9FF62D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
 		8D3EA0012D5122C600C21FE0 /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
@@ -58,6 +57,73 @@
 		8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142722D52355F00FBF58A /* SecurityServiceProtocol.swift */; };
 		8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4142762D52355F00FBF58A /* MockLogger.swift */; };
 		8D4142A72D52355F00FBF58A /* Core.docc in Sources */ = {isa = PBXBuildFile; fileRef = 8D41427C2D52355F00FBF58A /* Core.docc */; };
+		8D679E152D5683630060D84A /* DevelopmentSecurityService+AccessControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0E2D5683630060D84A /* DevelopmentSecurityService+AccessControl.swift */; };
+		8D679E162D5683630060D84A /* DevelopmentKeychainService+Simulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0D2D5683630060D84A /* DevelopmentKeychainService+Simulation.swift */; };
+		8D679E172D5683630060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E082D5683630060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */; };
+		8D679E182D5683630060D84A /* SecurityOperationRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E132D5683630060D84A /* SecurityOperationRecorder.swift */; };
+		8D679E192D5683630060D84A /* DevelopmentKeychainItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0A2D5683630060D84A /* DevelopmentKeychainItem.swift */; };
+		8D679E1A2D5683630060D84A /* DevelopmentBookmarkService+HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E052D5683630060D84A /* DevelopmentBookmarkService+HealthCheck.swift */; };
+		8D679E1B2D5683630060D84A /* DevelopmentBookmarkService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E072D5683630060D84A /* DevelopmentBookmarkService+Operations.swift */; };
+		8D679E1C2D5683630060D84A /* DevelopmentKeychainService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0C2D5683630060D84A /* DevelopmentKeychainService+Operations.swift */; };
+		8D679E1D2D5683630060D84A /* SecurityMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E122D5683630060D84A /* SecurityMetrics.swift */; };
+		8D679E1E2D5683630060D84A /* DevelopmentSecurityService+SecurityRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E102D5683630060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */; };
+		8D679E1F2D5683630060D84A /* DevelopmentSecurityService+XPCValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E112D5683630060D84A /* DevelopmentSecurityService+XPCValidation.swift */; };
+		8D679E202D5683630060D84A /* DevelopmentSecurityService+BookmarkManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0F2D5683630060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */; };
+		8D679E212D5683630060D84A /* DevelopmentKeychainService+Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E0B2D5683630060D84A /* DevelopmentKeychainService+Metrics.swift */; };
+		8D679E222D5683630060D84A /* DevelopmentBookmarkService+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E092D5683630060D84A /* DevelopmentBookmarkService+Types.swift */; };
+		8D679E232D5683630060D84A /* DevelopmentBookmarkService+Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E062D5683630060D84A /* DevelopmentBookmarkService+Metrics.swift */; };
+		8D679E242D5683630060D84A /* SecuritySimulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E142D5683630060D84A /* SecuritySimulator.swift */; };
+		8D679E692D5686AE0060D84A /* ResticXPCService+Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E602D5686AE0060D84A /* ResticXPCService+Connection.swift */; };
+		8D679E6A2D5686AE0060D84A /* DevelopmentBookmarkService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E372D5686AE0060D84A /* DevelopmentBookmarkService+Operations.swift */; };
+		8D679E6B2D5686AE0060D84A /* ServiceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E4A2D5686AE0060D84A /* ServiceFactory.swift */; };
+		8D679E6C2D5686AE0060D84A /* ServiceFactory+Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E4D2D5686AE0060D84A /* ServiceFactory+Services.swift */; };
+		8D679E6D2D5686AE0060D84A /* ServiceFactory+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E4C2D5686AE0060D84A /* ServiceFactory+Lifecycle.swift */; };
+		8D679E6E2D5686AE0060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E382D5686AE0060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */; };
+		8D679E6F2D5686AE0060D84A /* PermissionManager+Bookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E5C2D5686AE0060D84A /* PermissionManager+Bookmarks.swift */; };
+		8D679E702D5686AE0060D84A /* DevelopmentKeychainService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3D2D5686AE0060D84A /* DevelopmentKeychainService+Operations.swift */; };
+		8D679E712D5686AE0060D84A /* ServiceLifecycle+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E562D5686AE0060D84A /* ServiceLifecycle+State.swift */; };
+		8D679E722D5686AE0060D84A /* DevelopmentBookmarkService+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E392D5686AE0060D84A /* DevelopmentBookmarkService+Types.swift */; };
+		8D679E732D5686AE0060D84A /* ResticXPCService+Resources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E642D5686AE0060D84A /* ResticXPCService+Resources.swift */; };
+		8D679E742D5686AE0060D84A /* DevelopmentKeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3B2D5686AE0060D84A /* DevelopmentKeychainService.swift */; };
+		8D679E752D5686AE0060D84A /* LoggerFactory+Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E592D5686AE0060D84A /* LoggerFactory+Configuration.swift */; };
+		8D679E762D5686AE0060D84A /* ServiceFactory+Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E4B2D5686AE0060D84A /* ServiceFactory+Configuration.swift */; };
+		8D679E772D5686AE0060D84A /* DevelopmentSecurityService+XPCValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E432D5686AE0060D84A /* DevelopmentSecurityService+XPCValidation.swift */; };
+		8D679E782D5686AE0060D84A /* ServiceLifecycle+ErrorHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E542D5686AE0060D84A /* ServiceLifecycle+ErrorHandling.swift */; };
+		8D679E792D5686AE0060D84A /* DevelopmentKeychainItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3A2D5686AE0060D84A /* DevelopmentKeychainItem.swift */; };
+		8D679E7A2D5686AE0060D84A /* ServiceLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E532D5686AE0060D84A /* ServiceLifecycle.swift */; };
+		8D679E7B2D5686AE0060D84A /* DevelopmentXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E442D5686AE0060D84A /* DevelopmentXPCService.swift */; };
+		8D679E7C2D5686AE0060D84A /* KeychainService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E512D5686AE0060D84A /* KeychainService+Operations.swift */; };
+		8D679E7D2D5686AE0060D84A /* BaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E312D5686AE0060D84A /* BaseService.swift */; };
+		8D679E7E2D5686AE0060D84A /* BaseSandboxedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E302D5686AE0060D84A /* BaseSandboxedService.swift */; };
+		8D679E7F2D5686AE0060D84A /* DevelopmentBookmarkService+Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E362D5686AE0060D84A /* DevelopmentBookmarkService+Metrics.swift */; };
+		8D679E802D5686AE0060D84A /* CircuitBreakerXPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E5A2D5686AE0060D84A /* CircuitBreakerXPCService.swift */; };
+		8D679E812D5686AE0060D84A /* PermissionManager+Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E5E2D5686AE0060D84A /* PermissionManager+Validation.swift */; };
+		8D679E822D5686AE0060D84A /* DevelopmentKeychainService+Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3C2D5686AE0060D84A /* DevelopmentKeychainService+Metrics.swift */; };
+		8D679E832D5686AE0060D84A /* PermissionManager+Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E5D2D5686AE0060D84A /* PermissionManager+Errors.swift */; };
+		8D679E842D5686AE0060D84A /* ServiceLifecycle+Management.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E552D5686AE0060D84A /* ServiceLifecycle+Management.swift */; };
+		8D679E852D5686AE0060D84A /* ResticXPCService+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E632D5686AE0060D84A /* ResticXPCService+Operations.swift */; };
+		8D679E862D5686AE0060D84A /* SecurityMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E462D5686AE0060D84A /* SecurityMetrics.swift */; };
+		8D679E882D5686AE0060D84A /* SecurityService+XPCValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E682D5686AE0060D84A /* SecurityService+XPCValidation.swift */; };
+		8D679E892D5686AE0060D84A /* DevelopmentSecurityService+AccessControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E402D5686AE0060D84A /* DevelopmentSecurityService+AccessControl.swift */; };
+		8D679E8A2D5686AE0060D84A /* DevelopmentSecurityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3F2D5686AE0060D84A /* DevelopmentSecurityService.swift */; };
+		8D679E8B2D5686AE0060D84A /* ServiceFactory+Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E4E2D5686AE0060D84A /* ServiceFactory+Validation.swift */; };
+		8D679E8C2D5686AE0060D84A /* ResticXPCService+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E5F2D5686AE0060D84A /* ResticXPCService+Commands.swift */; };
+		8D679E8D2D5686AE0060D84A /* LoggerFactory+Categories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E582D5686AE0060D84A /* LoggerFactory+Categories.swift */; };
+		8D679E8E2D5686AE0060D84A /* KeychainService+QueryBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E522D5686AE0060D84A /* KeychainService+QueryBuilder.swift */; };
+		8D679E8F2D5686AE0060D84A /* ResticXPCService+HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E622D5686AE0060D84A /* ResticXPCService+HealthCheck.swift */; };
+		8D679E902D5686AE0060D84A /* DevelopmentBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E342D5686AE0060D84A /* DevelopmentBookmarkService.swift */; };
+		8D679E912D5686AE0060D84A /* ResticXPCService+Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E652D5686AE0060D84A /* ResticXPCService+Validation.swift */; };
+		8D679E922D5686AE0060D84A /* ResticXPCService+ErrorHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E612D5686AE0060D84A /* ResticXPCService+ErrorHandling.swift */; };
+		8D679E932D5686AE0060D84A /* DevelopmentSecurityService+SecurityRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E422D5686AE0060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */; };
+		8D679E942D5686AE0060D84A /* SecurityService+AccessControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E662D5686AE0060D84A /* SecurityService+AccessControl.swift */; };
+		8D679E952D5686AE0060D84A /* SecurityService+BookmarkManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E672D5686AE0060D84A /* SecurityService+BookmarkManagement.swift */; };
+		8D679E962D5686AE0060D84A /* DevelopmentBookmarkService+HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E352D5686AE0060D84A /* DevelopmentBookmarkService+HealthCheck.swift */; };
+		8D679E972D5686AE0060D84A /* DevelopmentKeychainService+Simulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E3E2D5686AE0060D84A /* DevelopmentKeychainService+Simulation.swift */; };
+		8D679E982D5686AE0060D84A /* DevelopmentSecurityService+BookmarkManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E412D5686AE0060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */; };
+		8D679E992D5686AE0060D84A /* SecuritySimulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E482D5686AE0060D84A /* SecuritySimulator.swift */; };
+		8D679E9A2D5686AE0060D84A /* KeychainService+HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E502D5686AE0060D84A /* KeychainService+HealthCheck.swift */; };
+		8D679E9B2D5686AE0060D84A /* SecurityOperationRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D679E472D5686AE0060D84A /* SecurityOperationRecorder.swift */; };
+		8D679E9C2D5686AE0060D84A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 8D679E452D5686AE0060D84A /* README.md */; };
 		8DB709F42D5366C800F71C4B /* ResticXPCServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB709F32D5366C800F71C4B /* ResticXPCServiceTests.swift */; };
 		8DB70A052D53884000F71C4B /* ResticService.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = 8DB709F92D53884000F71C4B /* ResticService.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DB70A0C2D5388D500F71C4B /* Core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D3E9FEC2D5122C600C21FE0 /* Core.framework */; };
@@ -168,7 +234,6 @@
 		8D386F472D54D6AE00FAFA66 /* DevelopmentSecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSecurityService.swift; sourceTree = "<group>"; };
 		8D386F482D54D6AE00FAFA66 /* DevelopmentXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentXPCService.swift; sourceTree = "<group>"; };
 		8D386F492D54D6AE00FAFA66 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentConfiguration.swift; sourceTree = "<group>"; };
 		8D386F522D54F08800FAFA66 /* BookmarkError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkError.swift; sourceTree = "<group>"; };
 		8D3E9DD92D51219800C21FE0 /* rBUM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = rBUM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D3E9DEA2D51219900C21FE0 /* rBUMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rBUMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -215,6 +280,73 @@
 		8D41427C2D52355F00FBF58A /* Core.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Core.docc; sourceTree = "<group>"; };
 		8D41427D2D52355F00FBF58A /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
 		8D4142A92D5236FF00FBF58A /* SecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityService.swift; sourceTree = "<group>"; };
+		8D679E052D5683630060D84A /* DevelopmentBookmarkService+HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+HealthCheck.swift"; sourceTree = "<group>"; };
+		8D679E062D5683630060D84A /* DevelopmentBookmarkService+Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Metrics.swift"; sourceTree = "<group>"; };
+		8D679E072D5683630060D84A /* DevelopmentBookmarkService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E082D5683630060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+ResourceMonitoring.swift"; sourceTree = "<group>"; };
+		8D679E092D5683630060D84A /* DevelopmentBookmarkService+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Types.swift"; sourceTree = "<group>"; };
+		8D679E0A2D5683630060D84A /* DevelopmentKeychainItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentKeychainItem.swift; sourceTree = "<group>"; };
+		8D679E0B2D5683630060D84A /* DevelopmentKeychainService+Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Metrics.swift"; sourceTree = "<group>"; };
+		8D679E0C2D5683630060D84A /* DevelopmentKeychainService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E0D2D5683630060D84A /* DevelopmentKeychainService+Simulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Simulation.swift"; sourceTree = "<group>"; };
+		8D679E0E2D5683630060D84A /* DevelopmentSecurityService+AccessControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+AccessControl.swift"; sourceTree = "<group>"; };
+		8D679E0F2D5683630060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+BookmarkManagement.swift"; sourceTree = "<group>"; };
+		8D679E102D5683630060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+SecurityRequirements.swift"; sourceTree = "<group>"; };
+		8D679E112D5683630060D84A /* DevelopmentSecurityService+XPCValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+XPCValidation.swift"; sourceTree = "<group>"; };
+		8D679E122D5683630060D84A /* SecurityMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityMetrics.swift; sourceTree = "<group>"; };
+		8D679E132D5683630060D84A /* SecurityOperationRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityOperationRecorder.swift; sourceTree = "<group>"; };
+		8D679E142D5683630060D84A /* SecuritySimulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySimulator.swift; sourceTree = "<group>"; };
+		8D679E302D5686AE0060D84A /* BaseSandboxedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseSandboxedService.swift; sourceTree = "<group>"; };
+		8D679E312D5686AE0060D84A /* BaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseService.swift; sourceTree = "<group>"; };
+		8D679E342D5686AE0060D84A /* DevelopmentBookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentBookmarkService.swift; sourceTree = "<group>"; };
+		8D679E352D5686AE0060D84A /* DevelopmentBookmarkService+HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+HealthCheck.swift"; sourceTree = "<group>"; };
+		8D679E362D5686AE0060D84A /* DevelopmentBookmarkService+Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Metrics.swift"; sourceTree = "<group>"; };
+		8D679E372D5686AE0060D84A /* DevelopmentBookmarkService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E382D5686AE0060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+ResourceMonitoring.swift"; sourceTree = "<group>"; };
+		8D679E392D5686AE0060D84A /* DevelopmentBookmarkService+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentBookmarkService+Types.swift"; sourceTree = "<group>"; };
+		8D679E3A2D5686AE0060D84A /* DevelopmentKeychainItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentKeychainItem.swift; sourceTree = "<group>"; };
+		8D679E3B2D5686AE0060D84A /* DevelopmentKeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentKeychainService.swift; sourceTree = "<group>"; };
+		8D679E3C2D5686AE0060D84A /* DevelopmentKeychainService+Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Metrics.swift"; sourceTree = "<group>"; };
+		8D679E3D2D5686AE0060D84A /* DevelopmentKeychainService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E3E2D5686AE0060D84A /* DevelopmentKeychainService+Simulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentKeychainService+Simulation.swift"; sourceTree = "<group>"; };
+		8D679E3F2D5686AE0060D84A /* DevelopmentSecurityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSecurityService.swift; sourceTree = "<group>"; };
+		8D679E402D5686AE0060D84A /* DevelopmentSecurityService+AccessControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+AccessControl.swift"; sourceTree = "<group>"; };
+		8D679E412D5686AE0060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+BookmarkManagement.swift"; sourceTree = "<group>"; };
+		8D679E422D5686AE0060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+SecurityRequirements.swift"; sourceTree = "<group>"; };
+		8D679E432D5686AE0060D84A /* DevelopmentSecurityService+XPCValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevelopmentSecurityService+XPCValidation.swift"; sourceTree = "<group>"; };
+		8D679E442D5686AE0060D84A /* DevelopmentXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentXPCService.swift; sourceTree = "<group>"; };
+		8D679E452D5686AE0060D84A /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		8D679E462D5686AE0060D84A /* SecurityMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityMetrics.swift; sourceTree = "<group>"; };
+		8D679E472D5686AE0060D84A /* SecurityOperationRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityOperationRecorder.swift; sourceTree = "<group>"; };
+		8D679E482D5686AE0060D84A /* SecuritySimulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySimulator.swift; sourceTree = "<group>"; };
+		8D679E4A2D5686AE0060D84A /* ServiceFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFactory.swift; sourceTree = "<group>"; };
+		8D679E4B2D5686AE0060D84A /* ServiceFactory+Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceFactory+Configuration.swift"; sourceTree = "<group>"; };
+		8D679E4C2D5686AE0060D84A /* ServiceFactory+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceFactory+Lifecycle.swift"; sourceTree = "<group>"; };
+		8D679E4D2D5686AE0060D84A /* ServiceFactory+Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceFactory+Services.swift"; sourceTree = "<group>"; };
+		8D679E4E2D5686AE0060D84A /* ServiceFactory+Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceFactory+Validation.swift"; sourceTree = "<group>"; };
+		8D679E502D5686AE0060D84A /* KeychainService+HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeychainService+HealthCheck.swift"; sourceTree = "<group>"; };
+		8D679E512D5686AE0060D84A /* KeychainService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeychainService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E522D5686AE0060D84A /* KeychainService+QueryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeychainService+QueryBuilder.swift"; sourceTree = "<group>"; };
+		8D679E532D5686AE0060D84A /* ServiceLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLifecycle.swift; sourceTree = "<group>"; };
+		8D679E542D5686AE0060D84A /* ServiceLifecycle+ErrorHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceLifecycle+ErrorHandling.swift"; sourceTree = "<group>"; };
+		8D679E552D5686AE0060D84A /* ServiceLifecycle+Management.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceLifecycle+Management.swift"; sourceTree = "<group>"; };
+		8D679E562D5686AE0060D84A /* ServiceLifecycle+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServiceLifecycle+State.swift"; sourceTree = "<group>"; };
+		8D679E582D5686AE0060D84A /* LoggerFactory+Categories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggerFactory+Categories.swift"; sourceTree = "<group>"; };
+		8D679E592D5686AE0060D84A /* LoggerFactory+Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggerFactory+Configuration.swift"; sourceTree = "<group>"; };
+		8D679E5A2D5686AE0060D84A /* CircuitBreakerXPCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircuitBreakerXPCService.swift; sourceTree = "<group>"; };
+		8D679E5C2D5686AE0060D84A /* PermissionManager+Bookmarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PermissionManager+Bookmarks.swift"; sourceTree = "<group>"; };
+		8D679E5D2D5686AE0060D84A /* PermissionManager+Errors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PermissionManager+Errors.swift"; sourceTree = "<group>"; };
+		8D679E5E2D5686AE0060D84A /* PermissionManager+Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PermissionManager+Validation.swift"; sourceTree = "<group>"; };
+		8D679E5F2D5686AE0060D84A /* ResticXPCService+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+Commands.swift"; sourceTree = "<group>"; };
+		8D679E602D5686AE0060D84A /* ResticXPCService+Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+Connection.swift"; sourceTree = "<group>"; };
+		8D679E612D5686AE0060D84A /* ResticXPCService+ErrorHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+ErrorHandling.swift"; sourceTree = "<group>"; };
+		8D679E622D5686AE0060D84A /* ResticXPCService+HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+HealthCheck.swift"; sourceTree = "<group>"; };
+		8D679E632D5686AE0060D84A /* ResticXPCService+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+Operations.swift"; sourceTree = "<group>"; };
+		8D679E642D5686AE0060D84A /* ResticXPCService+Resources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+Resources.swift"; sourceTree = "<group>"; };
+		8D679E652D5686AE0060D84A /* ResticXPCService+Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ResticXPCService+Validation.swift"; sourceTree = "<group>"; };
+		8D679E662D5686AE0060D84A /* SecurityService+AccessControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SecurityService+AccessControl.swift"; sourceTree = "<group>"; };
+		8D679E672D5686AE0060D84A /* SecurityService+BookmarkManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SecurityService+BookmarkManagement.swift"; sourceTree = "<group>"; };
+		8D679E682D5686AE0060D84A /* SecurityService+XPCValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SecurityService+XPCValidation.swift"; sourceTree = "<group>"; };
 		8DB709F32D5366C800F71C4B /* ResticXPCServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticXPCServiceTests.swift; sourceTree = "<group>"; };
 		8DB709F92D53884000F71C4B /* ResticService.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = ResticService.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
 		8DB70A112D538A6A00F71C4B /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
@@ -333,7 +465,22 @@
 		8D386F4A2D54D6AE00FAFA66 /* Development */ = {
 			isa = PBXGroup;
 			children = (
-				8D386F502D54DC6E00FAFA66 /* DevelopmentConfiguration.swift */,
+				8D679E052D5683630060D84A /* DevelopmentBookmarkService+HealthCheck.swift */,
+				8D679E062D5683630060D84A /* DevelopmentBookmarkService+Metrics.swift */,
+				8D679E072D5683630060D84A /* DevelopmentBookmarkService+Operations.swift */,
+				8D679E082D5683630060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */,
+				8D679E092D5683630060D84A /* DevelopmentBookmarkService+Types.swift */,
+				8D679E0A2D5683630060D84A /* DevelopmentKeychainItem.swift */,
+				8D679E0B2D5683630060D84A /* DevelopmentKeychainService+Metrics.swift */,
+				8D679E0C2D5683630060D84A /* DevelopmentKeychainService+Operations.swift */,
+				8D679E0D2D5683630060D84A /* DevelopmentKeychainService+Simulation.swift */,
+				8D679E0E2D5683630060D84A /* DevelopmentSecurityService+AccessControl.swift */,
+				8D679E0F2D5683630060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */,
+				8D679E102D5683630060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */,
+				8D679E112D5683630060D84A /* DevelopmentSecurityService+XPCValidation.swift */,
+				8D679E122D5683630060D84A /* SecurityMetrics.swift */,
+				8D679E132D5683630060D84A /* SecurityOperationRecorder.swift */,
+				8D679E142D5683630060D84A /* SecuritySimulator.swift */,
 				8D386F452D54D6AE00FAFA66 /* DevelopmentBookmarkService.swift */,
 				8D386F462D54D6AE00FAFA66 /* DevelopmentKeychainService.swift */,
 				8D386F472D54D6AE00FAFA66 /* DevelopmentSecurityService.swift */,
@@ -401,6 +548,29 @@
 		8D3F8D9B2D524700007E239E /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				8D679E322D5686AE0060D84A /* Base */,
+				8D679E492D5686AE0060D84A /* Development */,
+				8D679E4F2D5686AE0060D84A /* Factory */,
+				8D679E502D5686AE0060D84A /* KeychainService+HealthCheck.swift */,
+				8D679E512D5686AE0060D84A /* KeychainService+Operations.swift */,
+				8D679E522D5686AE0060D84A /* KeychainService+QueryBuilder.swift */,
+				8D679E572D5686AE0060D84A /* Lifecycle */,
+				8D679E582D5686AE0060D84A /* LoggerFactory+Categories.swift */,
+				8D679E592D5686AE0060D84A /* LoggerFactory+Configuration.swift */,
+				8D679E5B2D5686AE0060D84A /* Mock */,
+				8D679E5C2D5686AE0060D84A /* PermissionManager+Bookmarks.swift */,
+				8D679E5D2D5686AE0060D84A /* PermissionManager+Errors.swift */,
+				8D679E5E2D5686AE0060D84A /* PermissionManager+Validation.swift */,
+				8D679E5F2D5686AE0060D84A /* ResticXPCService+Commands.swift */,
+				8D679E602D5686AE0060D84A /* ResticXPCService+Connection.swift */,
+				8D679E612D5686AE0060D84A /* ResticXPCService+ErrorHandling.swift */,
+				8D679E622D5686AE0060D84A /* ResticXPCService+HealthCheck.swift */,
+				8D679E632D5686AE0060D84A /* ResticXPCService+Operations.swift */,
+				8D679E642D5686AE0060D84A /* ResticXPCService+Resources.swift */,
+				8D679E652D5686AE0060D84A /* ResticXPCService+Validation.swift */,
+				8D679E662D5686AE0060D84A /* SecurityService+AccessControl.swift */,
+				8D679E672D5686AE0060D84A /* SecurityService+BookmarkManagement.swift */,
+				8D679E682D5686AE0060D84A /* SecurityService+XPCValidation.swift */,
 				8D3F8D932D524700007E239E /* KeychainService.swift */,
 				8D3F8D942D524700007E239E /* LoggerFactory.swift */,
 				8D3F8D952D524700007E239E /* PermissionManager.swift */,
@@ -517,6 +687,74 @@
 				8D4142752D52355F00FBF58A /* Sources */,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		8D679E322D5686AE0060D84A /* Base */ = {
+			isa = PBXGroup;
+			children = (
+				8D679E302D5686AE0060D84A /* BaseSandboxedService.swift */,
+				8D679E312D5686AE0060D84A /* BaseService.swift */,
+			);
+			path = Base;
+			sourceTree = "<group>";
+		};
+		8D679E492D5686AE0060D84A /* Development */ = {
+			isa = PBXGroup;
+			children = (
+				8D679E342D5686AE0060D84A /* DevelopmentBookmarkService.swift */,
+				8D679E352D5686AE0060D84A /* DevelopmentBookmarkService+HealthCheck.swift */,
+				8D679E362D5686AE0060D84A /* DevelopmentBookmarkService+Metrics.swift */,
+				8D679E372D5686AE0060D84A /* DevelopmentBookmarkService+Operations.swift */,
+				8D679E382D5686AE0060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift */,
+				8D679E392D5686AE0060D84A /* DevelopmentBookmarkService+Types.swift */,
+				8D679E3A2D5686AE0060D84A /* DevelopmentKeychainItem.swift */,
+				8D679E3B2D5686AE0060D84A /* DevelopmentKeychainService.swift */,
+				8D679E3C2D5686AE0060D84A /* DevelopmentKeychainService+Metrics.swift */,
+				8D679E3D2D5686AE0060D84A /* DevelopmentKeychainService+Operations.swift */,
+				8D679E3E2D5686AE0060D84A /* DevelopmentKeychainService+Simulation.swift */,
+				8D679E3F2D5686AE0060D84A /* DevelopmentSecurityService.swift */,
+				8D679E402D5686AE0060D84A /* DevelopmentSecurityService+AccessControl.swift */,
+				8D679E412D5686AE0060D84A /* DevelopmentSecurityService+BookmarkManagement.swift */,
+				8D679E422D5686AE0060D84A /* DevelopmentSecurityService+SecurityRequirements.swift */,
+				8D679E432D5686AE0060D84A /* DevelopmentSecurityService+XPCValidation.swift */,
+				8D679E442D5686AE0060D84A /* DevelopmentXPCService.swift */,
+				8D679E452D5686AE0060D84A /* README.md */,
+				8D679E462D5686AE0060D84A /* SecurityMetrics.swift */,
+				8D679E472D5686AE0060D84A /* SecurityOperationRecorder.swift */,
+				8D679E482D5686AE0060D84A /* SecuritySimulator.swift */,
+			);
+			path = Development;
+			sourceTree = "<group>";
+		};
+		8D679E4F2D5686AE0060D84A /* Factory */ = {
+			isa = PBXGroup;
+			children = (
+				8D679E4A2D5686AE0060D84A /* ServiceFactory.swift */,
+				8D679E4B2D5686AE0060D84A /* ServiceFactory+Configuration.swift */,
+				8D679E4C2D5686AE0060D84A /* ServiceFactory+Lifecycle.swift */,
+				8D679E4D2D5686AE0060D84A /* ServiceFactory+Services.swift */,
+				8D679E4E2D5686AE0060D84A /* ServiceFactory+Validation.swift */,
+			);
+			path = Factory;
+			sourceTree = "<group>";
+		};
+		8D679E572D5686AE0060D84A /* Lifecycle */ = {
+			isa = PBXGroup;
+			children = (
+				8D679E532D5686AE0060D84A /* ServiceLifecycle.swift */,
+				8D679E542D5686AE0060D84A /* ServiceLifecycle+ErrorHandling.swift */,
+				8D679E552D5686AE0060D84A /* ServiceLifecycle+Management.swift */,
+				8D679E562D5686AE0060D84A /* ServiceLifecycle+State.swift */,
+			);
+			path = Lifecycle;
+			sourceTree = "<group>";
+		};
+		8D679E5B2D5686AE0060D84A /* Mock */ = {
+			isa = PBXGroup;
+			children = (
+				8D679E5A2D5686AE0060D84A /* CircuitBreakerXPCService.swift */,
+			);
+			path = Mock;
 			sourceTree = "<group>";
 		};
 		8DB70A0B2D5388D500F71C4B /* Frameworks */ = {
@@ -800,6 +1038,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8D679E9C2D5686AE0060D84A /* README.md in Resources */,
 				8D386F4B2D54D6AE00FAFA66 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -923,6 +1162,22 @@
 				8DB70A162D53901D00F71C4B /* ResticXPCError.swift in Sources */,
 				8D3F8DA22D524700007E239E /* SecurityService.swift in Sources */,
 				8D36157C2D53E2810008675E /* StorageServiceProtocol.swift in Sources */,
+				8D679E152D5683630060D84A /* DevelopmentSecurityService+AccessControl.swift in Sources */,
+				8D679E162D5683630060D84A /* DevelopmentKeychainService+Simulation.swift in Sources */,
+				8D679E172D5683630060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift in Sources */,
+				8D679E182D5683630060D84A /* SecurityOperationRecorder.swift in Sources */,
+				8D679E192D5683630060D84A /* DevelopmentKeychainItem.swift in Sources */,
+				8D679E1A2D5683630060D84A /* DevelopmentBookmarkService+HealthCheck.swift in Sources */,
+				8D679E1B2D5683630060D84A /* DevelopmentBookmarkService+Operations.swift in Sources */,
+				8D679E1C2D5683630060D84A /* DevelopmentKeychainService+Operations.swift in Sources */,
+				8D679E1D2D5683630060D84A /* SecurityMetrics.swift in Sources */,
+				8D679E1E2D5683630060D84A /* DevelopmentSecurityService+SecurityRequirements.swift in Sources */,
+				8D679E1F2D5683630060D84A /* DevelopmentSecurityService+XPCValidation.swift in Sources */,
+				8D679E202D5683630060D84A /* DevelopmentSecurityService+BookmarkManagement.swift in Sources */,
+				8D679E212D5683630060D84A /* DevelopmentKeychainService+Metrics.swift in Sources */,
+				8D679E222D5683630060D84A /* DevelopmentBookmarkService+Types.swift in Sources */,
+				8D679E232D5683630060D84A /* DevelopmentBookmarkService+Metrics.swift in Sources */,
+				8D679E242D5683630060D84A /* SecuritySimulator.swift in Sources */,
 				8D3F8DA32D524700007E239E /* SandboxMonitor.swift in Sources */,
 				8DEB6AAB2D52939D00DE8CDE /* ServiceLifecycle.swift in Sources */,
 				8D3F8D8F2D5246A3007E239E /* RepositoryStatus.swift in Sources */,
@@ -942,12 +1197,61 @@
 				8D3615802D53F9510008675E /* MockResticXPCService.swift in Sources */,
 				8D4142A42D52355F00FBF58A /* ResticXPCServiceProtocol.swift in Sources */,
 				8DEB6A942D528C5B00DE8CDE /* LoggerProtocol.swift in Sources */,
-				8D386F512D54DC6E00FAFA66 /* DevelopmentConfiguration.swift in Sources */,
 				8DEB6ABF2D52D8F000DE8CDE /* KeychainCredentials.swift in Sources */,
 				8D4142A52D52355F00FBF58A /* SecurityServiceProtocol.swift in Sources */,
 				8D4142A62D52355F00FBF58A /* MockLogger.swift in Sources */,
 				8D4142A72D52355F00FBF58A /* Core.docc in Sources */,
 				8DEB6AB92D52BDA200DE8CDE /* SandboxMonitorProtocol.swift in Sources */,
+				8D679E692D5686AE0060D84A /* ResticXPCService+Connection.swift in Sources */,
+				8D679E6A2D5686AE0060D84A /* DevelopmentBookmarkService+Operations.swift in Sources */,
+				8D679E6B2D5686AE0060D84A /* ServiceFactory.swift in Sources */,
+				8D679E6C2D5686AE0060D84A /* ServiceFactory+Services.swift in Sources */,
+				8D679E6D2D5686AE0060D84A /* ServiceFactory+Lifecycle.swift in Sources */,
+				8D679E6E2D5686AE0060D84A /* DevelopmentBookmarkService+ResourceMonitoring.swift in Sources */,
+				8D679E6F2D5686AE0060D84A /* PermissionManager+Bookmarks.swift in Sources */,
+				8D679E702D5686AE0060D84A /* DevelopmentKeychainService+Operations.swift in Sources */,
+				8D679E712D5686AE0060D84A /* ServiceLifecycle+State.swift in Sources */,
+				8D679E722D5686AE0060D84A /* DevelopmentBookmarkService+Types.swift in Sources */,
+				8D679E732D5686AE0060D84A /* ResticXPCService+Resources.swift in Sources */,
+				8D679E742D5686AE0060D84A /* DevelopmentKeychainService.swift in Sources */,
+				8D679E752D5686AE0060D84A /* LoggerFactory+Configuration.swift in Sources */,
+				8D679E762D5686AE0060D84A /* ServiceFactory+Configuration.swift in Sources */,
+				8D679E772D5686AE0060D84A /* DevelopmentSecurityService+XPCValidation.swift in Sources */,
+				8D679E782D5686AE0060D84A /* ServiceLifecycle+ErrorHandling.swift in Sources */,
+				8D679E792D5686AE0060D84A /* DevelopmentKeychainItem.swift in Sources */,
+				8D679E7A2D5686AE0060D84A /* ServiceLifecycle.swift in Sources */,
+				8D679E7B2D5686AE0060D84A /* DevelopmentXPCService.swift in Sources */,
+				8D679E7C2D5686AE0060D84A /* KeychainService+Operations.swift in Sources */,
+				8D679E7D2D5686AE0060D84A /* BaseService.swift in Sources */,
+				8D679E7E2D5686AE0060D84A /* BaseSandboxedService.swift in Sources */,
+				8D679E7F2D5686AE0060D84A /* DevelopmentBookmarkService+Metrics.swift in Sources */,
+				8D679E802D5686AE0060D84A /* CircuitBreakerXPCService.swift in Sources */,
+				8D679E812D5686AE0060D84A /* PermissionManager+Validation.swift in Sources */,
+				8D679E822D5686AE0060D84A /* DevelopmentKeychainService+Metrics.swift in Sources */,
+				8D679E832D5686AE0060D84A /* PermissionManager+Errors.swift in Sources */,
+				8D679E842D5686AE0060D84A /* ServiceLifecycle+Management.swift in Sources */,
+				8D679E852D5686AE0060D84A /* ResticXPCService+Operations.swift in Sources */,
+				8D679E862D5686AE0060D84A /* SecurityMetrics.swift in Sources */,
+				8D679E882D5686AE0060D84A /* SecurityService+XPCValidation.swift in Sources */,
+				8D679E892D5686AE0060D84A /* DevelopmentSecurityService+AccessControl.swift in Sources */,
+				8D679E8A2D5686AE0060D84A /* DevelopmentSecurityService.swift in Sources */,
+				8D679E8B2D5686AE0060D84A /* ServiceFactory+Validation.swift in Sources */,
+				8D679E8C2D5686AE0060D84A /* ResticXPCService+Commands.swift in Sources */,
+				8D679E8D2D5686AE0060D84A /* LoggerFactory+Categories.swift in Sources */,
+				8D679E8E2D5686AE0060D84A /* KeychainService+QueryBuilder.swift in Sources */,
+				8D679E8F2D5686AE0060D84A /* ResticXPCService+HealthCheck.swift in Sources */,
+				8D679E902D5686AE0060D84A /* DevelopmentBookmarkService.swift in Sources */,
+				8D679E912D5686AE0060D84A /* ResticXPCService+Validation.swift in Sources */,
+				8D679E922D5686AE0060D84A /* ResticXPCService+ErrorHandling.swift in Sources */,
+				8D679E932D5686AE0060D84A /* DevelopmentSecurityService+SecurityRequirements.swift in Sources */,
+				8D679E942D5686AE0060D84A /* SecurityService+AccessControl.swift in Sources */,
+				8D679E952D5686AE0060D84A /* SecurityService+BookmarkManagement.swift in Sources */,
+				8D679E962D5686AE0060D84A /* DevelopmentBookmarkService+HealthCheck.swift in Sources */,
+				8D679E972D5686AE0060D84A /* DevelopmentKeychainService+Simulation.swift in Sources */,
+				8D679E982D5686AE0060D84A /* DevelopmentSecurityService+BookmarkManagement.swift in Sources */,
+				8D679E992D5686AE0060D84A /* SecuritySimulator.swift in Sources */,
+				8D679E9A2D5686AE0060D84A /* KeychainService+HealthCheck.swift in Sources */,
+				8D679E9B2D5686AE0060D84A /* SecurityOperationRecorder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

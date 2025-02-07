@@ -1,46 +1,106 @@
 //
 //  MockLogger.swift
-//  rBUM
+//  Core
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
+//  Last updated: 7 February 2025
 //
 
 import Foundation
 import os.log
 
 /// Mock logger for testing
-class MockLogger: LoggerProtocol {
-    func warning(_ message: String, file: String, function: String, line: Int) {
-        warningMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+public final class MockLogger: LoggerProtocol {
+    public struct LogMessage {
+        public let message: String
+        public let metadata: [String: LogMetadataValue]
+        public let privacy: LogPrivacy
+        public let file: String
+        public let function: String
+        public let line: Int
     }
 
-    struct LogMessage {
-        let message: String
-        let file: String
-        let function: String
-        let line: Int
+    public private(set) var messages: [LogMessage] = []
+
+    public init() {}
+
+    public func debug(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        messages.append(LogMessage(
+            message: message,
+            metadata: metadata ?? [:],
+            privacy: privacy,
+            file: file,
+            function: function,
+            line: line
+        ))
     }
 
-    var debugMessages: [LogMessage] = []
-    var infoMessages: [LogMessage] = []
-    var warningMessages: [LogMessage] = []
-    var errorMessages: [LogMessage] = []
-
-    func debug(_ message: String, file: String, function: String, line: Int) {
-        debugMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+    public func info(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        messages.append(LogMessage(
+            message: message,
+            metadata: metadata ?? [:],
+            privacy: privacy,
+            file: file,
+            function: function,
+            line: line
+        ))
     }
 
-    func info(_ message: String, file: String, function: String, line: Int) {
-        infoMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+    public func warning(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        messages.append(LogMessage(
+            message: message,
+            metadata: metadata ?? [:],
+            privacy: privacy,
+            file: file,
+            function: function,
+            line: line
+        ))
     }
 
-    func error(_ message: String, file: String, function: String, line: Int) {
-        errorMessages.append(LogMessage(message: message, file: file, function: function, line: line))
+    public func error(
+        _ message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        messages.append(LogMessage(
+            message: message,
+            metadata: metadata ?? [:],
+            privacy: privacy,
+            file: file,
+            function: function,
+            line: line
+        ))
+    }
+
+    public func containsMessage(_ pattern: String) -> Bool {
+        messages.contains { $0.message.contains(pattern) }
+    }
+
+    public func clear() {
+        messages.removeAll()
     }
 }
