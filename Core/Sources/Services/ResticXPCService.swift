@@ -136,7 +136,7 @@ extension ResticXPCService {
         }
         
         connection.invalidationHandler = { [weak self] in
-            self?.handleError(ResticXPCError.connectionFailed)
+            self?.handleInvalidation()
         }
     }
     
@@ -187,12 +187,10 @@ extension ResticXPCService {
     
     /// Handle XPC connection interruption
     private func handleInterruption() {
-        logger.error(
-            "XPC connection interrupted",
-            file: #file,
-            function: #function,
-            line: #line
-        )
+        logger.error("XPC connection interrupted",
+                    file: #file,
+                    function: #function,
+                    line: #line)
         cleanupResources()
         isHealthy = false
     }
