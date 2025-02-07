@@ -70,9 +70,9 @@ public extension LifecycleManaged where Self: LoggingService {
     /// - Throws: Any error that occurs during initialisation
     func initialize() async throws {
         logger.info("Initialising service...",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+                    file: #file,
+                    function: #function,
+                    line: #line)
         // Override in concrete implementations
     }
     
@@ -81,9 +81,9 @@ public extension LifecycleManaged where Self: LoggingService {
     /// their specific shutdown logic.
     func shutdown() async {
         logger.info("Shutting down service...",
-                   file: #file,
-                   function: #function,
-                   line: #line)
+                    file: #file,
+                    function: #function,
+                    line: #line)
         // Override in concrete implementations
     }
 }

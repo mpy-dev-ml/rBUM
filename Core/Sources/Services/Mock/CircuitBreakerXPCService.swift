@@ -50,10 +50,12 @@ internal final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtoco
         do {
             isHealthy = try await performHealthCheck()
         } catch {
-            logger.error("Health check failed: \(error.localizedDescription)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.error(
+                "Health check failed: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             isHealthy = false
         }
     }
