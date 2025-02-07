@@ -8,16 +8,48 @@
 import Foundation
 
 /// Protocol for file system operations, allowing for easier testing and sandbox compliance.
-/// This protocol provides a safe interface for file operations while respecting sandbox restrictions.
+///
+/// The `FileManagerProtocol` provides a safe interface for file operations while respecting
+/// sandbox restrictions. Implementations must:
+/// - Handle sandbox access restrictions appropriately
+/// - Use security-scoped bookmarks when needed
+/// - Clean up resources properly
+/// - Handle permission errors gracefully
+/// - Support both synchronous and asynchronous operations
+///
+/// Example usage:
+/// ```swift
+/// class BackupManager {
+///     private let fileManager: FileManagerProtocol
+///
+///     init(fileManager: FileManagerProtocol) {
+///         self.fileManager = fileManager
+///     }
+///
+///     func backupFile(at url: URL) throws {
+///         guard fileManager.fileExists(atPath: url.path) else {
+///             throw BackupError.fileNotFound
+///         }
+///         // Perform backup operations...
+///     }
+/// }
+/// ```
+///
+/// - Note: All operations must be performed within the app's sandbox boundaries
+/// - Important: Always check for file existence before performing operations
 public protocol FileManagerProtocol {
     /// Check if a file exists and is accessible at the given path
     /// - Parameter path: The path to check
     /// - Returns: True if the file exists and is accessible
+    /// - Note: This operation respects sandbox restrictions
     func fileExists(atPath path: String) -> Bool
 
     /// Check if a file exists and get its type
-    /// - Parameter path: The path to check
-    /// - Returns: A tuple containing existence and whether it's a directory
+    /// - Parameters:
+    ///   - path: The path to check
+    ///   - isDirectory: Pointer to receive directory status
+    /// - Returns: True if the file exists and is accessible
+    /// - Note: The isDirectory parameter will be set to true for directories
     func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool
 
     /// Create a directory at the given URL
@@ -25,7 +57,8 @@ public protocol FileManagerProtocol {
     ///   - url: The URL where the directory should be created
     ///   - createIntermediates: If true, creates intermediate directories
     ///   - attributes: Optional attributes for the new directory
-    /// - Throws: FileError if creation fails
+    /// - Throws: FileError if creation fails due to permissions or sandbox restrictions
+    /// - Note: Ensure you have proper sandbox entitlements for the target location
     func createDirectory(
         at url: URL,
         withIntermediateDirectories createIntermediates: Bool,
@@ -34,12 +67,14 @@ public protocol FileManagerProtocol {
 
     /// Remove item at the given URL
     /// - Parameter url: The URL of the item to remove
-    /// - Throws: FileError if removal fails
+    /// - Throws: FileError if removal fails due to permissions or sandbox restrictions
+    /// - Important: This operation cannot be undone
     func removeItem(at url: URL) throws
 
     /// Get contents of a file at the given path
     /// - Parameter path: The path to read from
     /// - Returns: The file contents as Data, or nil if the file cannot be read
+    /// - Note: Returns nil if sandbox restrictions prevent access
     func contents(atPath path: String) -> Data?
 
     /// Write data to a file at the given path
@@ -48,6 +83,7 @@ public protocol FileManagerProtocol {
     ///   - data: The data to write
     ///   - attr: Optional attributes for the new file
     /// - Returns: True if the write was successful
+    /// - Note: Ensure proper sandbox entitlements for the target location
     func createFile(
         atPath path: String,
         contents data: Data?,
@@ -58,25 +94,29 @@ public protocol FileManagerProtocol {
     /// - Parameters:
     ///   - srcURL: The source URL
     ///   - dstURL: The destination URL
-    /// - Throws: FileError if the copy fails
+    /// - Throws: FileError if the copy fails due to permissions or sandbox restrictions
+    /// - Note: Ensure proper sandbox entitlements for the target location
     func copyItem(at srcURL: URL, to dstURL: URL) throws
 
     /// Move an item from one location to another
     /// - Parameters:
     ///   - srcURL: The source URL
     ///   - dstURL: The destination URL
-    /// - Throws: FileError if the move fails
+    /// - Throws: FileError if the move fails due to permissions or sandbox restrictions
+    /// - Important: This operation cannot be undone
     func moveItem(at srcURL: URL, to dstURL: URL) throws
 
     /// Get attributes of an item
     /// - Parameter path: The path to get attributes for
     /// - Returns: The attributes dictionary, or nil if not accessible
+    /// - Throws: FileError if access is denied due to sandbox restrictions
     func attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any]
 
     /// List contents of a directory
     /// - Parameter url: The directory URL to list
     /// - Returns: Array of URLs for the directory contents
-    /// - Throws: FileError if the directory cannot be read
+    /// - Throws: FileError if the directory cannot be read due to sandbox restrictions
+    /// - Note: Ensure proper sandbox entitlements for the target location
     func contentsOfDirectory(
         at url: URL,
         includingPropertiesForKeys keys: [URLResourceKey]?,
