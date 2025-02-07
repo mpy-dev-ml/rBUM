@@ -298,45 +298,22 @@ final class BackupServiceTests: XCTestCase {
 
 // MARK: - Test Helpers
 
-private struct LogMessage {
-    let level: LogLevel
-    let message: String
-    let metadata: [String: LogMetadataValue]?
-    let privacy: LogPrivacy
-    let error: Error?
-    let file: String
-    let function: String
-    let line: Int
-}
-
 private final class TestLogger: LoggerProtocol {
     var messages: [String] = []
-
-    func log(
-        level: LogLevel,
-        message: String,
-        metadata: [String: LogMetadataValue]?,
-        privacy: LogPrivacy,
-        error: Error?,
-        file: String,
-        function: String,
-        line: Int
-    ) {
-        let logMessage = LogMessage(
-            level: level,
-            message: message,
-            metadata: metadata,
-            privacy: privacy,
-            error: error,
-            file: file,
-            function: function,
-            line: line
-        )
-        handleLogMessage(logMessage)
-    }
     
-    private func handleLogMessage(_ message: LogMessage) {
-        messages.append(message.message)
+    func log(
+        level: LogLevel = .info,
+        message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .public,
+        error: Error? = nil,
+        file: String = #file,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        let errorText = error.map { " Error: \($0)" } ?? ""
+        let metadataText = metadata.map { " Metadata: \($0)" } ?? ""
+        messages.append("[\(level)] \(message)\(errorText)\(metadataText)")
     }
 }
 
