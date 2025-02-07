@@ -58,7 +58,12 @@ extension SandboxMonitor: SandboxMonitorProtocol {
             }
         }
         set {
-            logger.warning("Attempted to set isMonitoring to \(newValue), but this property is read-only")
+            logger.warning(
+                "Attempted to set isMonitoring to \(newValue), but this property is read-only",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
