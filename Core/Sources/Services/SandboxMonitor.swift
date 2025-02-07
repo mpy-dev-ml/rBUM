@@ -81,10 +81,12 @@ extension SandboxMonitor: SandboxMonitorProtocol {
                         scheduleAccessExpiration(for: url)
                     }
                 } catch {
-                    logger.error("Failed to start monitoring: \(error.localizedDescription)",
+                    logger.error(
+                        "Failed to start monitoring: \(error.localizedDescription)",
                         file: #file,
                         function: #function,
-                        line: #line)
+                        line: #line
+                    )
                     delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
                 }
             }
@@ -102,10 +104,12 @@ extension SandboxMonitor: SandboxMonitorProtocol {
                     activeResources.remove(url)
                     delegate?.sandboxMonitor(self, didReceive: .accessRevoked, for: url)
                 } catch {
-                    logger.error("Failed to stop monitoring: \(error.localizedDescription)",
+                    logger.error(
+                        "Failed to stop monitoring: \(error.localizedDescription)",
                         file: #file,
                         function: #function,
-                        line: #line)
+                        line: #line
+                    )
                 }
             }
         }

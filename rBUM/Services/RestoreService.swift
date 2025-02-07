@@ -77,10 +77,12 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
                 to: URL(fileURLWithPath: target)
             )
             
-            logger.info("Restore completed for snapshot \(snapshot.id) to \(target)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Restore completed for snapshot \(snapshot.id) to \(target)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     

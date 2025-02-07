@@ -82,7 +82,11 @@ final class LoggerTests: XCTestCase {
             "key3": .bool(true)
         ]
         
-        logger.debug(message, metadata: metadata, privacy: .public)
+        logger.debug(
+            message,
+            metadata: metadata,
+            privacy: .public
+        )
         
         XCTAssertEqual(testOutput.lastLevel, .debug)
         XCTAssertEqual(testOutput.lastMessage, message)
@@ -97,7 +101,13 @@ final class LoggerTests: XCTestCase {
         let function = "testFunction()"
         let line = 42
         
-        logger.debug(message, privacy: .public, file: file, function: function, line: line)
+        logger.debug(
+            message,
+            privacy: .public,
+            file: file,
+            function: function,
+            line: line
+        )
         
         XCTAssertEqual(testOutput.lastFile, file)
         XCTAssertEqual(testOutput.lastFunction, function)

@@ -175,10 +175,12 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
                 let bookmark = try bookmarkService.createBookmark(for: url)
                 return try bookmarkService.validateBookmark(bookmark)
             } catch {
-                logger.error("Failed to validate access: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Failed to validate access: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
         }
@@ -194,10 +196,12 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
         do {
             return try bookmarkService.startAccessing(url)
         } catch {
-            logger.error("Failed to start accessing: \(error.localizedDescription)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.error(
+                "Failed to start accessing: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return false
         }
     }
@@ -212,10 +216,12 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
             do {
                 try await bookmarkService.stopAccessing(url)
             } catch {
-                logger.error("Failed to stop accessing: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Failed to stop accessing: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
             }
         }
     }
@@ -266,10 +272,12 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
 
                 return monitorHealthy && operationsHealthy
             } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                            file: #file,
-                            function: #function,
-                            line: #line)
+                logger.error(
+                    "Health check failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
         }

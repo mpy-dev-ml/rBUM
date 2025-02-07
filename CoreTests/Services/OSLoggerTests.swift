@@ -66,9 +66,24 @@ struct OSLoggerTests {
         
         // Test logging with source location
         #expect {
-            try logger.debug("Test message", file: file, function: function, line: line)
-            try logger.info("Test message", file: file, function: function, line: line)
-            try logger.error("Test message", file: file, function: function, line: line)
+            try logger.debug(
+                "Test message",
+                file: file,
+                function: function,
+                line: line
+            )
+            try logger.info(
+                "Test message",
+                file: file,
+                function: function,
+                line: line
+            )
+            try logger.error(
+                "Test message",
+                file: file,
+                function: function,
+                line: line
+            )
         }
     }
 }

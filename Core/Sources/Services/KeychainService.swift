@@ -96,16 +96,20 @@ public final class KeychainService: BaseSandboxedService, Measurable {
             try save(data, for: testKey)
             try delete(for: testKey)
             
-            logger.info("Keychain health check passed",
-                        file: #file,
-                        function: #function,
-                        line: #line)
+            logger.info(
+                "Keychain health check passed",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return true
         } catch {
-            logger.error("Keychain health check failed: \(error.localizedDescription)",
-                         file: #file,
-                         function: #function,
-                         line: #line)
+            logger.error(
+                "Keychain health check failed: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
             return false
         }
     }

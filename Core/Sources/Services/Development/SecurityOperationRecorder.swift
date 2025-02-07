@@ -46,8 +46,12 @@ public final class SecurityOperationRecorder {
         self.logger = logger
     }
     
-    func recordOperation(url: URL, type: SecurityOperation.OperationType, 
-                        status: SecurityOperation.OperationStatus, error: String? = nil) {
+    func recordOperation(
+        url: URL,
+        type: SecurityOperation.OperationType,
+        status: SecurityOperation.OperationStatus,
+        error: String? = nil
+    ) {
         queue.sync {
             let operation = SecurityOperation(
                 url: url,

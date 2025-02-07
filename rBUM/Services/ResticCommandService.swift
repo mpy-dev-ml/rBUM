@@ -69,10 +69,12 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 password: UUID().uuidString      // Use appropriate credentials here
             )
             
-            logger.info("Repository initialized at \(url.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Repository initialized at \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -98,10 +100,12 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 password: UUID().uuidString              // Use appropriate credentials here
             )
             
-            logger.info("Backup completed from \(source.path) to \(destination.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Backup completed from \(source.path) to \(destination.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -137,10 +141,12 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 password: UUID().uuidString          // Use appropriate credentials here
             )
             
-            logger.info("Restore completed from \(source.path) to \(destination.path)",
-                       file: #file,
-                       function: #function,
-                       line: #line)
+            logger.info(
+                "Restore completed from \(source.path) to \(destination.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
         }
     }
     
@@ -159,10 +165,12 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
                 
                 return xpcHealthy && operationsHealthy
             } catch {
-                logger.error("Health check failed: \(error.localizedDescription)",
-                           file: #file,
-                           function: #function,
-                           line: #line)
+                logger.error(
+                    "Health check failed: \(error.localizedDescription)",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
                 return false
             }
         }

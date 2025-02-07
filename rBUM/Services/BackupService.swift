@@ -127,7 +127,8 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
                     id: id,
                     time: Date(),
                     hostname: Host.current().localizedName ?? "Unknown",
-                    tags: nil, paths: []
+                    tags: nil, 
+                    paths: []
                 )
             }
         }
