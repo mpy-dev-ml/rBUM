@@ -281,7 +281,9 @@ extension ResticXPCService {
                                 command,
                                 arguments: arguments,
                                 environment: environment,
-                                workingDirectory: workingDirectory
+                                workingDirectory: workingDirectory,
+                                bookmarks: bookmarks,
+                                retryCount: retryCount
                             )
                             continuation.resume(returning: result)
                             return
