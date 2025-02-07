@@ -101,18 +101,37 @@ import Foundation
     func cleanup(force: Bool) async throws
 }
 
-/// Error domain and codes for ResticXPC operations
+/// Error domain and codes for ResticXPC operations.
+/// Used to identify and categorise errors that occur during XPC communication and command execution.
 public enum ResticXPCErrorDomain {
+    /// The error domain identifier for ResticXPC operations
     public static let name = "dev.mpy.rBUM.ResticXPC"
 
+    /// Error codes specific to ResticXPC operations.
+    /// Each code represents a distinct type of error that can occur during XPC communication.
     public enum Code: Int {
+        /// The XPC interface version of the client does not match the service
         case interfaceVersionMismatch = 1000
+        
+        /// Security validation checks failed during XPC communication
         case securityValidationFailed = 1001
+        
+        /// The audit session is invalid or has expired
         case auditSessionInvalid = 1002
+        
+        /// Security-scoped bookmark validation failed
         case bookmarkValidationFailed = 1003
+        
+        /// The XPC service is not available or cannot be reached
         case serviceUnavailable = 1004
+        
+        /// Command execution through XPC failed
         case commandExecutionFailed = 1005
+        
+        /// The operation exceeded its specified timeout
         case timeoutExceeded = 1006
+        
+        /// Access to requested resources was denied
         case accessDenied = 1007
     }
 }
