@@ -258,7 +258,9 @@ extension ResticXPCService {
     ) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
             guard let service = connection.remoteObjectProxy as? ResticXPCProtocol else {
-                continuation.resume(throwing: ResticXPCError.serviceUnavailable)
+                continuation.resume(
+                    throwing: ResticXPCError.serviceUnavailable
+                )
                 return
             }
             
