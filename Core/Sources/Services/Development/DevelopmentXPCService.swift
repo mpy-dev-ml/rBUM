@@ -287,12 +287,20 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     }
 }
 
+/// Configuration for XPC commands
 struct XPCCommandConfig {
+    /// The command to execute
     let command: String
+    /// Arguments to pass to the command
     let arguments: [String]
+    /// Environment variables to set for the command
     let environment: [String: String]
+    /// Working directory for the command
     let workingDirectory: String
+    /// Bookmarks to use for the command
     let bookmarks: [String: NSData]
+    /// Timeout for the command execution
     let timeout: TimeInterval
+    /// Audit session ID for the command
     let auditSessionId: au_asid_t
 }

@@ -147,7 +147,14 @@ final class ResticXPCServiceTests: XCTestCase {
         let invalidSnapshot = "invalid-snapshot"
         
         // When/Then
-        await XCTAssertThrowsError(try await service.restore(repository: invalidRepo, destination: invalidDest, snapshot: invalidSnapshot, password: testPassword)) { error in
+        await XCTAssertThrowsError(
+            try await service.restore(
+                repository: invalidRepo,
+                destination: invalidDest,
+                snapshot: invalidSnapshot,
+                password: testPassword
+            )
+        ) { error in
             XCTAssertTrue(error is XPCError)
             XCTAssertTrue(mockLogger.containsMessage("Failed to execute restore command"))
         }

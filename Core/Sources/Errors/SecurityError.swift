@@ -9,16 +9,27 @@ import Foundation
 
 /// Errors that can occur during security operations
 public enum SecurityError: LocalizedError, Equatable {
+    /// Access permission was denied by the system
     case permissionDenied(String)
+    /// Failed to create a security-scoped bookmark
     case bookmarkCreationFailed(String)
+    /// Failed to resolve an existing security-scoped bookmark
     case bookmarkResolutionFailed(String)
+    /// Security-scoped bookmark has become stale and needs to be recreated
     case bookmarkStale(String)
+    /// Operation violates sandbox restrictions
     case sandboxViolation(String)
+    /// Access to a resource was denied
     case accessDenied(String)
+    /// Required resource is not available or accessible
     case resourceUnavailable(String)
+    /// Failed to establish XPC connection
     case xpcConnectionFailed(String)
+    /// XPC service encountered an error during operation
     case xpcServiceError(String)
+    /// XPC service denied permission for the requested operation
     case xpcPermissionDenied(String)
+    /// XPC message validation failed
     case xpcValidationFailed(String)
     
     public var errorDescription: String? {

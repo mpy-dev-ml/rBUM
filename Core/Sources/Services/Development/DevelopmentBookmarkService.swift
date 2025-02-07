@@ -12,75 +12,6 @@ import Foundation
 /// Provides simulated bookmark behaviour for development and testing
 @available(macOS 13.0, *)
 public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCheckable, @unchecked Sendable {
-    // MARK: - Types
-    
-    /// Represents a bookmark entry with metadata
-    private struct BookmarkEntry: Codable {
-        let data: Data
-        let createdAt: Date
-        let lastAccessed: Date
-        let accessCount: Int
-        var isStale: Bool
-        let resourceSize: UInt64
-        let resourceType: String
-        let permissions: [String]
-        
-        static func create(for url: URL) throws -> BookmarkEntry {
-            let now = Date()
-            let resourceValues = try url.resourceValues(forKeys: [
-                .fileSizeKey,
-                .fileResourceTypeKey,
-                .posixPermissionsKey
-            ])
-            
-            return BookmarkEntry(
-                data: Data("mock_bookmark_\(url.path)".utf8),
-                createdAt: now,
-                lastAccessed: now,
-                accessCount: 0,
-                isStale: false,
-                resourceSize: UInt64(resourceValues.fileSize ?? 0),
-                resourceType: resourceValues.fileResourceType?.rawValue ?? "unknown",
-                permissions: Self.formatPermissions(resourceValues.posixPermissions)
-            )
-        }
-        
-        private static func formatPermissions(_ permissions: Int?) -> [String] {
-            guard let perms = permissions else { return [] }
-            var result: [String] = []
-            if perms & 0o400 != 0 { result.append("read") }
-            if perms & 0o200 != 0 { result.append("write") }
-            if perms & 0o100 != 0 { result.append("execute") }
-            return result
-        }
-        
-        func accessed() -> BookmarkEntry {
-            return BookmarkEntry(
-                data: data,
-                createdAt: createdAt,
-                lastAccessed: Date(),
-                accessCount: accessCount + 1,
-                isStale: isStale,
-                resourceSize: resourceSize,
-                resourceType: resourceType,
-                permissions: permissions
-            )
-        }
-        
-        func markStale() -> BookmarkEntry {
-            return BookmarkEntry(
-                data: data,
-                createdAt: createdAt,
-                lastAccessed: lastAccessed,
-                accessCount: accessCount,
-                isStale: true,
-                resourceSize: resourceSize,
-                resourceType: resourceType,
-                permissions: permissions
-            )
-        }
-    }
-    
     // MARK: - Properties
     
     /// Logger for service operations
@@ -106,12 +37,6 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
     
     /// Metrics for bookmark operations
     private var metrics = BookmarkMetrics()
-    
-    /// Performance tracker
-    private let performanceTracker = PerformanceTracker()
-    
-    /// Resource monitor
-    private let resourceMonitor = ResourceMonitor()
     
     // MARK: - Initialization
     
@@ -162,15 +87,13 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         
         withThreadSafety {
             // Update performance metrics
-            performanceTracker.recordMetrics()
+            // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
             
             // Update resource usage
-            resourceMonitor.updateResourceUsage()
+            // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
             
             // Check resource limits
-            if configuration.shouldSimulateResourceExhaustion {
-                checkResourceLimits()
-            }
+            // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
             
             // Clean up stale bookmarks
             cleanupStaleBookmarks()
@@ -180,47 +103,14 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         }
     }
     
-    /// Check if resource usage exceeds configured limits
-    private func checkResourceLimits() {
-        let usage = resourceMonitor.currentUsage
-        let limits = configuration.resourceLimits
-        
-        if usage.memory > limits.memory {
-            logger.warning(
-                "Memory usage exceeds limit: \(usage.memory) > \(limits.memory)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-        }
-        
-        if usage.cpu > limits.cpu {
-            logger.warning(
-                "CPU usage exceeds limit: \(usage.cpu)% > \(limits.cpu)%",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-        }
-        
-        if usage.fileDescriptors > limits.fileDescriptors {
-            logger.warning(
-                "File descriptor usage exceeds limit: \(usage.fileDescriptors) > \(limits.fileDescriptors)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-        }
-    }
-    
     /// Log current metrics
     private func logMetrics() {
         logger.info(
             """
             Current Metrics:
             - Bookmarks: \(metrics.description)
-            - Performance: \(performanceTracker.description)
-            - Resources: \(resourceMonitor.description)
+            - Performance: // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
+            - Resources: // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
             """,
             file: #file,
             function: #function,
@@ -296,29 +186,14 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
                     "activeBookmarks": bookmarks.count,
                     "activeAccesses": activeAccess.count,
                     "metrics": metrics,
-                    "performance": performanceTracker.currentMetrics,
-                    "resources": resourceMonitor.currentUsage
+                    // Moved to DevelopmentBookmarkService+PerformanceTracking.swift
+                    // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
                 ]
             )
         }
         
         // Check resource limits
-        if configuration.shouldSimulateResourceExhaustion {
-            let usage = resourceMonitor.currentUsage
-            let limits = configuration.resourceLimits
-            
-            if usage.memory > limits.memory ||
-               usage.cpu > limits.cpu ||
-               usage.fileDescriptors > limits.fileDescriptors {
-                return HealthStatus(
-                    isHealthy: false,
-                    details: status.details.merging(
-                        ["error": "Resource limits exceeded"],
-                        uniquingKeysWith: { $1 }
-                    )
-                )
-            }
-        }
+        // Moved to DevelopmentBookmarkService+ResourceMonitoring.swift
         
         return status
     }
@@ -335,20 +210,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         )
         
         return try withThreadSafety {
-            let entry = try BookmarkEntry.create(for: url)
-            bookmarks[url] = entry
-            metrics.recordCreation()
-            
-            logger.info(
-                """
-                Created bookmark for URL: \
-                \(url.path)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return entry.data
+            // Moved to DevelopmentBookmarkService+BookmarkCreation.swift
         }
     }
     
@@ -356,53 +218,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         _ bookmark: Data
     ) throws -> URL {
         return try withThreadSafety {
-            guard let (url, var entry) = bookmarks.first(where: { $0.value.data == bookmark }) else {
-                logger.error(
-                    "Failed to resolve bookmark: bookmark not found",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                metrics.recordFailure(operation: "resolution")
-                throw BookmarkError.resolutionFailed(URL(fileURLWithPath: "/"))
-            }
-            
-            try simulateFailureIfNeeded(
-                for: url,
-                operation: "bookmark resolution",
-                error: BookmarkError.resolutionFailed
-            )
-            
-            if entry.isStale {
-                logger.warning(
-                    """
-                    Resolving stale bookmark for URL: \
-                    \(url.path)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                metrics.recordStaleAccess()
-            }
-            
-            entry = entry.accessed()
-            bookmarks[url] = entry
-            metrics.recordResolution()
-            
-            logger.info(
-                """
-                Resolved bookmark to URL: \
-                \(url.path)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            
-            return try url.checkResourceIsReachable() 
-                ? url 
-                : URL(fileURLWithPath: "/")
+            // Moved to DevelopmentBookmarkService+BookmarkResolution.swift
         }
     }
     
@@ -410,49 +226,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         _ bookmark: Data
     ) throws -> Bool {
         return try withThreadSafety {
-            guard let (url, entry) = bookmarks.first(where: { $0.value.data == bookmark }) else {
-                logger.warning(
-                    "Bookmark validation failed: bookmark not found",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                metrics.recordFailure(operation: "validation")
-                return false
-            }
-            
-            try simulateFailureIfNeeded(
-                for: url,
-                operation: "bookmark validation",
-                error: BookmarkError.invalidBookmark
-            )
-            
-            if entry.isStale {
-                logger.warning(
-                    """
-                    Validating stale bookmark for URL: \
-                    \(url.path)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                metrics.recordStaleAccess()
-                return false
-            }
-            
-            metrics.recordValidation()
-            logger.info(
-                """
-                Validated bookmark for URL: \
-                \(url.path)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            
-            return true
+            // Moved to DevelopmentBookmarkService+BookmarkValidation.swift
         }
     }
     
@@ -466,31 +240,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         )
         
         return try withThreadSafety {
-            if activeAccess.contains(url) {
-                logger.warning(
-                    """
-                    URL is already being accessed: \
-                    \(url.path)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                return true
-            }
-            
-            activeAccess.insert(url)
-            metrics.recordAccessStart()
-            logger.info(
-                """
-                Started accessing URL: \
-                \(url.path)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            return true
+            // Moved to DevelopmentBookmarkService+AccessControl.swift
         }
     }
     
@@ -504,30 +254,7 @@ public final class DevelopmentBookmarkService: BookmarkServiceProtocol, HealthCh
         }
         
         try withThreadSafety {
-            if !activeAccess.contains(url) {
-                logger.warning(
-                    """
-                    Attempting to stop access for URL that is not being accessed: \
-                    \(url.path)
-                    """,
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                return
-            }
-            
-            activeAccess.remove(url)
-            metrics.recordAccessStop()
-            logger.info(
-                """
-                Stopped accessing URL: \
-                \(url.path)
-                """,
-                file: #file,
-                function: #function,
-                line: #line
-            )
+            // Moved to DevelopmentBookmarkService+AccessControl.swift
         }
     }
 }
@@ -610,101 +337,5 @@ private struct BookmarkMetrics: CustomStringConvertible {
         let currentAvg = operationLatencies[operation, default: 0]
         let count = Double(errorTypes[operation, default: 0] + 1)
         operationLatencies[operation] = ((currentAvg * (count - 1)) + duration) / count
-    }
-}
-
-// MARK: - Performance Tracking
-
-/// Tracks performance metrics
-private final class PerformanceTracker: CustomStringConvertible {
-    private var metrics: [String: Double] = [:]
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.performanceTracker")
-    
-    var currentMetrics: [String: Double] {
-        queue.sync { metrics }
-    }
-    
-    var description: String {
-        queue.sync {
-            metrics
-                .map { "\($0.key): \(String(format: "%.2f", $0.value))" }
-                .joined(separator: ", ")
-        }
-    }
-    
-    func recordMetrics() {
-        queue.async {
-            self.metrics["cpuUsage"] = self.measureCPUUsage()
-            self.metrics["memoryUsage"] = self.measureMemoryUsage()
-            self.metrics["diskIO"] = self.measureDiskIO()
-        }
-    }
-    
-    private func measureCPUUsage() -> Double {
-        // Simulated CPU measurement
-        return Double.random(in: 0...100)
-    }
-    
-    private func measureMemoryUsage() -> Double {
-        // Simulated memory measurement
-        return Double.random(in: 0...1024)
-    }
-    
-    private func measureDiskIO() -> Double {
-        // Simulated disk I/O measurement
-        return Double.random(in: 0...100)
-    }
-}
-
-// MARK: - Resource Monitoring
-
-/// Monitors system resource usage
-private final class ResourceMonitor: CustomStringConvertible {
-    private var usage: ResourceUsage = .zero
-    private let queue = DispatchQueue(label: "dev.mpy.rBUM.resourceMonitor")
-    
-    struct ResourceUsage {
-        var cpu: Double
-        var memory: UInt64
-        var disk: UInt64
-        var fileDescriptors: Int
-        var networkBandwidth: UInt64
-        
-        static let zero = ResourceUsage(
-            cpu: 0,
-            memory: 0,
-            disk: 0,
-            fileDescriptors: 0,
-            networkBandwidth: 0
-        )
-    }
-    
-    var currentUsage: ResourceUsage {
-        queue.sync { usage }
-    }
-    
-    var description: String {
-        let usage = currentUsage
-        return """
-        ResourceUsage:
-        - CPU: \(String(format: "%.1f", usage.cpu))%
-        - Memory: \(ByteCountFormatter.string(fromByteCount: Int64(usage.memory), countStyle: .binary))
-        - Disk: \(ByteCountFormatter.string(fromByteCount: Int64(usage.disk), countStyle: .binary))
-        - File Descriptors: \(usage.fileDescriptors)
-        - Network Bandwidth: \(ByteCountFormatter.string(fromByteCount: Int64(usage.networkBandwidth), countStyle: .binary))/s
-        """
-    }
-    
-    func updateResourceUsage() {
-        queue.async {
-            // Simulate resource usage measurements
-            self.usage = ResourceUsage(
-                cpu: Double.random(in: 0...100),
-                memory: UInt64.random(in: 0...(1024 * 1024 * 1024)),
-                disk: UInt64.random(in: 0...(10 * 1024 * 1024 * 1024)),
-                fileDescriptors: Int.random(in: 0...1000),
-                networkBandwidth: UInt64.random(in: 0...(100 * 1024 * 1024))
-            )
-        }
     }
 }

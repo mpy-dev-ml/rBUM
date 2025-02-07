@@ -7,9 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+  XCODE_VERSION: 15.2
+
 jobs:
-  build-and-test:
-    name: Build and Test
+  lint:
+    name: Code Quality
     runs-on: macos-latest
     
     steps:
@@ -24,13 +28,28 @@ jobs:
     - name: Run SwiftLint
       run: swiftlint lint --strict
     
+    - name: Run Swift Format Check
+      run: swift-format lint -r .
+      
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    needs: lint
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app
+    
     - name: Build Core Framework
       run: |
         xcodebuild build -scheme Core \
           -destination 'platform=macOS' \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          ENABLE_TESTABILITY=YES
     
     - name: Test Core Framework
       run: |
@@ -47,7 +66,8 @@ jobs:
           -destination 'platform=macOS' \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          ENABLE_TESTABILITY=YES
     
     - name: Test rBUM App
       run: |
@@ -70,20 +90,6 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: true
-    
-    - name: Build Documentation
-      run: |
-        xcodebuild docbuild -scheme Core \
-          -destination 'platform=macOS' \
-          CODE_SIGN_IDENTITY="" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
-    
-    - name: Upload Documentation
-      uses: actions/upload-artifact@v3
-      with:
-        name: documentation
-        path: ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug/Core.doccarchive
 
   analyze:
     name: Static Analysis
@@ -109,5 +115,37 @@ jobs:
     - name: Upload Analysis Results
       uses: actions/upload-artifact@v3
       with:
-        name: static-analysis-report
+        name: analyzer-results
         path: analyzer-results
+
+  documentation:
+    name: Documentation
+    runs-on: macos-latest
+    needs: build-and-test
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app
+    
+    - name: Build Documentation
+      run: |
+        xcodebuild docbuild -scheme Core \
+          -destination 'platform=macOS' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
+    
+    - name: Upload Documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug/Core.doccarchive
+    
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug/Core.doccarchive

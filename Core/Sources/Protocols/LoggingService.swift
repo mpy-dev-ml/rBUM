@@ -25,10 +25,15 @@ public protocol LoggingService {
 
 /// Represents the available logging levels with their descriptions
 public enum LogLevel {
+    /// Debug level for detailed information during development
     case debug
+    /// Info level for general operational information
     case info
+    /// Warning level for potentially harmful situations
     case warning
+    /// Error level for errors that might still allow the application to continue running
     case error
+    /// Fault level for severe errors that may prevent proper functioning
     case fault
     
     /// Convert to OSLogType
