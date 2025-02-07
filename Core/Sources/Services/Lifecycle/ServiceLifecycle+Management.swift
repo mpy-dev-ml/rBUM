@@ -100,7 +100,10 @@ public extension LifecycleManaged {
     /// - Throws: ServiceError if transition is not allowed
     func validateStateTransition(to newState: ServiceState, for operation: String) throws {
         guard state.canTransitionTo(newState) else {
-            throw ServiceError.invalidStateTransition("Cannot transition from \(state) to \(newState) during \(operation)")
+            throw ServiceError.invalidStateTransition(
+                "Cannot transition from \(state) to \(newState) " +
+                "during \(operation)"
+            )
         }
     }
 }

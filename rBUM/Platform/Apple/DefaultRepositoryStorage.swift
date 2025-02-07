@@ -205,7 +205,12 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
         // Validate password complexity
         let passwordRegex = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,}$"
         guard credentials.password.range(of: passwordRegex, options: .regularExpression) != nil else {
-            throw RepositoryError.invalidCredentials("Password must be at least 8 characters and contain both letters and numbers")
+            throw RepositoryError.invalidCredentials(
+                """
+                Password must be at least 8 characters and
+                contain both letters and numbers
+                """
+            )
         }
     }
 

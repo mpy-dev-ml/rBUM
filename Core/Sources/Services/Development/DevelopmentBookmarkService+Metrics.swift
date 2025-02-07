@@ -45,7 +45,13 @@ extension DevelopmentBookmarkService {
         private let queue = DispatchQueue(label: "dev.mpy.rBUM.resourceMonitor")
 
         var description: String {
-            "ResourceMonitor(memory: \(usage.memoryUsage) bytes, disk: \(usage.diskUsage) bytes, cpu: \(usage.cpuUsage)%)"
+            """
+            ResourceMonitor(
+                memory: \(usage.memoryUsage) bytes,
+                disk: \(usage.diskUsage) bytes,
+                cpu: \(usage.cpuUsage)%
+            )
+            """
         }
 
         func update(memoryUsage: Int? = nil, diskUsage: Int? = nil, cpuUsage: Double? = nil) {

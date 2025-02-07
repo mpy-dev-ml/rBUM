@@ -3,11 +3,9 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
+//  Last updated: 7 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
+
 import Foundation
 
 /// A service that manages permission persistence and recovery for sandbox-compliant file access.
@@ -36,27 +34,21 @@ import Foundation
 /// // Recover permission later
 /// let hasAccess = try await manager.recoverPermission(for: fileURL)
 /// ```
-///
-/// ## Topics
-///
-/// ### Permission Management
-/// - ``persistPermission(for:)``
-/// - ``recoverPermission(for:)``
-/// - ``revokePermission(for:)``
-///
-/// ### Error Handling
-/// - ``PermissionError``
 public class PermissionManager {
-    private let logger: LoggerProtocol
-    private let securityService: SecurityServiceProtocol
-    private let keychain: KeychainServiceProtocol
-    private let fileManager: FileManager
+    // MARK: - Properties
+
+    let logger: LoggerProtocol
+    let securityService: SecurityServiceProtocol
+    let keychain: KeychainServiceProtocol
+    let fileManager: FileManager
 
     /// Prefix used for keychain permission entries to avoid naming conflicts
-    private let keychainPrefix = "dev.mpy.rBUM.permission."
+    let keychainPrefix = "dev.mpy.rBUM.permission."
 
     /// Access group identifier for sharing permissions with the XPC service
-    private let permissionAccessGroup = "dev.mpy.rBUM.permissions"
+    let permissionAccessGroup = "dev.mpy.rBUM.permissions"
+
+    // MARK: - Initialization
 
     /// Creates a new permission manager instance.
     ///
@@ -85,6 +77,8 @@ public class PermissionManager {
             )
         }
     }
+
+    // MARK: - Public Methods
 
     /// Request and persist permission for a URL
     /// - Parameter url: The URL to request permission for
@@ -199,10 +193,6 @@ public class PermissionManager {
                 function: #function,
                 line: #line
             )
-
-            // Clean up failed bookmark
-            try? removeBookmark(for: url)
-
             throw PermissionError.recoveryFailed(error.localizedDescription)
         }
     }
@@ -323,90 +313,6 @@ public class PermissionManager {
                 line: #line
             )
             throw PermissionError.revocationFailed(error.localizedDescription)
-        }
-    }
-
-    private func validateFileAccess(for url: URL) async throws {
-        try await validateFileExists(at: url)
-        try await validateFilePermissions(for: url)
-        try await validateSandboxAccess(to: url)
-    }
-
-    private func validateFileExists(at url: URL) async throws {
-        guard fileManager.fileExists(atPath: url.path) else {
-            logger.error("File does not exist", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.fileNotFound(url)
-        }
-    }
-
-    private func validateFilePermissions(for url: URL) async throws {
-        let resourceValues = try url.resourceValues(forKeys: [
-            .isReadableKey,
-            .isWritableKey,
-            .fileProtectionKey
-        ])
-
-        guard resourceValues.isReadable else {
-            logger.error("File is not readable", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.readAccessDenied(url)
-        }
-
-        guard resourceValues.isWritable else {
-            logger.error("File is not writable", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.writeAccessDenied(url)
-        }
-
-        if let protection = resourceValues.fileProtection,
-           protection == .complete {
-            logger.error("File is encrypted", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.fileEncrypted(url)
-        }
-    }
-
-    private func validateSandboxAccess(to url: URL) async throws {
-        let securityScopedURL = try await securityService.resolveBookmark(for: url)
-
-        guard securityScopedURL.startAccessingSecurityScopedResource() else {
-            logger.error("Failed to access security-scoped resource", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.sandboxAccessDenied(url)
-        }
-
-        defer {
-            securityScopedURL.stopAccessingSecurityScopedResource()
-        }
-
-        try validateSandboxPermissions(for: securityScopedURL)
-    }
-
-    private func validateSandboxPermissions(for url: URL) throws {
-        let resourceValues = try url.resourceValues(forKeys: [
-            .volumeIsReadOnlyKey,
-            .volumeSupportsFileCloningKey
-        ])
-
-        if let isReadOnly = resourceValues.volumeIsReadOnly,
-           isReadOnly {
-            logger.error("Volume is read-only", metadata: [
-                "path": .string(url.path)
-            ])
-            throw PermissionError.volumeReadOnly(url)
-        }
-
-        if let supportsCloning = resourceValues.volumeSupportsFileCloning,
-           !supportsCloning {
-            logger.warning("Volume does not support file cloning", metadata: [
-                "path": .string(url.path)
-            ])
         }
     }
 }

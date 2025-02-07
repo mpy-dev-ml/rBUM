@@ -3,23 +3,43 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
+//  Last updated: 7 February 2025
 //
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
+
 @testable import Core
 @testable import rBUM
 import XCTest
 
+/// Test suite for DefaultSecurityService
+///
+/// This test suite verifies the functionality of the DefaultSecurityService class,
+/// which is responsible for managing security-related operations such as:
+/// - Access validation
+/// - Credential management
+/// - Resource cleanup
+/// - Health monitoring
+///
+/// The tests are organised into several categories:
+/// - Access validation tests (DefaultSecurityServiceTests+Access.swift)
+/// - Credential management tests (DefaultSecurityServiceTests+Credentials.swift)
+/// - Maintenance tests (DefaultSecurityServiceTests+Maintenance.swift)
+/// - Test helpers (DefaultSecurityServiceTests+Helpers.swift)
 final class DefaultSecurityServiceTests: XCTestCase {
+    // MARK: - Types
+    
+    enum FilePermission: String {
+        case readable = "r"
+        case writable = "w"
+        case executable = "x"
+    }
+
     // MARK: - Properties
 
-    private var service: DefaultSecurityService!
-    private var mockLogger: MockLogger!
-    private var mockBookmarkService: MockBookmarkService!
-    private var mockKeychainService: MockKeychainService!
-    private let fileManager = FileManager.default
+    var service: DefaultSecurityService!
+    var mockLogger: MockLogger!
+    var mockBookmarkService: MockBookmarkService!
+    var mockKeychainService: MockKeychainService!
+    let fileManager = FileManager.default
 
     // MARK: - Setup
 
@@ -42,6 +62,23 @@ final class DefaultSecurityServiceTests: XCTestCase {
         mockBookmarkService.clear()
         mockKeychainService.clear()
         super.tearDown()
+    }
+
+    // MARK: - Helper Methods
+
+    func cleanupTestURLs(_ urls: URL...) {
+        for url in urls {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    func verifyLogMessages(_ logger: MockLogger, contains messages: [String]) {
+        for message in messages {
+            XCTAssertTrue(
+                logger.messages.contains { $0.contains(message) },
+                "Log should contain message: \(message)"
+            )
+        }
     }
 
     // MARK: - Test Setup Helpers

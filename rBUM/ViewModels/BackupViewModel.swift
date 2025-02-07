@@ -27,102 +27,56 @@ import SwiftUI
 /// This view model follows the MVVM pattern and is designed to be used with SwiftUI views.
 /// It integrates with Core services through protocol-based abstractions for improved testability
 /// and platform independence.
-///
-/// Example usage:
-/// ```swift
-/// let viewModel = BackupViewModel(
-///     repository: repository,
-///     backupService: backupService,
-///     credentialsService: credentialsService,
-///     bookmarkService: bookmarkService,
-///     securityService: securityService
-/// )
-///
-/// // Add a source
-/// try await viewModel.addSource(sourceURL)
-///
-/// // Start backup
-/// await viewModel.startBackup()
-/// ```
 @MainActor
 final class BackupViewModel: ObservableObject {
+    // MARK: - Types
+
+    enum Operation: String {
+        case backing = "Backing up"
+        case validating = "Validating"
+        case configuring = "Configuring"
+    }
+
     // MARK: - Published Properties
 
-    /// Current backup configuration including sources, repository, and settings.
-    /// This property is published to enable SwiftUI view updates when the configuration changes.
-    @Published private(set) var configuration: BackupConfiguration
-
-    /// Flag indicating whether to show an error alert to the user.
-    /// Set to true when an error occurs that requires user attention.
-    @Published var showError = false
-
-    /// Tracks the progress of the current backup operation.
-    /// Updates are published to enable real-time progress display in the UI.
+    @Published var configuration: BackupConfiguration
+    @Published var repository: Repository?
     @Published private(set) var progress: Progress?
-
-    /// Error message to display to the user.
-    /// Set when an operation fails and requires user notification.
-    @Published private(set) var errorMessage: String?
+    @Published private(set) var isBackingUp = false
+    @Published private(set) var currentOperation: Operation?
+    @Published var error: Error?
+    @Published var showError = false
+    @Published var showBackupSheet = false
 
     // MARK: - Private Properties
 
-    /// Service for performing backup operations.
-    /// Handles the actual execution of Restic commands.
     private let backupService: BackupServiceProtocol
-
-    /// Service for managing repository credentials.
-    /// Handles secure storage and retrieval of credentials.
     private let credentialsService: KeychainCredentialsManagerProtocol
-
-    /// Service for managing security-scoped bookmarks.
-    /// Enables persistent access to user-selected files and directories.
-    private let bookmarkService: BookmarkServiceProtocol
-
-    /// Service for validating security requirements.
-    /// Ensures operations comply with sandbox restrictions.
     private let securityService: SecurityServiceProtocol
-
-    /// Logger for recording operations and errors.
-    /// Uses privacy-aware logging for sensitive information.
-    private let logger: Logger
+    private let bookmarkService: BookmarkServiceProtocol
+    private let logger: LoggerProtocol
 
     // MARK: - Initialization
 
-    /// Initialises a new backup view model.
-    /// - Parameters:
-    ///   - repository: The target repository for backups
-    ///   - backupService: Service for performing backup operations
-    ///   - credentialsService: Service for managing credentials
-    ///   - bookmarkService: Service for managing security-scoped bookmarks
-    ///   - securityService: Service for validating security requirements
-    ///   - logger: Logger for recording operations and errors
     init(
-        repository: Repository,
+        repository: Repository? = nil,
         backupService: BackupServiceProtocol,
         credentialsService: KeychainCredentialsManagerProtocol,
-        bookmarkService: BookmarkServiceProtocol,
         securityService: SecurityServiceProtocol,
-        logger: Logger = Logger()
+        bookmarkService: BookmarkServiceProtocol,
+        logger: LoggerProtocol
     ) {
-        configuration = BackupConfiguration(
-            sources: [],
-            repository: repository,
-            settings: BackupSettings.default
-        )
+        self.repository = repository
         self.backupService = backupService
         self.credentialsService = credentialsService
-        self.bookmarkService = bookmarkService
         self.securityService = securityService
+        self.bookmarkService = bookmarkService
         self.logger = logger
-
-        logger.debug(
-            "Initialized BackupViewModel for repository: \(repository.name)",
-            file: #file,
-            function: #function,
-            line: #line
-        )
+        self.configuration = BackupConfiguration()
     }
+}
 
+extension BackupViewModel {
     // MARK: - Public Methods
 
     /// Adds a new source to the backup configuration.
@@ -220,7 +174,7 @@ final class BackupViewModel: ObservableObject {
     func startBackup() async {
         guard !configuration.sources.isEmpty else {
             logger.warning("Cannot start backup: no sources selected", file: #file, function: #function, line: #line)
-            errorMessage = "Please select at least one source to backup"
+            error = BackupError.missingSource("No source selected")
             showError = true
             return
         }
@@ -233,7 +187,9 @@ final class BackupViewModel: ObservableObject {
             handleError(error)
         }
     }
+}
 
+extension BackupViewModel {
     // MARK: - Private Methods
 
     private func handleBackupOperation() async throws {
@@ -437,14 +393,47 @@ final class BackupViewModel: ObservableObject {
 
             switch error {
             case let resticError as ResticError:
-                errorMessage = resticError.localizedDescription
+                error = resticError
             case let securityError as SecurityError:
-                errorMessage = securityError.localizedDescription
+                error = securityError
             default:
-                errorMessage = error.localizedDescription
+                error = error
             }
 
-            logger.error("Backup failed: \(errorMessage ?? "Unknown error")", file: #file, function: #function, line: #line)
+            logger.error(
+                "Backup failed: \(error.localizedDescription)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            showError = true
+        }
+    }
+
+    private func handleError(_ error: Error) {
+        Task { @MainActor in
+            progress?.cancel()
+
+            switch error {
+            case let resticError as ResticError:
+                error = resticError
+            case let securityError as SecurityError:
+                error = securityError
+            default:
+                error = error
+            }
+
+            logger.error(
+                """
+                Backup failed: \(error.localizedDescription)
+                File: \(#file)
+                Function: \(#function)
+                Line: \(#line)
+                """,
+                metadata: [
+                    "error": .string("\(error)")
+                ]
+            )
             showError = true
         }
     }
