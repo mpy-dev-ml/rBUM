@@ -10,54 +10,267 @@
 
 import Foundation
 
-/// Errors that can occur during service operations.
-/// This enum provides a comprehensive set of error cases that can occur
-/// during service lifecycle and operations, along with recovery suggestions.
+/// An enumeration of errors that can occur during service lifecycle and operations.
+///
+/// `ServiceError` provides detailed error information for various aspects of
+/// service management, including:
+/// - Service lifecycle
+/// - State management
+/// - Dependency handling
+/// - Operation execution
+/// - Resource management
+///
+/// Each error case includes relevant context to help with:
+/// - Error diagnosis
+/// - State recovery
+/// - User feedback
+/// - System monitoring
+///
+/// Example usage:
+/// ```swift
+/// do {
+///     try await service.initialize()
+/// } catch let error as ServiceError {
+///     switch error {
+///     case .notInitialized(let service):
+///         logger.error("Service not initialised: \(service)")
+///     case .dependencyUnavailable(let service, let dependency):
+///         logger.error("\(service) missing dependency: \(dependency)")
+///     default:
+///         logger.error("Service error: \(error.localizedDescription)")
+///     }
+///     
+///     if let recovery = error.recoverySuggestion {
+///         logger.info("Recovery suggestion: \(recovery)")
+///     }
+/// }
+/// ```
 public enum ServiceError: LocalizedError {
     // MARK: - Lifecycle Errors
     
-    /// Service initialization errors
+    /// Indicates that a service has not been initialised.
+    ///
+    /// This error occurs when:
+    /// - Service methods are called before initialisation
+    /// - Initialisation was skipped
+    /// - Previous initialisation failed
+    ///
+    /// - Parameter service: Name of the service that isn't initialised
     case notInitialized(service: String)
+    
+    /// Indicates that a service is already initialised.
+    ///
+    /// This error occurs when:
+    /// - Attempting to reinitialise a service
+    /// - Duplicate initialisation calls
+    /// - Race condition in initialisation
+    ///
+    /// - Parameter service: Name of the service that's already initialised
     case alreadyInitialized(service: String)
+    
+    /// Indicates that service initialisation failed.
+    ///
+    /// This error occurs when:
+    /// - Required resources are unavailable
+    /// - Configuration is invalid
+    /// - System constraints prevent initialisation
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service that failed to initialise
+    ///   - reason: Detailed explanation of the failure
     case initializationFailed(service: String, reason: String)
     
     // MARK: - State Errors
     
-    /// Service state errors
+    /// Indicates that a service is in an invalid state.
+    ///
+    /// This error occurs when:
+    /// - Operation requires different state
+    /// - State machine violation
+    /// - Concurrent state modification
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - currentState: The current state of the service
+    ///   - expectedState: The state required for the operation
     case invalidState(service: String, currentState: String, expectedState: String)
+    
+    /// Indicates that a state transition failed.
+    ///
+    /// This error occurs when:
+    /// - Invalid transition requested
+    /// - Transition preconditions not met
+    /// - System prevents transition
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - from: The starting state
+    ///   - to: The target state that couldn't be reached
     case stateTransitionFailed(service: String, from: String, to: String)
+    
+    /// Indicates that acquiring a state lock timed out.
+    ///
+    /// This error occurs when:
+    /// - Lock contention
+    /// - Deadlock prevention
+    /// - System overload
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - desiredState: The state that couldn't be locked
     case stateLockTimeout(service: String, desiredState: String)
     
     // MARK: - Dependency Errors
     
-    /// Service dependency errors
+    /// Indicates that a required dependency is unavailable.
+    ///
+    /// This error occurs when:
+    /// - Dependency not found
+    /// - Dependency not running
+    /// - Dependency crashed
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service requiring the dependency
+    ///   - dependency: Name of the unavailable dependency
     case dependencyUnavailable(service: String, dependency: String)
+    
+    /// Indicates that a dependency is misconfigured.
+    ///
+    /// This error occurs when:
+    /// - Invalid configuration
+    /// - Version mismatch
+    /// - Incompatible settings
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - dependency: Name of the misconfigured dependency
+    ///   - reason: Explanation of the misconfiguration
     case dependencyMisconfigured(service: String, dependency: String, reason: String)
+    
+    /// Indicates that waiting for a dependency timed out.
+    ///
+    /// This error occurs when:
+    /// - Dependency is slow to respond
+    /// - Dependency is deadlocked
+    /// - System is overloaded
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - dependency: Name of the dependency that timed out
     case dependencyTimeout(service: String, dependency: String)
     
     // MARK: - Operation Errors
     
-    /// Operation execution errors
+    /// Indicates that a service operation failed.
+    ///
+    /// This error occurs when:
+    /// - Operation preconditions not met
+    /// - Runtime error during execution
+    /// - System prevents operation
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - operation: Name of the failed operation
+    ///   - reason: Detailed explanation of the failure
     case operationFailed(service: String, operation: String, reason: String)
+    
+    /// Indicates that a service operation timed out.
+    ///
+    /// This error occurs when:
+    /// - Operation takes too long
+    /// - Resource contention
+    /// - System is overloaded
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - operation: Name of the operation that timed out
+    ///   - timeout: The duration after which the timeout occurred
     case operationTimeout(service: String, operation: String, timeout: TimeInterval)
+    
+    /// Indicates that a service operation was cancelled.
+    ///
+    /// This error occurs when:
+    /// - User cancels operation
+    /// - System cancels operation
+    /// - Dependent operation fails
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - operation: Name of the cancelled operation
     case operationCancelled(service: String, operation: String)
     
     // MARK: - Resource Errors
     
-    /// Resource access and management errors
+    /// Indicates that a required resource is unavailable.
+    ///
+    /// This error occurs when:
+    /// - Resource doesn't exist
+    /// - Resource is locked
+    /// - System prevents access
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - resource: Name of the unavailable resource
     case resourceUnavailable(service: String, resource: String)
+    
+    /// Indicates that a resource has been exhausted.
+    ///
+    /// This error occurs when:
+    /// - Resource pool is empty
+    /// - No more capacity
+    /// - System limits reached
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - resource: Name of the exhausted resource
     case resourceExhausted(service: String, resource: String)
+    
+    /// Indicates that a resource limit has been exceeded.
+    ///
+    /// This error occurs when:
+    /// - Usage exceeds quota
+    /// - Rate limit reached
+    /// - System capacity exceeded
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - resource: Name of the resource
+    ///   - current: Current usage level
+    ///   - limit: Maximum allowed usage
     case resourceLimitExceeded(service: String, resource: String, current: Int, limit: Int)
     
     // MARK: - Retry Errors
     
-    /// Retry-related errors
+    /// Indicates that a retry attempt failed.
+    ///
+    /// This error occurs when:
+    /// - Maximum retry attempts reached
+    /// - Underlying error persists
+    /// - System prevents further retries
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - operation: Name of the operation that failed
+    ///   - attempts: Number of retry attempts made
+    ///   - underlyingError: The underlying error that caused the failure
     case retryFailed(
         service: String,
         operation: String,
         attempts: Int,
         underlyingError: Error?
     )
+    
+    /// Indicates that the retry limit has been exceeded.
+    ///
+    /// This error occurs when:
+    /// - Maximum retry attempts reached
+    /// - Underlying error persists
+    /// - System prevents further retries
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - operation: Name of the operation that failed
+    ///   - limit: Maximum allowed retry attempts
     case retryLimitExceeded(
         service: String,
         operation: String,
@@ -66,9 +279,40 @@ public enum ServiceError: LocalizedError {
     
     // MARK: - Security Errors
     
-    /// Security-related errors
+    /// Indicates that authentication failed.
+    ///
+    /// This error occurs when:
+    /// - Invalid credentials
+    /// - Authentication system failure
+    /// - System prevents authentication
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - reason: Detailed explanation of the failure
     case authenticationFailed(service: String, reason: String)
+    
+    /// Indicates that authorization failed.
+    ///
+    /// This error occurs when:
+    /// - Insufficient permissions
+    /// - Authorization system failure
+    /// - System prevents access
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - resource: Name of the resource that couldn't be accessed
     case authorizationFailed(service: String, resource: String)
+    
+    /// Indicates that a security violation occurred.
+    ///
+    /// This error occurs when:
+    /// - Security policy violation
+    /// - System compromise
+    /// - Unauthorized access
+    ///
+    /// - Parameters:
+    ///   - service: Name of the service
+    ///   - violation: Description of the security violation
     case securityViolation(service: String, violation: String)
     
     // MARK: - Error Description

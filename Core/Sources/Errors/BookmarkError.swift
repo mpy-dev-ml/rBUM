@@ -8,23 +8,187 @@
 
 import Foundation
 
-/// Errors that can occur during bookmark operations
+/// An enumeration of errors that can occur during security-scoped bookmark operations.
+///
+/// `BookmarkError` provides detailed error information for operations involving
+/// security-scoped bookmarks, including:
+/// - Bookmark creation
+/// - Bookmark resolution
+/// - Bookmark validation
+/// - Access control
+///
+/// Each error case includes the URL that caused the error to help with:
+/// - Error diagnosis
+/// - User feedback
+/// - Error recovery
+/// - Audit logging
+///
+/// The enum conforms to `LocalizedError` to provide:
+/// - User-friendly error descriptions
+/// - Technical failure reasons
+/// - Recovery suggestions
+/// - Localised messages
+///
+/// Example usage:
+/// ```swift
+/// // Creating and handling bookmark errors
+/// do {
+///     let bookmark = try bookmarkService.createBookmark(for: fileURL)
+/// } catch let error as BookmarkError {
+///     switch error {
+///     case .creationFailed(let url):
+///         logger.error("Failed to create bookmark: \(url.path)")
+///         showErrorAlert(
+///             title: error.localizedDescription,
+///             message: error.recoverySuggestion ?? ""
+///         )
+///
+///     case .accessDenied(let url):
+///         logger.error("Access denied: \(url.path)")
+///         requestUserPermission(for: url)
+///
+///     case .staleBookmark(let url):
+///         logger.error("Stale bookmark: \(url.path)")
+///         refreshBookmark(for: url)
+///
+///     default:
+///         logger.error("Bookmark error: \(error.localizedDescription)")
+///         handleGenericError(error)
+///     }
+/// }
+///
+/// // Using error properties
+/// let error = BookmarkError.invalidBookmark(fileURL)
+/// print(error.localizedDescription)  // User-friendly description
+/// print(error.failureReason)         // Technical details
+/// print(error.recoverySuggestion)    // Recovery steps
+/// ```
+///
+/// Implementation notes:
+/// 1. Always include the affected URL
+/// 2. Provide clear error messages
+/// 3. Include recovery steps
+/// 4. Log error details
 public enum BookmarkError: LocalizedError {
-    /// Failed to create a security-scoped bookmark
+    /// Indicates that creating a security-scoped bookmark failed.
+    ///
+    /// This error occurs when:
+    /// - The URL is invalid
+    /// - The resource doesn't exist
+    /// - Insufficient permissions
+    /// - System bookmark creation fails
+    ///
+    /// Example:
+    /// ```swift
+    /// throw BookmarkError.creationFailed(fileURL)
+    /// ```
+    ///
+    /// Recovery steps:
+    /// 1. Verify resource exists
+    /// 2. Check permissions
+    /// 3. Request user access
+    /// 4. Retry creation
     case creationFailed(URL)
     
-    /// Failed to resolve an existing bookmark
+    /// Indicates that resolving an existing bookmark failed.
+    ///
+    /// This error occurs when:
+    /// - The bookmark data is corrupted
+    /// - The resource was deleted
+    /// - Permissions changed
+    /// - System cannot resolve bookmark
+    ///
+    /// Example:
+    /// ```swift
+    /// throw BookmarkError.resolutionFailed(fileURL)
+    /// ```
+    ///
+    /// Recovery steps:
+    /// 1. Check resource existence
+    /// 2. Verify permissions
+    /// 3. Recreate bookmark
+    /// 4. Update cached paths
     case resolutionFailed(URL)
     
-    /// Bookmark has become stale and needs to be recreated
+    /// Indicates that a bookmark has become stale and needs recreation.
+    ///
+    /// This error occurs when:
+    /// - The resource was moved
+    /// - The resource was renamed
+    /// - File system changed
+    /// - Security state changed
+    ///
+    /// Example:
+    /// ```swift
+    /// throw BookmarkError.staleBookmark(fileURL)
+    /// ```
+    ///
+    /// Recovery steps:
+    /// 1. Locate current resource
+    /// 2. Update bookmark data
+    /// 3. Refresh access
+    /// 4. Update references
     case staleBookmark(URL)
     
-    /// Bookmark data is invalid or corrupted
+    /// Indicates that the bookmark data is invalid or corrupted.
+    ///
+    /// This error occurs when:
+    /// - Bookmark data is malformed
+    /// - Data integrity check fails
+    /// - Bookmark format is invalid
+    /// - System cannot parse bookmark
+    ///
+    /// Example:
+    /// ```swift
+    /// throw BookmarkError.invalidBookmark(fileURL)
+    /// ```
+    ///
+    /// Recovery steps:
+    /// 1. Delete invalid bookmark
+    /// 2. Request new access
+    /// 3. Create fresh bookmark
+    /// 4. Update storage
     case invalidBookmark(URL)
     
-    /// Access to the bookmarked resource was denied
+    /// Indicates that access to the bookmarked resource was denied.
+    ///
+    /// This error occurs when:
+    /// - Permissions are insufficient
+    /// - Resource is protected
+    /// - Security scope is invalid
+    /// - System denies access
+    ///
+    /// Example:
+    /// ```swift
+    /// throw BookmarkError.accessDenied(fileURL)
+    /// ```
+    ///
+    /// Recovery steps:
+    /// 1. Request permissions
+    /// 2. Verify security scope
+    /// 3. Check resource state
+    /// 4. Update access rights
     case accessDenied(URL)
     
+    /// A localised description of the error suitable for user display.
+    ///
+    /// This property provides a human-readable description of the error,
+    /// including the path of the URL that caused the error.
+    ///
+    /// Format: "[Error Type]: [Resource Path]"
+    ///
+    /// Example:
+    /// ```swift
+    /// let error = BookmarkError.accessDenied(fileURL)
+    /// print(error.localizedDescription)
+    /// // "Access denied to /Users/username/Documents/file.txt"
+    /// ```
+    ///
+    /// Usage:
+    /// - Display in error alerts
+    /// - Show in status messages
+    /// - Include in user feedback
+    /// - Log for support
     public var errorDescription: String? {
         switch self {
         case .creationFailed(let url):
@@ -40,6 +204,26 @@ public enum BookmarkError: LocalizedError {
         }
     }
     
+    /// A detailed explanation of why the error occurred.
+    ///
+    /// This property provides technical details about the error that may be
+    /// useful for debugging or logging purposes.
+    ///
+    /// Format: "Detailed technical explanation with context"
+    ///
+    /// Example:
+    /// ```swift
+    /// let error = BookmarkError.staleBookmark(fileURL)
+    /// print(error.failureReason)
+    /// // "The security-scoped bookmark for /path/to/file has become stale.
+    /// // This can happen if the resource was moved or modified."
+    /// ```
+    ///
+    /// Usage:
+    /// - Debug logging
+    /// - Technical support
+    /// - Error investigation
+    /// - System diagnostics
     public var failureReason: String? {
         switch self {
         case .creationFailed(let url):
@@ -71,6 +255,25 @@ public enum BookmarkError: LocalizedError {
         }
     }
     
+    /// A suggestion for how the user can recover from the error.
+    ///
+    /// This property provides a human-readable suggestion for how the user can
+    /// recover from the error, including any necessary actions or steps.
+    ///
+    /// Format: "Clear instructions for error recovery"
+    ///
+    /// Example:
+    /// ```swift
+    /// let error = BookmarkError.accessDenied(fileURL)
+    /// print(error.recoverySuggestion)
+    /// // "Please grant access to /path/to/file when prompted."
+    /// ```
+    ///
+    /// Usage:
+    /// - User guidance
+    /// - Error recovery
+    /// - Help documentation
+    /// - Support responses
     public var recoverySuggestion: String? {
         switch self {
         case .creationFailed(let url):
