@@ -109,4 +109,38 @@ extension ResticCommandService {
             try await cancelResticOperation(id)
         }
     }
+    
+    /// Pauses all active Restic operations.
+    ///
+    /// - Throws: ResticCommandError if operations cannot be paused
+    public func pauseAllOperations() async throws {
+        logger.info(
+            "Pausing all backup operations",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
+        // Signal all active operations to pause
+        for operation in activeOperations {
+            try await operation.pause()
+        }
+    }
+    
+    /// Resumes all paused Restic operations.
+    ///
+    /// - Throws: ResticCommandError if operations cannot be resumed
+    public func resumeAllOperations() async throws {
+        logger.info(
+            "Resuming all backup operations",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
+        // Resume all paused operations
+        for operation in activeOperations where operation.isPaused {
+            try await operation.resume()
+        }
+    }
 }

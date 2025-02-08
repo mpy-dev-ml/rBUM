@@ -237,72 +237,92 @@ final class ProcessExecutor: ProcessExecutorProtocol {
     ) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
             do {
-                process.terminationHandler = { process in
+                process.terminationHandler = { [weak self] process in
+                    guard let self = self else { return }
                     Task {
                         do {
-                            let output = try outputPipe.fileHandleForReading
-                                .readToEnd() ?? Data()
-                            let error = try errorPipe.fileHandleForReading
-                                .readToEnd() ?? Data()
-
-                            let outputString = String(
-                                data: output,
-                                encoding: .utf8
-                            ) ?? ""
-                            let errorString = String(
-                                data: error,
-                                encoding: .utf8
-                            ) ?? ""
-
-                            if process.terminationStatus != 0 {
-                                self.logger.error(
-                                    """
-                                    Process failed with status \
-                                    \(process.terminationStatus): \
-                                    \(errorString)
-                                    """,
-                                    file: #file,
-                                    function: #function,
-                                    line: #line
-                                )
-                            }
-
-                            continuation.resume(
-                                returning: ProcessResult(
-                                    output: outputString,
-                                    error: errorString,
-                                    exitCode: Int(process.terminationStatus)
-                                )
+                            let result = try await self.handleProcessTermination(
+                                process,
+                                outputPipe: outputPipe,
+                                errorPipe: errorPipe
                             )
+                            continuation.resume(returning: result)
                         } catch {
-                            continuation.resume(
-                                throwing: ProcessError.executionFailed(
-                                    error.localizedDescription
-                                )
-                            )
+                            continuation.resume(throwing: error)
                         }
                     }
                 }
 
                 try process.run()
-
-                // Handle real-time output if callback provided
-                if let onOutput {
-                    outputPipe.fileHandleForReading.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        if let output = String(data: data, encoding: .utf8) {
-                            onOutput(output)
-                        }
+                
+                // Set up output handling if needed
+                if let onOutput = onOutput {
+                    Task {
+                        try await handleProcessOutput(outputPipe, callback: onOutput)
                     }
                 }
             } catch {
-                continuation.resume(
-                    throwing: ProcessError.executionFailed(
-                        error.localizedDescription
-                    )
-                )
+                continuation.resume(throwing: error)
             }
         }
+    }
+    
+    /// Handles process termination and collects output
+    private func handleProcessTermination(
+        _ process: Process,
+        outputPipe: Pipe,
+        errorPipe: Pipe
+    ) async throws -> ProcessResult {
+        let (outputData, errorData) = try await collectProcessOutput(
+            outputPipe: outputPipe,
+            errorPipe: errorPipe
+        )
+        
+        let outputString = String(data: outputData, encoding: .utf8) ?? ""
+        let errorString = String(data: errorData, encoding: .utf8) ?? ""
+        
+        if process.terminationStatus != 0 {
+            logProcessError(status: process.terminationStatus, error: errorString)
+        }
+        
+        return ProcessResult(
+            output: outputString,
+            error: errorString,
+            exitCode: Int(process.terminationStatus)
+        )
+    }
+    
+    /// Collects output from process pipes
+    private func collectProcessOutput(
+        outputPipe: Pipe,
+        errorPipe: Pipe
+    ) async throws -> (output: Data, error: Data) {
+        async let output = outputPipe.fileHandleForReading.readToEnd() ?? Data()
+        async let error = errorPipe.fileHandleForReading.readToEnd() ?? Data()
+        return try await (output, error)
+    }
+    
+    /// Handles real-time process output
+    private func handleProcessOutput(
+        _ pipe: Pipe,
+        callback: @escaping (String) -> Void
+    ) async throws {
+        let handle = pipe.fileHandleForReading
+        for try await line in handle.bytes.lines {
+            callback(line)
+        }
+    }
+    
+    /// Logs process error information
+    private func logProcessError(status: Int32, error: String) {
+        logger.error(
+            """
+            Process failed with status \(status): \(error)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
     }
 
     private func enforceTimeout(_ process: Process) async throws {

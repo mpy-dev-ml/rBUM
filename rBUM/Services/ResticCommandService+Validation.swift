@@ -135,7 +135,8 @@ extension ResticCommandService {
         switch command {
         case .init:
             // Repository should not exist
-            guard !try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path)) else {
+            let repositoryExists = try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path))
+            guard !repositoryExists else {
                 throw ResticCommandError.repositoryExists
             }
             
@@ -147,7 +148,8 @@ extension ResticCommandService {
             
             // Check source permissions
             for source in sources {
-                guard try await securityService.hasAccess(to: URL(fileURLWithPath: source)) else {
+                let hasAccess = try await securityService.hasAccess(to: URL(fileURLWithPath: source))
+                guard hasAccess else {
                     throw ResticCommandError.insufficientPermissions
                 }
             }
@@ -159,13 +161,15 @@ extension ResticCommandService {
             }
             
             // Check target permissions
-            guard try await securityService.hasAccess(to: URL(fileURLWithPath: target)) else {
+            let hasAccess = try await securityService.hasAccess(to: URL(fileURLWithPath: target))
+            guard hasAccess else {
                 throw ResticCommandError.insufficientPermissions
             }
             
         case .list:
             // Repository should exist
-            guard try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path)) else {
+            let repositoryExists = try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path))
+            guard repositoryExists else {
                 throw ResticCommandError.repositoryNotFound
             }
         }

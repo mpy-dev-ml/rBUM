@@ -37,71 +37,106 @@ extension BookmarkService {
     /// - Throws: BookmarkError if access fails
     public func startAccessing(_ url: URL) async throws -> Bool {
         try await measure("Start Accessing Bookmark") {
-            do {
-                // Check if already accessing
-                if accessQueue.sync({ activeBookmarks[url] != nil }) {
-                    logger.warning("Already accessing bookmark for \(url.path)")
-                    return true
-                }
-
-                // Retrieve or create bookmark
-                let bookmark = try await getOrCreateBookmark(for: url)
-
-                var isStale = false
-                var resolvedURL: URL?
-
-                do {
-                    resolvedURL = try URL(
-                        resolvingBookmarkData: bookmark,
-                        options: .withSecurityScope,
-                        relativeTo: nil,
-                        bookmarkDataIsStale: &isStale
-                    )
-                } catch {
-                    logger.error("Failed to resolve bookmark: \(error.localizedDescription)")
-                    throw BookmarkError.resolutionFailed(error.localizedDescription)
-                }
-
-                guard let resolvedURL else {
-                    logger.error("Failed to resolve bookmark URL")
-                    throw BookmarkError.resolutionFailed("Failed to resolve URL")
-                }
-
-                // Handle stale bookmark
-                if isStale {
-                    logger.warning("Stale bookmark detected for \(url.path)")
-                    // Create new bookmark
-                    let newBookmark = try await createBookmark(for: url)
-                    accessQueue.async(flags: .barrier) {
-                        self.activeBookmarks[url] = BookmarkAccess(
-                            startTime: Date(),
-                            maxDuration: 300, // 5 minutes
-                            bookmark: newBookmark
-                        )
-                    }
-                } else {
-                    accessQueue.async(flags: .barrier) {
-                        self.activeBookmarks[url] = BookmarkAccess(
-                            startTime: Date(),
-                            maxDuration: 300, // 5 minutes
-                            bookmark: bookmark
-                        )
-                    }
-                }
-
-                // Start accessing
-                guard resolvedURL.startAccessingSecurityScopedResource() else {
-                    logger.error("Failed to start accessing security-scoped resource")
-                    throw BookmarkError.accessDenied
-                }
-
-                logger.info("Started accessing bookmark for \(url.path)")
+            // Check if already accessing
+            if isActivelyAccessing(url) {
+                logger.warning("Already accessing bookmark for \(url.path)")
                 return true
-            } catch {
-                logger.error("Failed to start accessing bookmark: \(error.localizedDescription)")
-                throw error
             }
+
+            // Get or create bookmark and resolve it
+            let resolved = try await resolveBookmark(for: url)
+
+            // Handle stale bookmark if needed
+            let finalBookmark = try await handleStaleBookmarkIfNeeded(
+                url: url,
+                bookmark: resolved.data,
+                isStale: resolved.isStale
+            )
+
+            // Start accessing the URL
+            return try await startAccessingURL(resolved.url, bookmark: finalBookmark, originalURL: url)
         }
+    }
+
+    /// Checks if a URL is already being actively accessed
+    private func isActivelyAccessing(_ url: URL) -> Bool {
+        accessQueue.sync { activeBookmarks[url] != nil }
+    }
+
+    /// Result of resolving a bookmark
+    private struct ResolvedBookmark {
+        /// The resolved URL
+        let url: URL
+        /// The bookmark data
+        let data: Data
+        /// Whether the bookmark is stale
+        let isStale: Bool
+    }
+
+    /// Resolves a bookmark for a URL
+    /// - Parameter url: The URL to resolve bookmark for
+    /// - Returns: The resolved bookmark information
+    private func resolveBookmark(for url: URL) async throws -> ResolvedBookmark {
+        let bookmark = try await getOrCreateBookmark(for: url)
+        var isStale = false
+        
+        let resolvedURL = try URL(
+            resolvingBookmarkData: bookmark,
+            options: .withSecurityScope,
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        )
+        
+        return ResolvedBookmark(
+            url: resolvedURL,
+            data: bookmark,
+            isStale: isStale
+        )
+    }
+
+    /// Handles stale bookmark if needed
+    /// - Parameters:
+    ///   - url: The original URL
+    ///   - bookmark: The current bookmark data
+    ///   - isStale: Whether the bookmark is stale
+    /// - Returns: The final bookmark data to use
+    private func handleStaleBookmarkIfNeeded(
+        url: URL,
+        bookmark: Data,
+        isStale: Bool
+    ) async throws -> Data {
+        if isStale {
+            logger.warning("Stale bookmark detected for \(url.path)")
+            return try await createBookmark(for: url)
+        }
+        return bookmark
+    }
+
+    /// Starts accessing a resolved URL with a bookmark
+    /// - Parameters:
+    ///   - resolvedURL: The resolved URL to access
+    ///   - bookmark: The bookmark data
+    ///   - originalURL: The original URL
+    /// - Returns: True if access was successful
+    private func startAccessingURL(
+        _ resolvedURL: URL,
+        bookmark: Data,
+        originalURL: URL
+    ) async throws -> Bool {
+        guard resolvedURL.startAccessingSecurityScopedResource() else {
+            logger.error("Failed to start accessing security-scoped resource")
+            throw BookmarkError.accessFailed
+        }
+
+        accessQueue.async(flags: .barrier) {
+            self.activeBookmarks[originalURL] = BookmarkAccess(
+                startTime: Date(),
+                maxDuration: 300, // 5 minutes
+                bookmark: bookmark
+            )
+        }
+
+        return true
     }
     
     /// Stops accessing a security-scoped resource.

@@ -64,7 +64,7 @@ extension RestoreService {
             }
             
             // Check if target has enough space
-            guard try await hasEnoughSpace(at: url) else {
+            guard try await hasEnoughSpace(at: url, snapshot: snapshot) else {
                 throw RestoreError.insufficientSpace
             }
         } else {
@@ -79,7 +79,7 @@ extension RestoreService {
             }
             
             // Check if parent has enough space
-            guard try await hasEnoughSpace(at: parent) else {
+            guard try await hasEnoughSpace(at: parent, snapshot: snapshot) else {
                 throw RestoreError.insufficientSpace
             }
         }
@@ -103,15 +103,17 @@ extension RestoreService {
     /// Checks if there is enough space at a URL.
     ///
     /// - Parameter url: The URL to check space at
+    /// - Parameter snapshot: The snapshot to calculate required space for
     /// - Returns: True if there is enough space
     /// - Throws: RestoreError if check fails
-    private func hasEnoughSpace(at url: URL) async throws -> Bool {
+    private func hasEnoughSpace(at url: URL, snapshot: ResticSnapshot) async throws -> Bool {
         // Get available space
         let available = try await fileManager.availableSpace(at: url)
         
-        // For now, require at least 1GB
-        // TODO: Calculate required space based on snapshot size
-        let required: UInt64 = 1024 * 1024 * 1024
+        // Calculate required space with a safety margin
+        let snapshotSize = snapshot.stats.totalSize
+        let safetyMargin: Double = 1.1 // 10% extra space for safety
+        let required = UInt64(Double(snapshotSize) * safetyMargin)
         
         return available >= required
     }

@@ -65,7 +65,13 @@ public final class MockResticXPCService: NSObject, ResticXPCServiceProtocol {
         return snapshotsToReturn
     }
 
-    public func restore(from source: URL, snapshot: String, to destination: URL, username: String, password: String) async throws {
+    public func restore(
+        from source: URL,
+        snapshot: String,
+        to destination: URL,
+        username: String,
+        password: String
+    ) async throws {
         if shouldFailConnection {
             throw ResticXPCError.connectionFailed
         }
