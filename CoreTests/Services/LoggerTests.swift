@@ -128,6 +128,37 @@ private struct LogContext {
     let line: Int
 }
 
+private struct LogParameters {
+    let level: LogLevel
+    let message: String
+    let metadata: [String: LogMetadataValue]?
+    let privacy: LogPrivacy
+    let error: Error?
+    let file: String
+    let function: String
+    let line: Int
+    
+    init(
+        level: LogLevel,
+        message: String,
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .private,
+        error: Error? = nil,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
+        self.level = level
+        self.message = message
+        self.metadata = metadata
+        self.privacy = privacy
+        self.error = error
+        self.file = file
+        self.function = function
+        self.line = line
+    }
+}
+
 private final class TestLogOutput {
     var lastContext: LogContext?
     
@@ -139,26 +170,45 @@ private final class TestLogOutput {
     var lastFile: String? { lastContext?.file }
     var lastFunction: String? { lastContext?.function }
     var lastLine: Int? { lastContext?.line }
+    
+    func log(_ context: LogContext) {
+        lastContext = context
+    }
 }
 
 private final class TestLogger: LoggerProtocol {
-    private let output: TestLogOutput
+    let output: TestLogOutput
 
     init(output: TestLogOutput) {
         self.output = output
     }
 
+    func log(parameters: LogParameters) {
+        let context = LogContext(
+            level: parameters.level,
+            message: parameters.message,
+            metadata: parameters.metadata,
+            privacy: parameters.privacy,
+            error: parameters.error,
+            file: parameters.file,
+            function: parameters.function,
+            line: parameters.line
+        )
+        output.log(context)
+    }
+    
+    // Convenience method that maintains the original interface
     func log(
         level: LogLevel,
         message: String,
-        metadata: [String: LogMetadataValue]?,
-        privacy: LogPrivacy,
-        error: Error?,
-        file: String,
-        function: String,
-        line: Int
+        metadata: [String: LogMetadataValue]? = nil,
+        privacy: LogPrivacy = .private,
+        error: Error? = nil,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
     ) {
-        let context = LogContext(
+        let params = LogParameters(
             level: level,
             message: message,
             metadata: metadata,
@@ -168,6 +218,6 @@ private final class TestLogger: LoggerProtocol {
             function: function,
             line: line
         )
-        output.lastContext = context
+        log(parameters: params)
     }
 }

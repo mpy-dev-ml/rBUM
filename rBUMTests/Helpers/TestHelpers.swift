@@ -39,8 +39,8 @@ extension XCTestCase {
 extension XCTestCase {
     static func generateTestData(size: Int = 1024) -> Data {
         var data = Data(count: size)
-        for i in 0..<size {
-            data[i] = UInt8.random(in: 0...255)
+        for index in 0..<size {
+            data[index] = UInt8.random(in: 0...255)
         }
         return data
     }
