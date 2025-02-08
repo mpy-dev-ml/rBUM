@@ -20,8 +20,6 @@ extension SnapshotListViewModel {
     ///   - snapshot: The snapshot to restore
     ///   - destination: The destination URL for the restored files
     private func handleSnapshotRestoration(_ snapshot: ResticSnapshot, to destination: URL) async throws {
-        guard let repository = repository else { return }
-
         isRestoringSnapshot = true
         currentOperation = .restoring
 

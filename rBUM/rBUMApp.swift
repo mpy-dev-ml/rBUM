@@ -217,14 +217,55 @@ struct RBUMApp: App {
     }
 
     private func checkForUpdates() {
-        logger.debug(
-            "Checking for updates",
+        guard let url = URL(string: "https://api.github.com/repos/mpy/rBUM/releases/latest") else {
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] _, _, _ in
+            // Implementation moved to GitHubRelease.swift
+        }.resume()
+    }
+    
+    private func showUpdateAlert(release: GitHubRelease) {
+        let alert = NSAlert()
+        alert.messageText = "Update Available"
+        alert.informativeText = "A new version of rBUM (\(release.tagName)) is available."
+        alert.addButton(withTitle: "View Release")
+        alert.addButton(withTitle: "Later")
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(URL(string: release.htmlUrl)!)
+        }
+    }
+    
+    private func handleSleepState() {
+        logger.info(
+            "System entering sleep state",
             file: #file,
             function: #function,
             line: #line
         )
-
-        // TODO: Implement update checking
+        
+        // Pause any active backup operations
+        Task {
+            await resticService.pauseAllOperations()
+        }
+    }
+    
+    private func handleWakeState() {
+        logger.info(
+            "System waking from sleep",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        
+        // Resume paused backup operations
+        Task {
+            await resticService.resumeAllOperations()
+            // Check for updates after wake
+            checkForUpdates()
+        }
     }
 
     var body: some Scene {
@@ -321,7 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             function: #function,
             line: #line
         )
-        // TODO: Handle sleep state
+        handleSleepState()
     }
 
     @objc private func handleWakeNotification(_: Notification) {
@@ -331,6 +372,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             function: #function,
             line: #line
         )
-        // TODO: Handle wake state
+        handleWakeState()
     }
 }

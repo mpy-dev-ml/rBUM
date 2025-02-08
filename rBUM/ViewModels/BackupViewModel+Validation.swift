@@ -42,7 +42,7 @@ extension BackupViewModel {
         guard let repository = repository else { return }
 
         // Check if credentials exist
-        guard let _ = try await credentialsService.loadCredentials(for: repository) else {
+        guard try await credentialsService.loadCredentials(for: repository) != nil else {
             throw BackupError.missingCredentials("Repository credentials not found")
         }
     }

@@ -117,7 +117,13 @@ final class SnapshotListViewModel: ObservableObject {
         case .today:
             snapshots = snapshots.filter { Calendar.current.isDateInToday($0.time) }
         case .thisWeek:
-            snapshots = snapshots.filter { Calendar.current.isDate($0.time, equalTo: Date(), toGranularity: .weekOfYear) }
+            snapshots = snapshots.filter {
+                Calendar.current.isDate(
+                    $0.time,
+                    equalTo: Date(),
+                    toGranularity: .weekOfYear
+                )
+            }
         case .thisMonth:
             snapshots = snapshots.filter { Calendar.current.isDate($0.time, equalTo: Date(), toGranularity: .month) }
         case .thisYear:
@@ -133,8 +139,8 @@ final class SnapshotListViewModel: ObservableObject {
     private func handleError(_ error: Error) async {
         await MainActor.run {
             self.error = error
-            showError = true
-            logger.error("Error loading snapshots: \(error.localizedDescription)")
+            self.showError = true
+            self.logger.error("Error loading snapshots: \(error.localizedDescription)")
         }
     }
 }

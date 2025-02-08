@@ -22,42 +22,59 @@ struct BackupView: View {
     init(repository: Repository) {
         let logger = Logger(subsystem: "dev.mpy.rBUM", category: "backup")
         let fileManager = FileManager.default
+
+        // Initialize security service first
+        let securityService = DefaultSecurityService()
         
+        // Initialize base services
         let keychainService = KeychainService(
-            logger: logger as LoggerProtocol
-        )
-        
-        let bookmarkService = BookmarkService(
-            logger: logger as LoggerProtocol
-        )
-        
-        let securityService = DefaultSecurityService(
-            logger: logger as LoggerProtocol,
-            bookmarkService: bookmarkService,
-            keychainService: keychainService
-        )
-        
-        let xpcService = ResticXPCService(
-            logger: logger as LoggerProtocol,
+            logger: logger,
             securityService: securityService
         )
         
+        let bookmarkService = BookmarkService(
+            logger: logger,
+            securityService: securityService,
+            keychainService: keychainService
+        )
+        
+        let sandboxMonitor = SandboxMonitor(
+            logger: logger,
+            securityService: securityService
+        )
+
+        // Update security service with dependencies
+        securityService.configure(
+            logger: logger,
+            bookmarkService: bookmarkService,
+            keychainService: keychainService,
+            sandboxMonitor: sandboxMonitor
+        )
+
+        // Initialize dependent services
+        let xpcService = ResticXPCService(
+            securityService: securityService,
+            sandboxMonitor: sandboxMonitor,
+            logger: logger
+        )
+
         let resticService = ResticCommandService(
-            logger: logger as LoggerProtocol,
             securityService: securityService,
             xpcService: xpcService,
             keychainService: keychainService,
-            fileManager: fileManager
+            fileManager: fileManager,
+            logger: logger
         )
-        
+
         let backupService = BackupService(
             resticService: resticService,
-            logger: logger as LoggerProtocol
+            keychainService: keychainService,
+            logger: logger
         )
-        
+
         let credentialsManager = KeychainCredentialsManager(
             keychainService: keychainService,
-            logger: logger as LoggerProtocol
+            logger: logger
         )
 
         _viewModel = StateObject(
@@ -67,38 +84,38 @@ struct BackupView: View {
                 credentialsService: credentialsManager,
                 securityService: securityService,
                 bookmarkService: bookmarkService,
-                logger: logger as LoggerProtocol
+                logger: logger
             )
         )
     }
 
     var body: some View {
         VStack(spacing: 20) {
-            if case .inProgress(let progress) = viewModel.state {
+            if viewModel.backupState.isInProgress {
                 VStack(spacing: 8) {
                     ProgressView(
-                        value: progress.percentComplete,
+                        value: viewModel.backupState.progress?.percentComplete ?? 0,
                         total: 100
                     ) {
-                        Text(viewModel.progressMessage)
+                        Text(viewModel.backupState.progressMessage)
                             .font(.headline)
                     }
                     .progressViewStyle(.linear)
 
                     HStack {
                         Text(
-                            "\(progress.processedFiles)/" +
-                                "\(progress.totalFiles) files"
+                            "\(viewModel.backupState.progress?.processedFiles ?? 0)/" +
+                                "\(viewModel.backupState.progress?.totalFiles ?? 0) files"
                         )
                         Spacer()
-                        Text("\(Int(progress.percentComplete))%")
+                        Text("\(Int(viewModel.backupState.progress?.percentComplete ?? 0))%")
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 }
                 .padding()
             } else {
-                Text(viewModel.progressMessage)
+                Text(viewModel.backupState.progressMessage)
                     .font(.headline)
                     .padding()
             }
@@ -150,9 +167,9 @@ struct BackupView: View {
                         }
                     )
                     .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.isBackupInProgress)
+                    .disabled(viewModel.backupState.isInProgress)
 
-                    if viewModel.isBackupInProgress {
+                    if viewModel.backupState.isInProgress {
                         Button(
                             role: .cancel,
                             action: {
@@ -173,14 +190,12 @@ struct BackupView: View {
         }
         .frame(width: 400)
         .padding()
-        .alert("Backup Failed", isPresented: $viewModel.showError) {
+        .alert("Backup Failed", isPresented: $viewModel.showErrorAlert) {
             Button("OK") {
                 dismiss()
             }
         } message: {
-            if case let .failed(error) = viewModel.state {
-                Text(error.localizedDescription)
-            }
+            Text(viewModel.backupState.errorMessage ?? "An unknown error occurred")
         }
     }
 }
@@ -188,9 +203,7 @@ struct BackupView: View {
 #Preview {
     BackupView(
         repository: Repository(
-            id: UUID(),
             name: "Test Repository",
-            path: "/tmp/test",
             url: URL(fileURLWithPath: "/tmp/test"),
             credentials: RepositoryCredentials(
                 username: "test",
