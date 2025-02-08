@@ -1,3 +1,2 @@
 file,line,character,severity,type,reason,rule_id
 /Users/mpy/CascadeProjects/rBUM/Core/Sources/Services/Factory/ServiceFactory+Configuration.swift,73,16,Warning,Missing Docs,public declarations should be documented,missing_docs
-/Users/mpy/CascadeProjects/rBUM/rBUMTests/TestUtilities.swift,842,,Warning,File Length,File should contain 500 lines or less: currently contains 842,file_length
