@@ -3,21 +3,23 @@ import os.log
 
 /// Simulates security-related behaviors for development and testing
 @available(macOS 13.0, *)
-public final class SecuritySimulator {
+@objc public final class SecuritySimulator: NSObject {
     private let logger: Logger
     private let configuration: DevelopmentConfiguration
 
-    init(logger: Logger, configuration: DevelopmentConfiguration) {
+    @objc public init(logger: Logger, configuration: DevelopmentConfiguration) {
         self.logger = logger
         self.configuration = configuration
+        super.init()
     }
 
-    func simulateFailureIfNeeded(
+    @objc public func simulateFailure(
         operation: String,
-        url: URL,
-        error: (String) -> some Error
-    ) throws {
-        guard configuration.shouldSimulateAccessFailures else { return }
+        url: URL
+    ) throws -> NSError {
+        guard configuration.shouldSimulateAccessFailures else {
+            throw NSError(domain: "dev.mpy.rbum.security", code: 0, userInfo: nil)
+        }
 
         let errorMessage = "\(operation) failed (simulated)"
         logger.error("""
@@ -27,10 +29,15 @@ public final class SecuritySimulator {
                      file: #file,
                      function: #function,
                      line: #line)
-        throw error(errorMessage)
+        
+        return NSError(
+            domain: "dev.mpy.rbum.security",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: errorMessage]
+        )
     }
 
-    func simulateDelay() async throws {
+    @objc public func simulateDelay() async throws {
         if configuration.artificialDelay > 0 {
             try await Task.sleep(nanoseconds: UInt64(configuration.artificialDelay * 1_000_000_000))
         }

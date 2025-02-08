@@ -11,11 +11,11 @@
 import Foundation
 
 /// Protocol for executing Restic commands
-public protocol ResticCommandServiceProtocol {
+@objc public protocol ResticCommandServiceProtocol: NSObjectProtocol {
     /// Initialize a new repository
     /// - Parameter credentials: Credentials for repository access
     /// - Throws: SecurityError if initialization fails
-    func initRepository(credentials: RepositoryCredentials) async throws
+    @objc func initRepository(credentials: RepositoryCredentials) async throws
 
     /// Create a new backup
     /// - Parameters:
@@ -24,7 +24,7 @@ public protocol ResticCommandServiceProtocol {
     ///   - credentials: Repository credentials
     ///   - tags: Optional tags for the backup
     /// - Throws: SecurityError if backup fails
-    func createBackup(
+    @objc func createBackup(
         paths: [URL],
         to repository: Repository,
         credentials: RepositoryCredentials,
@@ -37,7 +37,10 @@ public protocol ResticCommandServiceProtocol {
     ///   - credentials: Repository credentials
     /// - Returns: Array of snapshots
     /// - Throws: SecurityError if listing fails
-    func listSnapshots(in repository: Repository, credentials: RepositoryCredentials) async throws -> [Snapshot]
+    @objc func listSnapshots(
+        in repository: Repository,
+        credentials: RepositoryCredentials
+    ) async throws -> [Snapshot]
 
     /// Restore a snapshot
     /// - Parameters:
@@ -46,7 +49,7 @@ public protocol ResticCommandServiceProtocol {
     ///   - credentials: Repository credentials
     ///   - path: Path to restore to
     /// - Throws: SecurityError if restore fails
-    func restoreSnapshot(
+    @objc func restoreSnapshot(
         _ snapshot: Snapshot,
         from repository: Repository,
         credentials: RepositoryCredentials,
@@ -59,7 +62,7 @@ public protocol ResticCommandServiceProtocol {
     ///   - repository: Source repository
     ///   - credentials: Repository credentials
     /// - Throws: SecurityError if deletion fails
-    func deleteSnapshot(
+    @objc func deleteSnapshot(
         _ snapshot: Snapshot,
         from repository: Repository,
         credentials: RepositoryCredentials
@@ -67,11 +70,11 @@ public protocol ResticCommandServiceProtocol {
 
     /// Pauses all active backup operations
     /// - Throws: `ResticError` if the operation fails
-    func pauseAllOperations() async throws
+    @objc func pauseAllOperations() async throws
 
     /// Resumes all paused backup operations
     /// - Throws: `ResticError` if the operation fails
-    func resumeAllOperations() async throws
+    @objc func resumeAllOperations() async throws
 }
 
 // MARK: - Default Implementation

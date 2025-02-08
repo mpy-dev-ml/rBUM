@@ -15,5 +15,3 @@ FOUNDATION_EXPORT const unsigned char CoreVersionString[];
 
 // Import all public headers
 #import <Core/OSLogger.h>
-
-// Public headers that will be exposed to users of the framework

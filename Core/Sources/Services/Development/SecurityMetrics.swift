@@ -3,28 +3,34 @@ import os.log
 
 /// Tracks metrics for security operations
 @available(macOS 13.0, *)
-public final class SecurityMetrics {
+@objc public final class SecurityMetrics: NSObject {
     private let logger: Logger
     private let queue = DispatchQueue(label: "dev.mpy.rbum.security.metrics")
 
     // Access metrics
-    private(set) var activeAccessCount: Int = 0
-    private(set) var totalAccessCount: Int = 0
-    private(set) var accessFailures: Int = 0
+    @objc private(set) var activeAccessCount: Int = 0
+    @objc private(set) var totalAccessCount: Int = 0
+    @objc private(set) var accessFailures: Int = 0
 
     // Bookmark metrics
-    private(set) var totalBookmarks: Int = 0
-    private(set) var bookmarkFailures: Int = 0
+    @objc private(set) var totalBookmarks: Int = 0
+    @objc private(set) var bookmarkFailures: Int = 0
 
     // Permission metrics
-    private(set) var totalPermissions: Int = 0
-    private(set) var permissionFailures: Int = 0
+    @objc private(set) var totalPermissions: Int = 0
+    @objc private(set) var permissionFailures: Int = 0
 
-    init(logger: Logger) {
-        self.logger = logger
+    @objc public override init() {
+        self.logger = Logger(subsystem: "dev.mpy.rbum", category: "SecurityMetrics")
+        super.init()
     }
 
-    func recordAccess(success: Bool = true, error: String? = nil) {
+    @objc public init(logger: Logger) {
+        self.logger = logger
+        super.init()
+    }
+
+    @objc public func recordAccess(success: Bool = true, error: String? = nil) {
         queue.sync {
             if success {
                 activeAccessCount += 1
@@ -38,13 +44,13 @@ public final class SecurityMetrics {
         }
     }
 
-    func recordAccessEnd() {
+    @objc public func recordAccessEnd() {
         queue.sync {
             activeAccessCount = max(0, activeAccessCount - 1)
         }
     }
 
-    func recordBookmark(success: Bool = true, error: String? = nil) {
+    @objc public func recordBookmark(success: Bool = true, error: String? = nil) {
         queue.sync {
             if success {
                 totalBookmarks += 1
@@ -57,7 +63,7 @@ public final class SecurityMetrics {
         }
     }
 
-    func recordPermission(success: Bool = true, error: String? = nil) {
+    @objc public func recordPermission(success: Bool = true, error: String? = nil) {
         queue.sync {
             if success {
                 totalPermissions += 1

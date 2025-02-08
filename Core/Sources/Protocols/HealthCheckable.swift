@@ -164,25 +164,22 @@ import Foundation
 }
 
 /// Health-related errors that can occur during health checks
-public enum HealthError: LocalizedError {
-    case timeout(service: String)
-    case connectionFailed(service: String)
-    case invalidState(service: String, state: String)
-    case dependencyUnavailable(service: String, dependency: String)
-    case configurationError(service: String, reason: String)
-
+@objc public enum HealthError: Int, Error {
+    case timeout = 1
+    case connectionFailed = 2
+    case invalidState = 3
+    case dependencyUnavailable = 4
+    
     public var errorDescription: String? {
         switch self {
-        case let .timeout(service):
-            "Health check timed out for service: \(service)"
-        case let .connectionFailed(service):
-            "Failed to connect to service: \(service)"
-        case let .invalidState(service, state):
-            "Invalid state (\(state)) for service: \(service)"
-        case let .dependencyUnavailable(service, dependency):
-            "Dependency \(dependency) unavailable for service: \(service)"
-        case let .configurationError(service, reason):
-            "Configuration error in service \(service): \(reason)"
+        case .timeout:
+            return "Service health check timed out"
+        case .connectionFailed:
+            return "Failed to connect to service"
+        case .invalidState:
+            return "Service is in an invalid state"
+        case .dependencyUnavailable:
+            return "Required dependency is unavailable"
         }
     }
 }

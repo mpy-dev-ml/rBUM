@@ -9,13 +9,6 @@
 import Foundation
 import os.log
 
-// Import security-related models
-@_implementationOnly import struct Core.SecurityMetrics
-@_implementationOnly import struct Core.SecurityOperationRecorder
-@_implementationOnly import struct Core.SecuritySimulator
-@_implementationOnly import enum Core.SecurityOperationType
-@_implementationOnly import enum Core.SecurityOperationStatus
-
 @available(macOS 13.0, *)
 public extension DevelopmentSecurityService {
     /// Validates an XPC connection.
@@ -29,13 +22,7 @@ public extension DevelopmentSecurityService {
     /// - Parameter connection: The XPC connection to validate
     /// - Returns: `true` if the connection is valid, `false` otherwise
     /// - Throws: `SecurityError.xpcValidationFailed` if validation fails
-    func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
-        try simulator.simulateFailureIfNeeded(
-            operation: "XPC validation",
-            url: nil,
-            error: { SecurityError.xpcValidationFailed($0) }
-        )
-
+    @objc func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
         try await simulator.simulateDelay()
 
         // Validate connection state
@@ -50,75 +37,49 @@ public extension DevelopmentSecurityService {
             return false
         }
 
-        // Validate interface
+        // Validate interface configuration
         guard connection.remoteObjectInterface != nil else {
-            logger.error("XPC connection missing remote object interface")
+            logger.error("XPC connection remote object interface not configured")
             return false
         }
 
         // Record successful validation
-        operationRecorder.recordOperation(
+        metrics.recordAccess(success: true)
+        recorder.record(
             url: nil,
-            type: .xpcValidation,
+            type: .xpc,
             status: .success
-        )
-        metrics.recordXPCValidation()
-
-        logger.info(
-            """
-            Validated XPC connection
-            Active XPC Connections: \(metrics.activeXPCConnectionCount)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
         )
 
         return true
     }
 
-    /// Validates XPC entitlements.
+    /// Validates the XPC security context.
     ///
-    /// This method simulates entitlement validation by:
+    /// This method simulates XPC security context validation by:
     /// - Checking for simulated failures
     /// - Adding artificial delays
     /// - Recording the validation attempt
     /// - Updating metrics
     ///
-    /// - Parameter connection: The XPC connection to validate entitlements for
-    /// - Returns: `true` if entitlements are valid, `false` otherwise
-    /// - Throws: `SecurityError.xpcEntitlementValidationFailed` if validation fails
-    func validateXPCEntitlements(_ connection: NSXPCConnection) async throws -> Bool {
-        try simulator.simulateFailureIfNeeded(
-            operation: "XPC entitlement validation",
-            url: nil,
-            error: { SecurityError.xpcEntitlementValidationFailed($0) }
-        )
-
+    /// - Parameter connection: The XPC connection to validate
+    /// - Returns: `true` if the security context is valid, `false` otherwise
+    /// - Throws: `SecurityError.xpcSecurityContextInvalid` if validation fails
+    @objc func validateXPCSecurityContext(_ connection: NSXPCConnection) async throws -> Bool {
         try await simulator.simulateDelay()
 
-        // Validate code signing
-        guard connection.processIdentifier > 0 else {
-            logger.error("Invalid process identifier")
+        // Validate security context
+        guard connection.effectiveUserIdentifier == getuid() else {
+            logger.error("XPC connection user identifier mismatch")
             return false
         }
 
         // Record successful validation
-        operationRecorder.recordOperation(
+        metrics.recordAccess(success: true)
+        recorder.record(
             url: nil,
-            type: .xpcEntitlementValidation,
+            type: .xpc,
             status: .success
-        )
-        metrics.recordXPCEntitlementValidation()
-
-        logger.info(
-            """
-            Validated XPC entitlements
-            Process ID: \(connection.processIdentifier)
-            """,
-            file: #file,
-            function: #function,
-            line: #line
         )
 
         return true

@@ -2,14 +2,14 @@ import Foundation
 import os.log
 
 /// Represents a security operation with metadata
-public struct SecurityOperation: Hashable {
-    public let url: URL
-    public let type: SecurityOperationType
-    public let timestamp: Date
-    public let status: SecurityOperationStatus
-    public let error: String?
+@objc public class SecurityOperation: NSObject {
+    @objc public let url: URL
+    @objc public let type: SecurityOperationType
+    @objc public let timestamp: Date
+    @objc public let status: SecurityOperationStatus
+    @objc public let error: String?
 
-    public init(
+    @objc public init(
         url: URL,
         type: SecurityOperationType,
         timestamp: Date = Date(),
@@ -21,56 +21,53 @@ public struct SecurityOperation: Hashable {
         self.timestamp = timestamp
         self.status = status
         self.error = error
+        super.init()
     }
 
-    public static func == (lhs: SecurityOperation, rhs: SecurityOperation) -> Bool {
-        lhs.url == rhs.url &&
-            lhs.type == rhs.type &&
-            lhs.timestamp == rhs.timestamp
+    public override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? SecurityOperation else { return false }
+        return url == other.url &&
+            type == other.type &&
+            timestamp == other.timestamp
     }
 
-    public func hash(into hasher: inout Hasher) {
+    public override var hash: Int {
+        var hasher = Hasher()
         hasher.combine(url)
         hasher.combine(type)
         hasher.combine(timestamp)
+        return hasher.finalize()
     }
 }
 
 /// Represents the type of a security operation
-public enum SecurityOperationType: String {
-    case access
-    case permission
-    case bookmark
-    case xpc
+@objc public enum SecurityOperationType: Int {
+    case access = 1
+    case permission = 2
+    case bookmark = 3
+    case xpc = 4
 }
 
 /// Represents the status of a security operation
-public enum SecurityOperationStatus: String {
-    case success
-    case failure
-    case pending
+@objc public enum SecurityOperationStatus: Int {
+    case success = 1
+    case failure = 2
+    case pending = 3
 }
 
 /// Records and manages security operations for development and testing
 @available(macOS 13.0, *)
-public final class SecurityOperationRecorder {
+@objc public final class SecurityOperationRecorder: NSObject {
     private let logger: Logger
     private let queue = DispatchQueue(label: "dev.mpy.rbum.security.operations")
-    private var operations: Set<SecurityOperation> = []
+    private var operations: [SecurityOperation] = []
 
-    /// Creates a new security operation recorder
-    /// - Parameter logger: The logger to use for recording operations
-    public init(logger: Logger) {
+    @objc public init(logger: Logger) {
         self.logger = logger
+        super.init()
     }
 
-    /// Records a new security operation with the provided details
-    /// - Parameters:
-    ///   - url: The URL of the security operation
-    ///   - type: The type of the security operation
-    ///   - status: The status of the operation
-    ///   - error: Additional details about the operation
-    public func recordOperation(
+    @objc public func recordOperation(
         url: URL,
         type: SecurityOperationType,
         status: SecurityOperationStatus,
@@ -84,7 +81,7 @@ public final class SecurityOperationRecorder {
                 status: status,
                 error: error
             )
-            operations.insert(operation)
+            operations.append(operation)
 
             logger.info("""
             Recording security operation:
@@ -96,36 +93,26 @@ public final class SecurityOperationRecorder {
         }
     }
 
-    /// Retrieves all recorded operations for a specific URL
-    /// - Parameter url: The URL to get operations for
-    /// - Returns: An array of security operations sorted by timestamp
-    public func getOperations(for url: URL) -> [SecurityOperation] {
+    @objc public func getOperations(for url: URL) -> [SecurityOperation] {
         queue.sync {
             operations.filter { $0.url == url }
                 .sorted { $0.timestamp > $1.timestamp }
         }
     }
 
-    /// Clears all recorded operations from memory
-    /// This is useful for testing and when needing to reset the recorder's state
-    public func clearOperations() {
+    @objc public func clearOperations() {
         queue.sync {
             operations.removeAll()
         }
     }
 
-    /// Retrieves all recorded operations
-    /// - Returns: An array of all security operations sorted by timestamp
-    public func getAllOperations() -> [SecurityOperation] {
+    @objc public func getAllOperations() -> [SecurityOperation] {
         queue.sync {
             operations.sorted { $0.timestamp > $1.timestamp }
         }
     }
 
-    /// Retrieves operations filtered by status
-    /// - Parameter status: The status to filter by
-    /// - Returns: An array of matching security operations
-    public func getOperations(withStatus status: SecurityOperationStatus) -> [SecurityOperation] {
+    @objc public func getOperations(withStatus status: SecurityOperationStatus) -> [SecurityOperation] {
         queue.sync {
             operations.filter { $0.status == status }
                 .sorted { $0.timestamp > $1.timestamp }

@@ -11,11 +11,11 @@
 import Foundation
 
 /// Protocol for Restic backup operations
-public protocol ResticServiceProtocol: HealthCheckable {
+@objc public protocol ResticServiceProtocol: HealthCheckable {
     /// Initialize a new repository
     /// - Parameter url: Repository URL
     /// - Throws: ResticError if initialization fails
-    func initializeRepository(
+    @objc func initializeRepository(
         at url: URL
     ) async throws
 
@@ -24,7 +24,7 @@ public protocol ResticServiceProtocol: HealthCheckable {
     ///   - source: Source path
     ///   - destination: Destination path
     /// - Throws: ResticError if backup fails
-    func backup(
+    @objc func backup(
         from source: URL,
         to destination: URL
     ) async throws
@@ -32,14 +32,14 @@ public protocol ResticServiceProtocol: HealthCheckable {
     /// List snapshots in repository
     /// - Returns: List of snapshot IDs
     /// - Throws: ResticError if listing fails
-    func listSnapshots() async throws -> [String]
+    @objc func listSnapshots() async throws -> [String]
 
     /// Restore from backup
     /// - Parameters:
     ///   - source: Source path
     ///   - destination: Destination path
     /// - Throws: ResticError if restore fails
-    func restore(
+    @objc func restore(
         from source: URL,
         to destination: URL
     ) async throws

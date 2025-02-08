@@ -1,5 +1,53 @@
+//
+//  ResticXPCService+Commands.swift
+//  rBUM
+//
+//  First created: 6 February 2025
+//  Last updated: 8 February 2025
+//
 import Foundation
 import os.log
+
+// MARK: - Constants
+
+private extension ResticXPCService {
+    /// Minimum required memory in bytes (512MB)
+    static let minimumMemoryRequired: UInt64 = 512 * 1024 * 1024
+    
+    /// Minimum required disk space in bytes (1GB)
+    static let minimumDiskSpaceRequired: Int64 = 1024 * 1024 * 1024
+    
+    /// Cache directory name
+    static let cacheDirName = "ResticCache"
+}
+
+// MARK: - Properties
+
+extension ResticXPCService {
+    /// Cache directory for Restic operations
+    var cacheDirectory: URL {
+        get throws {
+            let fileManager = FileManager.default
+            let cacheDir = try fileManager.url(
+                for: .cachesDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            let resticCacheDir = cacheDir.appendingPathComponent(Self.cacheDirName)
+            
+            if !fileManager.fileExists(atPath: resticCacheDir.path) {
+                try fileManager.createDirectory(
+                    at: resticCacheDir,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            }
+            
+            return resticCacheDir
+        }
+    }
+}
 
 // MARK: - ResticServiceProtocol Implementation
 
@@ -17,11 +65,14 @@ public extension ResticXPCService {
         )
 
         // Initialize repository
-        let command = ResticCommand(
+        let command = XPCCommandConfig(
             command: "init",
             arguments: [],
             environment: [:],
-            workingDirectory: url.path
+            workingDirectory: url.path,
+            bookmarks: [:],
+            timeout: 30,
+            auditSessionId: au_session_self()
         )
         _ = try await executeResticCommand(command)
     }
@@ -39,11 +90,14 @@ public extension ResticXPCService {
             line: #line
         )
 
-        let command = ResticCommand(
+        let command = XPCCommandConfig(
             command: "backup",
             arguments: [source.path],
             environment: [:],
-            workingDirectory: destination.path
+            workingDirectory: destination.path,
+            bookmarks: [:],
+            timeout: 3600,
+            auditSessionId: au_session_self()
         )
         let result = try await executeResticCommand(command)
 
@@ -56,11 +110,14 @@ public extension ResticXPCService {
     /// - Returns: An array of snapshot IDs
     /// - Throws: ProcessError if the list operation fails
     func listSnapshots() async throws -> [String] {
-        let command = ResticCommand(
+        let command = XPCCommandConfig(
             command: "snapshots",
             arguments: ["--json"],
             environment: [:],
-            workingDirectory: "/"
+            workingDirectory: "/",
+            bookmarks: [:],
+            timeout: 30,
+            auditSessionId: au_session_self()
         )
         let result = try await executeResticCommand(command)
 
@@ -82,11 +139,14 @@ public extension ResticXPCService {
             line: #line
         )
 
-        let command = ResticCommand(
+        let command = XPCCommandConfig(
             command: "restore",
             arguments: ["latest", "--target", destination.path],
             environment: [:],
-            workingDirectory: source.path
+            workingDirectory: source.path,
+            bookmarks: [:],
+            timeout: 3600,
+            auditSessionId: au_session_self()
         )
         let result = try await executeResticCommand(command)
 
@@ -97,16 +157,16 @@ public extension ResticXPCService {
 }
 
 private extension ResticXPCService {
-    private func executeResticCommand(_ command: ResticCommand) async throws -> ProcessResult {
+    private func executeResticCommand(_ command: XPCCommandConfig) async throws -> ProcessResult {
         try await validateCommandPrerequisites(command)
         let preparedCommand = try await prepareCommand(command)
-        return try await performCommand(preparedCommand)
+        return try await executeCommand(preparedCommand)
     }
-
-    private func validateCommandPrerequisites(_ command: ResticCommand) async throws {
+    
+    private func validateCommandPrerequisites(_ command: XPCCommandConfig) async throws {
         // Check connection state
         guard connectionState == .connected else {
-            throw ResticXPCError.serviceUnavailable
+            throw ResticXPCError.serviceUnavailable("Service is not connected")
         }
 
         // Validate command parameters
@@ -114,14 +174,14 @@ private extension ResticXPCService {
 
         // Check resource availability
         guard try await checkResourceAvailability(for: command) else {
-            throw ResticXPCError.resourceUnavailable
+            throw ResticXPCError.resourceUnavailable("Required resources are not available")
         }
     }
-
-    private func validateCommandParameters(_ command: ResticCommand) throws {
+    
+    private func validateCommandParameters(_ command: XPCCommandConfig) throws {
         // Validate required parameters
-        guard !command.arguments.isEmpty else {
-            throw ResticXPCError.invalidArguments("Command arguments cannot be empty")
+        guard !command.command.isEmpty else {
+            throw ResticXPCError.invalidArguments("Command cannot be empty")
         }
 
         // Check for unsafe arguments
@@ -133,7 +193,7 @@ private extension ResticXPCService {
         // Validate environment variables
         try validateEnvironmentVariables(command.environment)
     }
-
+    
     private func validateEnvironmentVariables(_ environment: [String: String]) throws {
         let requiredVariables = ["RESTIC_PASSWORD", "RESTIC_REPOSITORY"]
         for variable in requiredVariables {
@@ -142,11 +202,11 @@ private extension ResticXPCService {
             }
         }
     }
-
-    private func checkResourceAvailability(for command: ResticCommand) async throws -> Bool {
+    
+    private func checkResourceAvailability(for command: XPCCommandConfig) async throws -> Bool {
         // Check system resources
         let resources = try await systemMonitor.checkResources()
-        guard resources.memoryAvailable > minimumMemoryRequired else {
+        guard resources.memoryAvailable > Self.minimumMemoryRequired else {
             logger.error("Insufficient memory available")
             return false
         }
@@ -159,8 +219,8 @@ private extension ResticXPCService {
 
         return true
     }
-
-    private func checkDiskSpace(for command: ResticCommand) async throws -> Bool {
+    
+    private func checkDiskSpace(for command: XPCCommandConfig) async throws -> Bool {
         // Get repository path
         guard let repoPath = command.environment["RESTIC_REPOSITORY"] else {
             return false
@@ -169,10 +229,10 @@ private extension ResticXPCService {
         // Check available space
         let url = URL(fileURLWithPath: repoPath)
         let availableSpace = try await fileManager.availableSpace(at: url)
-        return availableSpace > minimumDiskSpaceRequired
+        return availableSpace > Self.minimumDiskSpaceRequired
     }
-
-    private func prepareCommand(_ command: ResticCommand) async throws -> PreparedCommand {
+    
+    private func prepareCommand(_ command: XPCCommandConfig) async throws -> PreparedCommand {
         // Build command arguments
         var arguments = command.arguments
         arguments.insert(contentsOf: ["--json", "--quiet"], at: 0)
@@ -180,45 +240,39 @@ private extension ResticXPCService {
         // Add default environment variables
         var environment = command.environment
         environment["RESTIC_PROGRESS_FPS"] = "1"
-        environment["RESTIC_CACHE_DIR"] = cacheDirectory.path
+        environment["RESTIC_CACHE_DIR"] = try cacheDirectory.path
 
         return PreparedCommand(
+            command: "restic",
             arguments: arguments,
             environment: environment,
             workingDirectory: command.workingDirectory
         )
     }
-
-    private func performCommand(_ command: PreparedCommand) async throws -> ProcessResult {
+    
+    private func executeCommand(_ command: PreparedCommand) async throws -> ProcessResult {
         let operationId = UUID()
 
         // Start progress tracking
-        progressTracker.startTracking(operationId)
-
+        progressTracker.startOperation(operationId)
+        
         do {
             // Execute command
             let process = try await processExecutor.execute(
-                command: "restic",
+                command: command.command,
                 arguments: command.arguments,
                 environment: command.environment,
                 workingDirectory: command.workingDirectory
             )
-
-            // Monitor progress
-            for try await progress in process.progress {
-                progressTracker.updateProgress(
-                    operationId: operationId,
-                    progress: progress
-                )
-            }
-
-            // Command completed successfully
-            progressTracker.stopTracking(operationId)
-            return process.result
-
+            
+            // Update progress
+            progressTracker.updateProgress(operationId, progress: 1.0)
+            
+            return process
         } catch {
-            progressTracker.stopTracking(operationId)
-            throw ResticXPCError.commandFailed(error)
+            // Handle execution error
+            progressTracker.failOperation(operationId, error: error)
+            throw ResticXPCError.executionFailed("Command execution failed: \(error.localizedDescription)")
         }
     }
 }

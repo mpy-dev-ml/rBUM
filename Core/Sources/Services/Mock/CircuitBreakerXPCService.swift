@@ -65,7 +65,7 @@ final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
 
     // MARK: - ResticXPCServiceProtocol Implementation
 
-    func ping() async -> Bool {
+    @objc func ping() async -> Bool {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -75,7 +75,7 @@ final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
         return false
     }
 
-    func initializeRepository(at _: URL, username _: String, password _: String) async throws {
+    @objc func initializeRepository(at _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -85,7 +85,7 @@ final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
         throw ServiceError.operationFailed
     }
 
-    func backup(from _: URL, to _: URL, username _: String, password _: String) async throws {
+    @objc func backup(from _: URL, to _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -95,7 +95,7 @@ final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
         throw ServiceError.operationFailed
     }
 
-    func listSnapshots(username _: String, password _: String) async throws -> [String] {
+    @objc func listSnapshots(username _: String, password _: String) async throws -> [String] {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,
@@ -105,7 +105,7 @@ final class CircuitBreakerXPCService: NSObject, ResticXPCServiceProtocol {
         throw ServiceError.operationFailed
     }
 
-    func restore(from _: URL, to _: URL, username _: String, password _: String) async throws {
+    @objc func restore(from _: URL, to _: URL, username _: String, password _: String) async throws {
         logger.warning(
             "Circuit breaker XPC service called - this should not happen in production",
             file: #file,

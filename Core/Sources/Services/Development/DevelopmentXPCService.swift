@@ -10,7 +10,7 @@ import Foundation
 
 /// Development mock implementation of ResticXPCProtocol
 /// Provides simulated XPC service behaviour for development and testing
-public final class DevelopmentXPCService: ResticXPCProtocol {
+@objc public final class DevelopmentXPCService: NSObject, ResticXPCProtocol {
     // MARK: - Properties
 
     /// Logger for service operations
@@ -29,7 +29,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     private let configuration: DevelopmentConfiguration
 
     /// Current interface version
-    public static let interfaceVersion: Int = 1
+    @objc public static let interfaceVersion: Int = 1
 
     // MARK: - Initialization
 
@@ -37,12 +37,13 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     /// - Parameters:
     ///   - logger: Logger for service operations
     ///   - configuration: Configuration for development behavior
-    public init(
+    @objc public init(
         logger: LoggerProtocol,
         configuration: DevelopmentConfiguration = .default
     ) {
         self.logger = logger
         self.configuration = configuration
+        super.init()
 
         logger.info(
             """
@@ -183,10 +184,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
             Command: \(config.command)
             Arguments: \(config.arguments.joined(separator: " "))
             Working Directory: \(config.workingDirectory)
-            Environment Variables: \(config.environment.keys.joined(separator: ", "))
-            Bookmarks: \(config.bookmarks.keys.joined(separator: ", "))
-            Timeout: \(config.timeout)
-            Audit Session ID: \(config.auditSessionId)
+            Environment: \(config.environment)
             """,
             file: #file,
             function: #function,
@@ -205,8 +203,7 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
     }
     
     private func shouldSimulateTimeout(_ config: XPCCommandConfig) -> Bool {
-        configuration.commandExecutionTime > config.timeout ||
-        configuration.shouldSimulateTimeoutFailures
+        return config.command.contains("timeout")
     }
     
     private func handleTimeout(
@@ -337,43 +334,61 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
 }
 
 /// Configuration for command execution
-public struct ExecutionConfig {
+@objc public class ExecutionConfig: NSObject {
     /// The command to execute
-    let command: String
+    @objc public let command: String
     
-    /// Command arguments
-    let arguments: [String]
+    /// Arguments for the command
+    @objc public let arguments: [String]
     
     /// Environment variables
-    let environment: [String: String]
+    @objc public let environment: [String: String]
     
     /// Working directory for command execution
-    let workingDirectory: String
+    @objc public let workingDirectory: URL
     
-    /// Security-scoped bookmarks
-    let bookmarks: [String: NSData]
-    
-    /// Command timeout
-    let timeout: TimeInterval
-    
-    /// Audit session identifier
-    let auditSessionId: au_asid_t
+    @objc public init(
+        command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: URL
+    ) {
+        self.command = command
+        self.arguments = arguments
+        self.environment = environment
+        self.workingDirectory = workingDirectory
+        super.init()
+    }
 }
 
-/// Configuration for XPC commands
-struct XPCCommandConfig {
-    /// The command to execute
-    let command: String
-    /// Arguments to pass to the command
-    let arguments: [String]
-    /// Environment variables to set for the command
-    let environment: [String: String]
-    /// Working directory for the command
-    let workingDirectory: String
-    /// Bookmarks to use for the command
-    let bookmarks: [String: NSData]
-    /// Timeout for the command execution
-    let timeout: TimeInterval
-    /// Audit session ID for the command
-    let auditSessionId: au_asid_t
+// MARK: - Errors
+
+/// Error type for development XPC service operations
+enum DevelopmentXPCError: LocalizedError {
+    case invalidCommand
+    case invalidWorkingDirectory
+    case invalidBookmark
+    case timeout
+    case connectionFailed
+    case sandboxViolation
+    case securityError
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidCommand:
+            "Invalid command"
+        case .invalidWorkingDirectory:
+            "Invalid working directory"
+        case .invalidBookmark:
+            "Invalid security-scoped bookmark"
+        case .timeout:
+            "Command execution timed out"
+        case .connectionFailed:
+            "Failed to establish XPC connection"
+        case .sandboxViolation:
+            "Sandbox violation detected"
+        case .securityError:
+            "Security error occurred"
+        }
+    }
 }

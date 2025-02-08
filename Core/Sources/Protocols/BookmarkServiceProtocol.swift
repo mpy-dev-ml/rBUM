@@ -26,29 +26,50 @@
 
 import Foundation
 
-/// Protocol for managing security-scoped bookmarks
-public protocol BookmarkServiceProtocol {
+/// Protocol defining the interface for managing security-scoped bookmarks
+///
+/// This protocol provides methods for:
+/// - Creating and resolving security-scoped bookmarks
+/// - Managing bookmark access
+/// - Validating bookmark data
+/// - Handling bookmark errors
+@objc public protocol BookmarkServiceProtocol: NSObjectProtocol {
     /// Create a security-scoped bookmark for a URL
-    /// - Parameter url: The URL to create a bookmark for
-    /// - Returns: The bookmark data
-    func createBookmark(for url: URL) throws -> Data
-
-    /// Resolve a security-scoped bookmark
-    /// - Parameter bookmark: The bookmark data to resolve
-    /// - Returns: The resolved URL
-    func resolveBookmark(_ bookmark: Data) throws -> URL
-
-    /// Validate if a bookmark is still valid
-    /// - Parameter bookmark: The bookmark data to validate
-    /// - Returns: true if the bookmark is valid
-    func validateBookmark(_ bookmark: Data) throws -> Bool
-
-    /// Start accessing a security-scoped resource
-    /// - Parameter url: The URL to access
-    /// - Returns: true if access was granted
-    func startAccessing(_ url: URL) throws -> Bool
-
-    /// Stop accessing a security-scoped resource
-    /// - Parameter url: The URL to stop accessing
-    func stopAccessing(_ url: URL) async throws
+    ///
+    /// - Parameter url: URL to create bookmark for
+    /// - Returns: Bookmark data
+    /// - Throws: BookmarkError if creation fails
+    @objc func createBookmark(for url: URL) throws -> Data
+    
+    /// Resolve a security-scoped bookmark to its URL
+    ///
+    /// - Parameter bookmark: Bookmark data to resolve
+    /// - Returns: Resolved URL
+    /// - Throws: BookmarkError if resolution fails
+    @objc func resolveBookmark(_ bookmark: Data) throws -> URL
+    
+    /// Start accessing a bookmarked URL
+    ///
+    /// - Parameter url: URL to access
+    /// - Returns: true if access was started
+    /// - Throws: BookmarkError if access fails
+    @objc func startAccessing(_ url: URL) throws -> Bool
+    
+    /// Stop accessing a bookmarked URL
+    ///
+    /// - Parameter url: URL to stop accessing
+    @objc func stopAccessing(_ url: URL)
+    
+    /// Validate a security-scoped bookmark
+    ///
+    /// - Parameter bookmark: Bookmark data to validate
+    /// - Returns: true if bookmark is valid
+    /// - Throws: BookmarkError if validation fails
+    @objc func validateBookmark(_ bookmark: Data) throws -> Bool
+    
+    /// Check if a URL is currently being accessed
+    ///
+    /// - Parameter url: URL to check
+    /// - Returns: true if URL is being accessed
+    @objc func isAccessing(_ url: URL) -> Bool
 }

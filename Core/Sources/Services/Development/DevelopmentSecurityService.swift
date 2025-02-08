@@ -10,18 +10,18 @@ import Foundation
 import os.log
 
 /// Configuration for controlling the development security service's behaviour
-public struct DevelopmentConfiguration {
+@objc public class DevelopmentConfiguration: NSObject {
     /// Whether to simulate permission request failures
-    let shouldSimulatePermissionFailures: Bool
+    @objc public let shouldSimulatePermissionFailures: Bool
     
     /// Whether to simulate bookmark failures
-    let shouldSimulateBookmarkFailures: Bool
+    @objc public let shouldSimulateBookmarkFailures: Bool
     
     /// Whether to simulate access failures
-    let shouldSimulateAccessFailures: Bool
+    @objc public let shouldSimulateAccessFailures: Bool
     
     /// Artificial delay to add to operations (in seconds)
-    let artificialDelay: TimeInterval
+    @objc public let artificialDelay: TimeInterval
     
     /// Initialize a new development configuration
     /// - Parameters:
@@ -29,7 +29,7 @@ public struct DevelopmentConfiguration {
     ///   - shouldSimulateBookmarkFailures: Whether to simulate bookmark failures
     ///   - shouldSimulateAccessFailures: Whether to simulate access failures
     ///   - artificialDelay: Artificial delay to add to operations
-    public init(
+    @objc public init(
         shouldSimulatePermissionFailures: Bool = false,
         shouldSimulateBookmarkFailures: Bool = false,
         shouldSimulateAccessFailures: Bool = false,
@@ -39,72 +39,29 @@ public struct DevelopmentConfiguration {
         self.shouldSimulateBookmarkFailures = shouldSimulateBookmarkFailures
         self.shouldSimulateAccessFailures = shouldSimulateAccessFailures
         self.artificialDelay = artificialDelay
+        super.init()
     }
     
     /// Default configuration for development environment
     ///
     /// Returns a `DevelopmentConfiguration` instance with default settings for
     /// simulating security operations in a development environment.
-    public static var `default`: DevelopmentConfiguration {
+    @objc public static var `default`: DevelopmentConfiguration {
         return DevelopmentConfiguration()
     }
 }
 
-/// A development-focused implementation of `SecurityServiceProtocol` that simulates
-/// security operations for testing and development purposes.
-///
-/// `DevelopmentSecurityService` provides a controlled environment for testing security
-/// operations by:
-/// - Simulating various failure scenarios
-/// - Adding artificial delays
-/// - Tracking operation metrics
-/// - Recording security operations
-/// - Validating security boundaries
-///
-/// Key features:
-/// 1. Failure Simulation:
-///    - Permission denials
-///    - Bookmark failures
-///    - Access violations
-///    - XPC connection issues
-///
-/// 2. Performance Testing:
-///    - Configurable operation delays
-///    - Concurrent operation handling
-///    - Resource usage tracking
-///
-/// 3. Security Validation:
-///    - Sandbox compliance checking
-///    - Permission verification
-///    - Resource access control
-///
-/// Example usage:
-/// ```swift
-/// let config = DevelopmentConfiguration(
-///     shouldSimulateBookmarkFailures: true,
-///     shouldSimulateAccessFailures: true,
-///     artificialDelay: 1.0
-/// )
-/// let securityService = DevelopmentSecurityService(configuration: config)
-///
-/// // Test permission request with simulated failure
-/// do {
-///     let granted = try await securityService.requestPermission(for: fileURL)
-///     print("Permission granted: \(granted)")
-/// } catch {
-///     print("Permission request failed: \(error)")
-/// }
-/// ```
+/// Development implementation of SecurityServiceProtocol for testing and development
 @available(macOS 13.0, *)
-public final class DevelopmentSecurityService: SecurityServiceProtocol, @unchecked Sendable {
+@objc public final class DevelopmentSecurityService: NSObject, SecurityServiceProtocol {
     // MARK: - Properties
 
     /// Logger instance for recording security-related events
     internal let logger: LoggerProtocol
-
-    /// Configuration controlling the service's behaviour
-    internal let configuration: DevelopmentConfiguration
-
+    
+    /// Configuration for controlling development behavior
+    private let configuration: DevelopmentConfiguration
+    
     /// Serial queue for synchronising access to shared resources
     internal let queue = DispatchQueue(label: "dev.mpy.rbum.security")
 
@@ -137,7 +94,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     ///   - bookmarkService: Service for managing security-scoped bookmarks
     ///   - keychainService: Service for secure storage
     ///   - configuration: Optional configuration controlling behaviour
-    public init(
+    @objc public init(
         logger: LoggerProtocol,
         bookmarkService: BookmarkServiceProtocol,
         keychainService: KeychainServiceProtocol,
@@ -156,6 +113,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
             logger: logger as! Logger,
             configuration: configuration
         )
+        super.init()
     }
     
     // MARK: - SecurityServiceProtocol
@@ -167,7 +125,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     ///   - url: URL for which permission is requested
     /// - Returns: Whether permission was granted
     /// - Throws: `SecurityError` if permission is denied
-    public func requestPermission(for url: URL) async throws -> Bool {
+    @objc public func requestPermission(for url: URL) async throws -> Bool {
         try await simulator.simulateDelay()
         
         if configuration.shouldSimulateAccessFailures {
@@ -190,7 +148,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     ///   - url: URL for which a bookmark is created
     /// - Returns: Bookmark data
     /// - Throws: `SecurityError` if bookmark creation fails
-    public func createBookmark(for url: URL) throws -> Data {
+    @objc public func createBookmark(for url: URL) throws -> Data {
         try simulator.simulateDelay()
         
         if configuration.shouldSimulateBookmarkFailures {
@@ -222,7 +180,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     ///   - url: URL for which the bookmark is validated
     /// - Returns: Whether the bookmark is valid
     /// - Throws: `SecurityError` if bookmark validation fails
-    public func validateBookmark(_ bookmark: Data, for url: URL) throws -> Bool {
+    @objc public func validateBookmark(_ bookmark: Data, for url: URL) throws -> Bool {
         try simulator.simulateDelay()
         
         if configuration.shouldSimulateBookmarkFailures {
@@ -247,7 +205,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     /// - Parameters:
     ///   - url: URL for which access is started
     /// - Throws: `SecurityError` if access is denied
-    public func startAccessing(_ url: URL) throws {
+    @objc public func startAccessing(_ url: URL) throws {
         try simulator.simulateDelay()
         
         if configuration.shouldSimulateAccessFailures {
@@ -266,7 +224,7 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     /// Simulates stopping access to a URL.
     /// - Parameters:
     ///   - url: URL for which access is stopped
-    public func stopAccessing(_ url: URL) {
+    @objc public func stopAccessing(_ url: URL) {
         operationRecorder.recordOperation(
             url: url,
             type: SecurityOperationType.access,

@@ -1,39 +1,8 @@
 framework module Core {
     umbrella header "Core.h"
+    requires objc
     
     module * { 
         export * 
     }
-    
-    explicit module Logging {
-        header "Logging/OSLogger.h"
-        export *
-    }
-    
-    explicit module Platform {
-        umbrella "Platform"
-        export *
-    }
-    
-    explicit module Services {
-        umbrella "Services"
-        export *
-    }
-    
-    explicit module Protocols {
-        umbrella "Protocols"
-        export *
-    }
-    
-    explicit module Models {
-        umbrella "Models"
-        export *
-    }
-    
-    explicit module Errors {
-        umbrella "Errors"
-        export *
-    }
-    
-    export *
 }

@@ -35,63 +35,108 @@ import Security
 /// 3. Handles connection interruptions
 /// 4. Provides operation tracking
 @available(macOS 13.0, *)
-public final class ResticXPCService: BaseSandboxedService, Measurable, ResticServiceProtocol {
+@objc public final class ResticXPCService: NSObject, ResticServiceProtocol {
     // MARK: - Properties
 
     /// XPC connection to the Restic service
-    var connection: NSXPCConnection?
+    @objc private var connection: NSXPCConnection?
 
     /// Serial queue for synchronizing operations
-    let queue: DispatchQueue
+    @objc private let queue: DispatchQueue
 
     /// Current health state of the service
-    public private(set) var isHealthy: Bool
+    @objc public private(set) var isHealthy: Bool
 
     /// Currently active security-scoped bookmarks
-    var activeBookmarks: [String: NSData]
-
-    /// Default timeout for operations in seconds
-    let defaultTimeout: TimeInterval
-
-    /// Maximum number of retry attempts for operations
-    let maxRetries: Int
-
-    /// Current interface version for XPC communication
-    let interfaceVersion: Int
-
-    /// Pending operations
-    var pendingOperations: [ResticXPCOperation]
-
+    @objc private var activeBookmarks: [String: NSData]
+    
+    /// Logger for service operations
+    @objc private let logger: LoggerProtocol
+    
+    /// Security service for handling permissions
+    @objc private let securityService: SecurityServiceProtocol
+    
     // MARK: - Initialization
-
-    override public init(logger: LoggerProtocol, securityService: SecurityServiceProtocol) {
-        queue = DispatchQueue(label: "dev.mpy.rBUM.resticxpc", qos: .userInitiated)
-        isHealthy = false
-        activeBookmarks = [:]
-        defaultTimeout = 30.0
-        maxRetries = 3
-        interfaceVersion = 1
-        pendingOperations = []
-
-        super.init(logger: logger, securityService: securityService)
-
-        do {
-            try setupXPCConnection()
-        } catch {
-            logger.error(
-                "Failed to set up XPC connection: \(error.localizedDescription)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
+    
+    /// Initialize a new Restic XPC service
+    /// - Parameters:
+    ///   - logger: Logger for service operations
+    ///   - securityService: Security service for handling permissions
+    @objc public init(
+        logger: LoggerProtocol,
+        securityService: SecurityServiceProtocol
+    ) {
+        self.logger = logger
+        self.securityService = securityService
+        self.queue = DispatchQueue(label: "dev.mpy.rBUM.resticXPC", qos: .userInitiated)
+        self.isHealthy = false
+        self.activeBookmarks = [:]
+        super.init()
+        
+        setupConnection()
+    }
+    
+    // MARK: - ResticServiceProtocol Implementation
+    
+    @objc public func initializeRepository(at url: URL) async throws {
+        try await validateConnection()
+        try await validatePermissions(for: url)
+        
+        let result = try await executeCommand(
+            "init",
+            arguments: ["--repository", url.path],
+            at: url
+        )
+        
+        guard result.status == 0 else {
+            throw ResticError.initializationFailed(result.error ?? "Unknown error")
         }
     }
-
-    deinit {
-        cleanupResources()
-        connection?.invalidationHandler = nil
-        connection?.interruptionHandler = nil
-        connection?.invalidate()
+    
+    @objc public func backup(from source: URL, to destination: URL) async throws {
+        try await validateConnection()
+        try await validatePermissions(for: [source, destination])
+        
+        let result = try await executeCommand(
+            "backup",
+            arguments: [source.path, "--repository", destination.path],
+            at: destination
+        )
+        
+        guard result.status == 0 else {
+            throw ResticError.backupFailed(result.error ?? "Unknown error")
+        }
+    }
+    
+    @objc public func listSnapshots() async throws -> [String] {
+        try await validateConnection()
+        
+        let result = try await executeCommand(
+            "snapshots",
+            arguments: ["--json"],
+            at: nil
+        )
+        
+        guard result.status == 0 else {
+            throw ResticError.snapshotListFailed(result.error ?? "Unknown error")
+        }
+        
+        return try parseSnapshots(from: result.output)
+    }
+    
+    @objc public func restore(from source: URL, to destination: URL) async throws {
+        try await validateConnection()
+        try await validatePermissions(for: [source, destination])
+        
+        let result = try await executeCommand(
+            "restore",
+            arguments: ["latest", "--target", destination.path, "--repository", source.path],
+            at: destination
+        )
+        
+        guard result.status == 0 else {
+            throw ResticError.restoreFailed(result.error ?? "Unknown error")
+        }
     }
 }
 
