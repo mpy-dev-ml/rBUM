@@ -1,0 +1,6 @@
+framework module Core_Private {
+    umbrella header "Core_Private.h"
+    
+    export *
+    module * { export * }
+}

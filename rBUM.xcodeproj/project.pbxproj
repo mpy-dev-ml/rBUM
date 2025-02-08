@@ -94,6 +94,9 @@
 		8D67A0412D5787CB0060D84A /* (null) in Sources */ = {isa = PBXBuildFile; };
 		8D8E74522D57CBC300AFB5ED /* Core.h in Headers */ = {isa = PBXBuildFile; fileRef = 8D8E74512D57CBC300AFB5ED /* Core.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		8D8E74542D57CC2A00AFB5ED /* OSLogger.h in Headers */ = {isa = PBXBuildFile; fileRef = 8D8E74532D57CC2A00AFB5ED /* OSLogger.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		8DBB44622D580BF3006E2E76 /* Core_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 8DBB44612D580BF3006E2E76 /* Core_Private.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		8DBB44642D580C7B006E2E76 /* Core-Swift.h in Headers */ = {isa = PBXBuildFile; fileRef = 8DBB44632D580C7B006E2E76 /* Core-Swift.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		8DBB446B2D5813E3006E2E76 /* module.private.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8DBB44672D580E1C006E2E76 /* module.private.modulemap */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,9 +151,28 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		8DBB446A2D581392006E2E76 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 16;
+			files = (
+				8DBB446B2D5813E3006E2E76 /* module.private.modulemap in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		8D8E74512D57CBC300AFB5ED /* Core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Core.h; path = Core/Core.h; sourceTree = "<group>"; };
 		8D8E74532D57CC2A00AFB5ED /* OSLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OSLogger.h; path = ../../Documents/rBUMBackup/Core/Logging/OSLogger.h; sourceTree = "<group>"; };
+		8DBB445F2D580BB6006E2E76 /* OSLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OSLogger.h; path = Core/Sources/Logging/OSLogger.h; sourceTree = "<group>"; };
+		8DBB44612D580BF3006E2E76 /* Core_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Core_Private.h; path = Core/Core_Private.h; sourceTree = "<group>"; };
+		8DBB44632D580C7B006E2E76 /* Core-Swift.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Core-Swift.h"; path = "Core/Core-Swift.h"; sourceTree = "<group>"; };
+		8DBB44652D580E1C006E2E76 /* Core_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Core_Private.h; sourceTree = "<group>"; };
+		8DBB44662D580E1C006E2E76 /* Core-Swift.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Core-Swift.h"; sourceTree = "<group>"; };
+		8DBB44672D580E1C006E2E76 /* module.private.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.private.modulemap; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -164,7 +186,10 @@
 		8D3E9DD02D51219800C21FE0 = {
 			isa = PBXGroup;
 			children = (
+				8DBB44632D580C7B006E2E76 /* Core-Swift.h */,
+				8DBB44612D580BF3006E2E76 /* Core_Private.h */,
 				8D8E74532D57CC2A00AFB5ED /* OSLogger.h */,
+				8DBB445F2D580BB6006E2E76 /* OSLogger.h */,
 				8D8E74512D57CBC300AFB5ED /* Core.h */,
 				8D41427E2D52355F00FBF58A /* Core */,
 				8DB70A0B2D5388D500F71C4B /* Frameworks */,
@@ -270,6 +295,9 @@
 		8D41427E2D52355F00FBF58A /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				8DBB44652D580E1C006E2E76 /* Core_Private.h */,
+				8DBB44662D580E1C006E2E76 /* Core-Swift.h */,
+				8DBB44672D580E1C006E2E76 /* module.private.modulemap */,
 				8D41427A2D52355F00FBF58A /* Tests */,
 				8D4142752D52355F00FBF58A /* Sources */,
 			);
@@ -354,7 +382,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8D8E74522D57CBC300AFB5ED /* Core.h in Headers */,
+				8DBB44642D580C7B006E2E76 /* Core-Swift.h in Headers */,
 				8D8E74542D57CC2A00AFB5ED /* OSLogger.h in Headers */,
+				8DBB44622D580BF3006E2E76 /* Core_Private.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -423,6 +453,7 @@
 				8D3E9FE72D5122C600C21FE0 /* Headers */,
 				8D3E9FE82D5122C600C21FE0 /* Sources */,
 				8D3E9FEA2D5122C600C21FE0 /* Resources */,
+				8DBB446A2D581392006E2E76 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -1022,6 +1053,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/Core/Sources/**";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1032,11 +1064,12 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				"MODULEMAP_FILE[sdk=*]" = "$(SRCROOT)/Core/module.modulemap";
+				"MODULEMAP_PRIVATE_FILE[sdk=*]" = /Users/mpy/CascadeProjects/rBUM/Core/module.private.modulemap;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mpy.Core;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers\n";
+				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers";
 				RUN_DOCUMENTATION_COMPILER = YES;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1063,6 +1096,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/Core/Sources/**";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1073,11 +1107,12 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				"MODULEMAP_FILE[sdk=*]" = "$(SRCROOT)/Core/module.modulemap";
+				"MODULEMAP_PRIVATE_FILE[sdk=*]" = /Users/mpy/CascadeProjects/rBUM/Core/module.private.modulemap;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mpy.Core;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers\n";
+				PUBLIC_HEADERS_FOLDER_PATH = "$(CONTENTS_FOLDER_PATH)/Headers";
 				RUN_DOCUMENTATION_COMPILER = YES;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -1,0 +1,56 @@
+disabled_rules:
+  - trailing_whitespace
+  - force_cast
+  - force_try
+
+opt_in_rules:
+  - empty_count
+  - missing_docs
+  - closure_spacing
+  - explicit_init
+  - first_where
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - sorted_imports
+  - unused_import
+  - vertical_parameter_alignment_on_call
+
+excluded:
+  - Carthage
+  - Pods
+  - DerivedData
+  - .build
+
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - URL
+    - x
+    - y
+
+type_name:
+  min_length: 3
+  max_length:
+    warning: 50
+    error: 60
+
+function_parameter_count:
+  warning: 6
+  error: 8
+
+file_length:
+  warning: 500
+  error: 1000
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+reporter: "xcode"
