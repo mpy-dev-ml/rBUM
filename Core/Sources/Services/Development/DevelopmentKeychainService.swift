@@ -26,6 +26,14 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
 
     // MARK: - XPC Configuration
 
+    /// Configures XPC sharing for the development keychain.
+    /// 
+    /// This method simulates XPC configuration in a development environment.
+    /// It can simulate failures for testing purposes.
+    /// 
+    /// - Parameters:
+    ///   - accessGroup: The access group to configure
+    /// - Throws: KeychainError if the operation fails
     public func configureXPCSharing(accessGroup: String) throws {
         try simulateFailureIfNeeded(
             operation: "xpc_config",
@@ -37,6 +45,16 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
 // MARK: - KeychainServiceProtocol Implementation
 
 extension DevelopmentKeychainService {
+    /// Saves data to the development keychain.
+    /// 
+    /// This method simulates keychain storage in a development environment.
+    /// It validates access groups and can simulate failures for testing purposes.
+    /// 
+    /// - Parameters:
+    ///   - data: The data to save
+    ///   - key: The key to associate with the data
+    ///   - accessGroup: Optional access group for shared keychain access
+    /// - Throws: KeychainError if the operation fails or access is denied
     public func save(_ data: Data, for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "save",
@@ -71,6 +89,16 @@ extension DevelopmentKeychainService {
         }
     }
 
+    /// Retrieves data from the development keychain.
+    /// 
+    /// This method simulates keychain retrieval in a development environment.
+    /// It validates access groups and can simulate failures for testing purposes.
+    /// 
+    /// - Parameters:
+    ///   - key: The key to retrieve data for
+    ///   - accessGroup: Optional access group for shared keychain access
+    /// - Returns: The retrieved data, or nil if not found
+    /// - Throws: KeychainError if the operation fails or access is denied
     public func retrieve(for key: String, accessGroup: String?) throws -> Data? {
         try simulateFailureIfNeeded(
             operation: "retrieve",
@@ -130,6 +158,15 @@ extension DevelopmentKeychainService {
         }
     }
 
+    /// Deletes data from the development keychain.
+    /// 
+    /// This method simulates keychain deletion in a development environment.
+    /// It validates access groups and can simulate failures for testing purposes.
+    /// 
+    /// - Parameters:
+    ///   - key: The key to delete data for
+    ///   - accessGroup: Optional access group for shared keychain access
+    /// - Throws: KeychainError if the operation fails or access is denied
     public func delete(for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "delete",
@@ -224,11 +261,24 @@ extension DevelopmentKeychainService {
 // MARK: - Legacy Methods (Deprecated)
 
 extension DevelopmentKeychainService {
+    /// Saves data to the development keychain without an access group.
+    /// 
+    /// - Parameters:
+    ///   - data: The data to save
+    ///   - key: The key to associate with the data
+    /// - Throws: KeychainError if the operation fails
+    /// - Warning: Deprecated. Use save(_:for:accessGroup:) instead
     @available(*, deprecated, message: "Use save(_:for:accessGroup:) instead")
     public func save(_ data: Data, for key: String) throws {
         try save(data, for: key, accessGroup: nil)
     }
 
+    /// Retrieves data from the development keychain without an access group.
+    /// 
+    /// - Parameter key: The key to retrieve data for
+    /// - Returns: The retrieved data
+    /// - Throws: KeychainError if the operation fails or item is not found
+    /// - Warning: Deprecated. Use retrieve(for:accessGroup:) instead
     @available(*, deprecated, message: "Use retrieve(for:accessGroup:) instead")
     public func load(for key: String) throws -> Data {
         guard let data = try retrieve(for: key, accessGroup: nil) else {
@@ -237,6 +287,11 @@ extension DevelopmentKeychainService {
         return data
     }
 
+    /// Deletes data from the development keychain without an access group.
+    /// 
+    /// - Parameter key: The key to delete data for
+    /// - Throws: KeychainError if the operation fails
+    /// - Warning: Deprecated. Use delete(for:accessGroup:) instead
     @available(*, deprecated, message: "Use delete(for:accessGroup:) instead")
     public func delete(for key: String) throws {
         try delete(for: key, accessGroup: nil)

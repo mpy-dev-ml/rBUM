@@ -64,56 +64,88 @@ extension ServiceFactory {
         logger: LoggerProtocol
     ) -> Result<Void, Error> {
         do {
-            switch serviceType {
-            case is SecurityServiceProtocol.Type:
-                try createSecurityService(logger: logger).validate()
-            case is KeychainServiceProtocol.Type:
-                try createKeychainService(logger: logger).validate()
-            case is BookmarkServiceProtocol.Type:
-                let security = createSecurityService(logger: logger)
-                let keychain = createKeychainService(logger: logger)
-                try createBookmarkService(
-                    logger: logger,
-                    securityService: security,
-                    keychainService: keychain
-                ).validate()
-            case is ResticXPCProtocol.Type:
-                let security = createSecurityService(logger: logger)
-                try createXPCService(
-                    logger: logger,
-                    securityService: security
-                ).validate()
-            case is BackupServiceProtocol.Type:
-                let security = createSecurityService(logger: logger)
-                let xpc = createXPCService(logger: logger, securityService: security)
-                try createBackupService(
-                    logger: logger,
-                    securityService: security,
-                    xpcService: xpc
-                ).validate()
-            case is RestoreServiceProtocol.Type:
-                let security = createSecurityService(logger: logger)
-                let xpc = createXPCService(logger: logger, securityService: security)
-                try createRestoreService(
-                    logger: logger,
-                    securityService: security,
-                    xpcService: xpc
-                ).validate()
-            case is ResticCommandServiceProtocol.Type:
-                let security = createSecurityService(logger: logger)
-                let xpc = createXPCService(logger: logger, securityService: security)
-                try createResticCommandService(
-                    logger: logger,
-                    securityService: security,
-                    xpcService: xpc
-                ).validate()
-            default:
-                throw ServiceError.invalidServiceType(String(describing: serviceType))
-            }
-            
+            try validateSpecificService(serviceType, logger: logger)
             return .success(())
         } catch {
             return .failure(error)
         }
+    }
+    
+    /// Validates a specific service type
+    /// - Parameters:
+    ///   - serviceType: Type of service to validate
+    ///   - logger: Logger for validation
+    private static func validateSpecificService<T>(
+        _ serviceType: T.Type,
+        logger: LoggerProtocol
+    ) throws {
+        switch serviceType {
+        case is SecurityServiceProtocol.Type:
+            try validateSecurityService(logger: logger)
+        case is KeychainServiceProtocol.Type:
+            try validateKeychainService(logger: logger)
+        case is BookmarkServiceProtocol.Type:
+            try validateBookmarkService(logger: logger)
+        case is ResticXPCProtocol.Type:
+            try validateXPCService(logger: logger)
+        case is BackupServiceProtocol.Type:
+            try validateBackupService(logger: logger)
+        case is RestoreServiceProtocol.Type:
+            try validateRestoreService(logger: logger)
+        default:
+            throw ServiceError.unsupportedServiceType(String(describing: serviceType))
+        }
+    }
+    
+    /// Validates security service
+    private static func validateSecurityService(logger: LoggerProtocol) throws {
+        try createSecurityService(logger: logger).validate()
+    }
+    
+    /// Validates keychain service
+    private static func validateKeychainService(logger: LoggerProtocol) throws {
+        try createKeychainService(logger: logger).validate()
+    }
+    
+    /// Validates bookmark service
+    private static func validateBookmarkService(logger: LoggerProtocol) throws {
+        let security = createSecurityService(logger: logger)
+        let keychain = createKeychainService(logger: logger)
+        try createBookmarkService(
+            logger: logger,
+            securityService: security,
+            keychainService: keychain
+        ).validate()
+    }
+    
+    /// Validates XPC service
+    private static func validateXPCService(logger: LoggerProtocol) throws {
+        let security = createSecurityService(logger: logger)
+        try createXPCService(
+            logger: logger,
+            securityService: security
+        ).validate()
+    }
+    
+    /// Validates backup service
+    private static func validateBackupService(logger: LoggerProtocol) throws {
+        let security = createSecurityService(logger: logger)
+        let xpc = createXPCService(logger: logger, securityService: security)
+        try createBackupService(
+            logger: logger,
+            securityService: security,
+            xpcService: xpc
+        ).validate()
+    }
+    
+    /// Validates restore service
+    private static func validateRestoreService(logger: LoggerProtocol) throws {
+        let security = createSecurityService(logger: logger)
+        let xpc = createXPCService(logger: logger, securityService: security)
+        try createRestoreService(
+            logger: logger,
+            securityService: security,
+            xpcService: xpc
+        ).validate()
     }
 }

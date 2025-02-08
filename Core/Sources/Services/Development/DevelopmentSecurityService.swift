@@ -9,15 +9,6 @@
 import Foundation
 import os.log
 
-// Import security-related models
-@_implementationOnly import struct Core.SecurityMetrics
-@_implementationOnly import struct Core.SecurityOperationRecorder
-@_implementationOnly import struct Core.SecuritySimulator
-@_implementationOnly import enum Core.SecurityOperationType
-@_implementationOnly import enum Core.SecurityOperationStatus
-@_implementationOnly import struct Core.DevelopmentConfiguration
-@_implementationOnly import enum Core.SecurityError
-
 /// Configuration for controlling the development security service's behaviour
 public struct DevelopmentConfiguration {
     /// Whether to simulate permission request failures
@@ -50,6 +41,10 @@ public struct DevelopmentConfiguration {
         self.artificialDelay = artificialDelay
     }
     
+    /// Default configuration for development environment
+    ///
+    /// Returns a `DevelopmentConfiguration` instance with default settings for
+    /// simulating security operations in a development environment.
     public static var `default`: DevelopmentConfiguration {
         return DevelopmentConfiguration()
     }
@@ -117,13 +112,13 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     internal var bookmarks: [URL: Data] = [:]
 
     /// Metrics collector for tracking security operations
-    internal let metrics: Core.SecurityMetrics
+    internal let metrics: SecurityMetrics
 
     /// Recorder for logging security operations
-    internal let operationRecorder: Core.SecurityOperationRecorder
+    internal let operationRecorder: SecurityOperationRecorder
 
     /// Simulator for controlling operation behaviour
-    internal let simulator: Core.SecuritySimulator
+    internal let simulator: SecuritySimulator
 
     /// File manager for file system operations
     internal let fileManager: FileManager
@@ -155,9 +150,9 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         self.fileManager = FileManager.default
         
         // Initialize development tools
-        self.metrics = Core.SecurityMetrics(logger: logger as! Logger)
-        self.operationRecorder = Core.SecurityOperationRecorder(logger: logger as! Logger)
-        self.simulator = Core.SecuritySimulator(
+        self.metrics = SecurityMetrics(logger: logger as! Logger)
+        self.operationRecorder = SecurityOperationRecorder(logger: logger as! Logger)
+        self.simulator = SecuritySimulator(
             logger: logger as! Logger,
             configuration: configuration
         )
@@ -165,6 +160,13 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
     
     // MARK: - SecurityServiceProtocol
     
+    /// Requests permission for accessing a URL
+    ///
+    /// Simulates a permission request and returns the result.
+    /// - Parameters:
+    ///   - url: URL for which permission is requested
+    /// - Returns: Whether permission was granted
+    /// - Throws: `SecurityError` if permission is denied
     public func requestPermission(for url: URL) async throws -> Bool {
         try await simulator.simulateDelay()
         
@@ -174,13 +176,20 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         
         operationRecorder.recordOperation(
             url: url,
-            type: Core.SecurityOperationType.permission,
-            status: Core.SecurityOperationStatus.success
+            type: SecurityOperationType.permission,
+            status: SecurityOperationStatus.success
         )
         
         return true
     }
     
+    /// Creates a security-scoped bookmark for a URL
+    ///
+    /// Simulates bookmark creation and returns the bookmark data.
+    /// - Parameters:
+    ///   - url: URL for which a bookmark is created
+    /// - Returns: Bookmark data
+    /// - Throws: `SecurityError` if bookmark creation fails
     public func createBookmark(for url: URL) throws -> Data {
         try simulator.simulateDelay()
         
@@ -198,13 +207,21 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         
         operationRecorder.recordOperation(
             url: url,
-            type: Core.SecurityOperationType.bookmark,
-            status: Core.SecurityOperationStatus.success
+            type: SecurityOperationType.bookmark,
+            status: SecurityOperationStatus.success
         )
         
         return bookmark
     }
     
+    /// Validates a security-scoped bookmark for a URL
+    ///
+    /// Simulates bookmark validation and returns the result.
+    /// - Parameters:
+    ///   - bookmark: Bookmark data to validate
+    ///   - url: URL for which the bookmark is validated
+    /// - Returns: Whether the bookmark is valid
+    /// - Throws: `SecurityError` if bookmark validation fails
     public func validateBookmark(_ bookmark: Data, for url: URL) throws -> Bool {
         try simulator.simulateDelay()
         
@@ -216,14 +233,20 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         
         operationRecorder.recordOperation(
             url: url,
-            type: Core.SecurityOperationType.bookmark,
-            status: isValid ? Core.SecurityOperationStatus.success : Core.SecurityOperationStatus.failure,
+            type: SecurityOperationType.bookmark,
+            status: isValid ? SecurityOperationStatus.success : SecurityOperationStatus.failure,
             error: isValid ? nil : "Bookmark mismatch"
         )
         
         return isValid
     }
     
+    /// Starts accessing a URL
+    ///
+    /// Simulates starting access to a URL.
+    /// - Parameters:
+    ///   - url: URL for which access is started
+    /// - Throws: `SecurityError` if access is denied
     public func startAccessing(_ url: URL) throws {
         try simulator.simulateDelay()
         
@@ -233,16 +256,21 @@ public final class DevelopmentSecurityService: SecurityServiceProtocol, @uncheck
         
         operationRecorder.recordOperation(
             url: url,
-            type: Core.SecurityOperationType.access,
-            status: Core.SecurityOperationStatus.success
+            type: SecurityOperationType.access,
+            status: SecurityOperationStatus.success
         )
     }
     
+    /// Stops accessing a URL
+    ///
+    /// Simulates stopping access to a URL.
+    /// - Parameters:
+    ///   - url: URL for which access is stopped
     public func stopAccessing(_ url: URL) {
         operationRecorder.recordOperation(
             url: url,
-            type: Core.SecurityOperationType.access,
-            status: Core.SecurityOperationStatus.success
+            type: SecurityOperationType.access,
+            status: SecurityOperationStatus.success
         )
     }
 }

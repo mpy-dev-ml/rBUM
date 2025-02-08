@@ -93,17 +93,62 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
 
     // MARK: - Command Execution
 
-    public func executeCommand(
-        config: XPCCommandConfig,
-        completion: @escaping ([String: Any]?) -> Void
-    ) {
-        if simulateConnectionFailureIfNeeded(
-            operation: "command execution",
-            completion: completion
-        ) {
+    /// Execute a command through XPC using a configuration object
+    /// - Parameters:
+    ///   - config: The command configuration object containing all execution parameters
+    ///   - completion: Completion handler with result
+    public func executeCommand(config: XPCCommandConfig, completion: @escaping ([String: Any]?) -> Void) {
+        if simulateConnectionFailureIfNeeded(completion: completion) {
             return
         }
-
+        
+        if simulateTimeoutIfNeeded(completion: completion) {
+            return
+        }
+        
+        handleCommand(config, completion: completion)
+    }
+    
+    /// Execute a command through XPC using individual parameters
+    /// - Parameters:
+    ///   - command: The command to execute
+    ///   - arguments: Command arguments
+    ///   - environment: Environment variables
+    ///   - workingDirectory: Working directory for command execution
+    ///   - bookmarks: Security-scoped bookmarks
+    ///   - timeout: Command timeout
+    ///   - auditSessionId: Audit session identifier
+    ///   - completion: Completion handler with result
+    /// - Note: This method is deprecated. Use `executeCommand(config:completion:)` instead
+    @available(*, deprecated, message: "Use executeCommand(config:completion:) instead")
+    // swiftlint:disable:next function_parameter_count
+    public func executeCommand(
+        _ command: String,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: String,
+        bookmarks: [String: NSData],
+        timeout: TimeInterval,
+        auditSessionId: au_asid_t,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
+        let config = XPCCommandConfig(
+            command: command,
+            arguments: arguments,
+            environment: environment,
+            workingDirectory: workingDirectory,
+            bookmarks: bookmarks,
+            timeout: timeout,
+            auditSessionId: auditSessionId
+        )
+        
+        executeCommand(config: config, completion: completion)
+    }
+    
+    private func handleCommand(
+        _ config: XPCCommandConfig,
+        completion: @escaping ([String: Any]?) -> Void
+    ) {
         logCommandExecution(config)
         
         queue.async {
@@ -266,29 +311,6 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
         completion(["validation": result])
     }
 
-    public func executeCommand(
-        _ command: String,
-        arguments: [String],
-        environment: [String: String],
-        workingDirectory: String,
-        bookmarks: [String: NSData],
-        timeout: TimeInterval,
-        auditSessionId: au_asid_t,
-        completion: @escaping ([String: Any]?) -> Void
-    ) {
-        let config = XPCCommandConfig(
-            command: command,
-            arguments: arguments,
-            environment: environment,
-            workingDirectory: workingDirectory,
-            bookmarks: bookmarks,
-            timeout: timeout,
-            auditSessionId: auditSessionId
-        )
-
-        executeCommand(config: config, completion: completion)
-    }
-
     public func ping(
         auditSessionId: au_asid_t,
         completion: @escaping (Bool) -> Void
@@ -312,6 +334,30 @@ public final class DevelopmentXPCService: ResticXPCProtocol {
 
         completion(true)
     }
+}
+
+/// Configuration for command execution
+public struct ExecutionConfig {
+    /// The command to execute
+    let command: String
+    
+    /// Command arguments
+    let arguments: [String]
+    
+    /// Environment variables
+    let environment: [String: String]
+    
+    /// Working directory for command execution
+    let workingDirectory: String
+    
+    /// Security-scoped bookmarks
+    let bookmarks: [String: NSData]
+    
+    /// Command timeout
+    let timeout: TimeInterval
+    
+    /// Audit session identifier
+    let auditSessionId: au_asid_t
 }
 
 /// Configuration for XPC commands

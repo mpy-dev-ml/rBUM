@@ -8,6 +8,45 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
+
+/// Repository statistics
+struct RepositoryStats: Codable, Equatable {
+    /// Total size of the repository in bytes
+    let totalSize: UInt64
+
+    /// Number of pack files
+    let packFiles: UInt
+
+    /// Number of snapshots
+    let snapshots: UInt
+
+    private enum CodingKeys: String, CodingKey {
+        case totalSize = "total_size"
+        case packFiles = "pack_files"
+        case snapshots
+    }
+}
+
+/// Represents the current operational status of a repository
+public enum RepositoryStatusType {
+    /// Repository is ready for operations
+    case ready
+    
+    /// Repository has encountered an error
+    /// - Parameter error: The error that occurred
+    case error(Error)
+    
+    /// Repository is currently performing an operation
+    /// - Parameter operation: Description of the current operation
+    case inProgress(operation: String)
+    
+    /// Repository is locked, preventing concurrent operations
+    case locked
+    
+    /// Repository is currently unavailable
+    case unavailable
+}
+
 /// Model representing the status of a repository after a check operation
 struct RepositoryStatus: Codable, Equatable {
     /// Whether the repository is valid
@@ -28,38 +67,12 @@ struct RepositoryStatus: Codable, Equatable {
     /// Statistics about the repository
     let stats: RepositoryStats
 
-    /// Repository statistics
-    struct RepositoryStats: Codable, Equatable {
-        /// Total size of the repository in bytes
-        let totalSize: UInt64
-
-        /// Number of pack files
-        let packFiles: UInt
-
-        /// Number of snapshots
-        let snapshots: UInt
-
-        private enum CodingKeys: String, CodingKey {
-            case totalSize = "total_size"
-            case packFiles = "pack_files"
-            case snapshots
-        }
-    }
-
-    public enum Status {
-        case ready
-        case error(Error)
-        case inProgress(operation: String)
-        case locked
-        case unavailable
-    }
-    
-    public let status: Status
+    public let status: RepositoryStatusType
     public let lastCheck: Date?
     public let errorDetails: String?
-    
+
     public init(
-        status: Status,
+        status: RepositoryStatusType,
         lastCheck: Date? = nil,
         errorDetails: String? = nil
     ) {

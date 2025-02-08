@@ -137,64 +137,35 @@ public class PermissionManager {
             line: #line
         )
 
-        do {
-            // Check for existing bookmark
-            guard let bookmark = try loadBookmark(for: url) else {
-                logger.debug(
-                    "No stored bookmark found for: \(url.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                return false
-            }
-
-            // Attempt to resolve bookmark
-            let resolvedURL = try securityService.resolveBookmark(bookmark)
-
-            // Verify resolved URL matches original
-            guard resolvedURL.path == url.path else {
-                logger.error(
-                    "Bookmark resolved to different path: \(resolvedURL.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                try removeBookmark(for: url)
-                return false
-            }
-
-            // Test access
-            let canAccess = try await securityService.startAccessing(resolvedURL)
-            guard canAccess else {
-                logger.error(
-                    "Failed to access resolved URL: \(resolvedURL.path)",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-                try removeBookmark(for: url)
-                return false
-            }
-            try await securityService.stopAccessing(resolvedURL)
-
-            logger.info(
-                "Successfully recovered permission for: \(url.path)",
+        // Check for existing bookmark
+        guard let bookmark = try loadBookmark(for: url) else {
+            logger.debug(
+                "No stored bookmark found for: \(url.path)",
                 file: #file,
                 function: #function,
                 line: #line
             )
-            return true
-
-        } catch {
-            logger.error(
-                "Failed to recover permission: \(error.localizedDescription)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            throw PermissionError.recoveryFailed(error.localizedDescription)
+            return false
         }
+
+        // Attempt to resolve and verify bookmark
+        guard let resolvedURL = try resolveAndVerifyBookmark(bookmark, originalURL: url) else {
+            return false
+        }
+
+        // Test access
+        guard try await testAccess(to: resolvedURL) else {
+            try removeBookmark(for: url)
+            return false
+        }
+
+        logger.info(
+            "Successfully recovered permission for: \(url.path)",
+            file: #file,
+            function: #function,
+            line: #line
+        )
+        return true
     }
 
     /// Check if permission exists for a URL
@@ -314,6 +285,48 @@ public class PermissionManager {
             )
             throw PermissionError.revocationFailed(error.localizedDescription)
         }
+    }
+
+    /// Resolves and verifies a bookmark matches the original URL
+    /// - Parameters:
+    ///   - bookmark: The bookmark data to resolve
+    ///   - originalURL: The original URL to verify against
+    /// - Returns: The resolved URL if successful, nil otherwise
+    private func resolveAndVerifyBookmark(_ bookmark: Data, originalURL: URL) throws -> URL? {
+        // Attempt to resolve bookmark
+        let resolvedURL = try securityService.resolveBookmark(bookmark)
+
+        // Verify resolved URL matches original
+        guard resolvedURL.path == originalURL.path else {
+            logger.error(
+                "Bookmark resolved to different path: \(resolvedURL.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            try removeBookmark(for: originalURL)
+            return nil
+        }
+
+        return resolvedURL
+    }
+
+    /// Tests access to a URL using the security service
+    /// - Parameter url: The URL to test access to
+    /// - Returns: true if access was successful
+    private func testAccess(to url: URL) async throws -> Bool {
+        let canAccess = try await securityService.startAccessing(url)
+        guard canAccess else {
+            logger.error(
+                "Failed to access resolved URL: \(url.path)",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            return false
+        }
+        try await securityService.stopAccessing(url)
+        return true
     }
 }
 
