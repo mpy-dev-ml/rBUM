@@ -1,0 +1,32 @@
+coverage:
+  status:
+    project:
+      default:
+        # Basic settings
+        target: 80%
+        threshold: 1%
+        base: auto
+        # Advanced settings
+        branches:
+          - main
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
+    
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+        base: auto
+        
+  ignore:
+    - "rBUMUITests/**/*"  # Ignore UI tests from coverage
+    - "**/*.generated.swift"  # Ignore generated files
+    
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+
+github_checks:
+  annotations: true
