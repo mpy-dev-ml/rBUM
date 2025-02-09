@@ -12,150 +12,151 @@
 //
 
 @testable import Core
-import XCTest
+import Testing
 
-final class ResticSnapshotTests: XCTestCase {
+struct ResticSnapshotTests {
     // MARK: - Properties
 
-    private var snapshot: ResticSnapshot!
-    private var sampleDate: Date!
-    private var sampleTags: [String]!
-    private var samplePaths: [String]!
-
-    // MARK: - Setup
-
-    override func setUp() async throws {
-        try await super.setUp()
-        sampleDate = Date()
-        sampleTags = ["test", "backup", "important"]
-        samplePaths = ["/path/to/backup", "/another/path"]
-
-        snapshot = ResticSnapshot(
+    let sampleDate = Date(timeIntervalSince1970: 1707469339) // Fixed date for testing
+    let sampleTags = ["test", "backup", "important"]
+    let samplePaths = ["/path/to/backup", "/another/path"]
+    let sampleSize: UInt64 = 1024 * 1024 // 1MB
+    let sampleRepoId = "test-repo-id"
+    
+    var snapshot: ResticSnapshot {
+        ResticSnapshot(
             id: "test-snapshot-id",
             time: sampleDate,
             hostname: "test-host",
-            username: "test-user",
-            paths: samplePaths,
             tags: sampleTags,
-            sizeInBytes: 1024,
-            fileCount: 42
+            paths: samplePaths,
+            parent: "parent-snapshot-id",
+            size: sampleSize,
+            repositoryId: sampleRepoId
         )
-    }
-
-    override func tearDown() async throws {
-        snapshot = nil
-        sampleDate = nil
-        sampleTags = nil
-        samplePaths = nil
-        try await super.tearDown()
     }
 
     // MARK: - Tests
 
-    func testSnapshotInitialization() throws {
-        XCTAssertNotNil(snapshot)
-        XCTAssertEqual(snapshot.id, "test-snapshot-id")
-        XCTAssertEqual(snapshot.time, sampleDate)
-        XCTAssertEqual(snapshot.hostname, "test-host")
-        XCTAssertEqual(snapshot.username, "test-user")
-        XCTAssertEqual(snapshot.paths, samplePaths)
-        XCTAssertEqual(snapshot.tags, sampleTags)
-        XCTAssertEqual(snapshot.sizeInBytes, 1024)
-        XCTAssertEqual(snapshot.fileCount, 42)
+    @Test
+    func testSnapshotInitialization() {
+        let snapshot = self.snapshot
+        
+        #expect(snapshot.id == "test-snapshot-id")
+        #expect(snapshot.time == sampleDate)
+        #expect(snapshot.hostname == "test-host")
+        #expect(snapshot.tags == sampleTags)
+        #expect(snapshot.paths == samplePaths)
+        #expect(snapshot.parent == "parent-snapshot-id")
+        #expect(snapshot.size == sampleSize)
+        #expect(snapshot.repositoryId == sampleRepoId)
+        #expect(snapshot.shortId == "test-sna")
     }
 
-    func testSnapshotEquality() throws {
-        let sameSnapshot = ResticSnapshot(
-            id: snapshot.id,
-            time: snapshot.time,
-            hostname: snapshot.hostname,
-            username: snapshot.username,
-            paths: snapshot.paths,
-            tags: snapshot.tags,
-            sizeInBytes: snapshot.sizeInBytes,
-            fileCount: snapshot.fileCount
+    @Test
+    func testSnapshotEquality() {
+        let snapshot1 = self.snapshot
+        let snapshot2 = ResticSnapshot(
+            id: "test-snapshot-id",
+            time: sampleDate,
+            hostname: "test-host",
+            tags: sampleTags,
+            paths: samplePaths,
+            parent: "parent-snapshot-id",
+            size: sampleSize,
+            repositoryId: sampleRepoId
         )
-
-        XCTAssertEqual(snapshot, sameSnapshot)
-
+        
+        #expect(snapshot1 == snapshot2)
+        
+        // Test inequality
         let differentSnapshot = ResticSnapshot(
             id: "different-id",
-            time: snapshot.time,
-            hostname: snapshot.hostname,
-            username: snapshot.username,
-            paths: snapshot.paths,
-            tags: snapshot.tags,
-            sizeInBytes: snapshot.sizeInBytes,
-            fileCount: snapshot.fileCount
+            time: sampleDate,
+            hostname: "test-host",
+            tags: sampleTags,
+            paths: samplePaths,
+            parent: "parent-snapshot-id",
+            size: sampleSize,
+            repositoryId: sampleRepoId
         )
-
-        XCTAssertNotEqual(snapshot, differentSnapshot)
+        
+        #expect(snapshot1 != differentSnapshot)
     }
 
-    func testSnapshotValidation() throws {
-        // Test valid snapshot
-        XCTAssertNoThrow(try snapshot.validate())
+    @Test
+    func testJSONInitialization() throws {
+        let json: [String: Any] = [
+            "id": "json-test-id",
+            "time": "2025-02-09T08:22:19Z",
+            "hostname": "json-test-host",
+            "tags": ["json", "test"],
+            "paths": ["/json/test/path"],
+            "parent": "json-parent-id",
+            "size": UInt64(2048),
+            "repository_id": "json-repo-id"
+        ]
+        
+        let snapshot = try ResticSnapshot(json: json)
+        
+        #expect(snapshot.id == "json-test-id")
+        #expect(snapshot.hostname == "json-test-host")
+        #expect(snapshot.tags == ["json", "test"])
+        #expect(snapshot.paths == ["/json/test/path"])
+        #expect(snapshot.parent == "json-parent-id")
+        #expect(snapshot.size == 2048)
+        #expect(snapshot.repositoryId == "json-repo-id")
+    }
 
-        // Test invalid ID
-        var invalidSnapshot = snapshot
-        invalidSnapshot.id = ""
-        XCTAssertThrowsError(try invalidSnapshot.validate()) { error in
-            XCTAssertEqual(error as? SnapshotError, .invalidId)
+    @Test
+    func testJSONInitializationFailure() {
+        let invalidJSON: [String: Any] = [
+            "id": "test-id",
+            // Missing required fields
+            "hostname": "test-host"
+        ]
+        
+        #expect(throws: DecodingError.self) {
+            _ = try ResticSnapshot(json: invalidJSON)
         }
-
-        // Test invalid time
-        invalidSnapshot = snapshot
-        invalidSnapshot.time = Date(timeIntervalSince1970: -1)
-        XCTAssertThrowsError(try invalidSnapshot.validate()) { error in
-            XCTAssertEqual(error as? SnapshotError, .invalidTime)
-        }
-
-        // Test empty paths
-        invalidSnapshot = snapshot
-        invalidSnapshot.paths = []
-        XCTAssertThrowsError(try invalidSnapshot.validate()) { error in
-            XCTAssertEqual(error as? SnapshotError, .emptyPaths)
-        }
     }
 
-    func testSnapshotSerialization() throws {
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-
-        // Test encoding
-        let encodedData = try encoder.encode(snapshot)
-        XCTAssertNotNil(encodedData)
-
-        // Test decoding
-        let decodedSnapshot = try decoder.decode(ResticSnapshot.self, from: encodedData)
-        XCTAssertEqual(snapshot, decodedSnapshot)
+    @Test
+    func testNSCoding() {
+        let originalSnapshot = snapshot
+        
+        // Archive
+        let data = try! NSKeyedArchiver.archivedData(
+            withRootObject: originalSnapshot,
+            requiringSecureCoding: true
+        )
+        
+        // Unarchive
+        let unarchivedSnapshot = try! NSKeyedUnarchiver.unarchivedObject(
+            of: ResticSnapshot.self,
+            from: data
+        )
+        
+        #expect(unarchivedSnapshot != nil)
+        #expect(unarchivedSnapshot?.id == originalSnapshot.id)
+        #expect(unarchivedSnapshot?.time == originalSnapshot.time)
+        #expect(unarchivedSnapshot?.hostname == originalSnapshot.hostname)
+        #expect(unarchivedSnapshot?.tags == originalSnapshot.tags)
+        #expect(unarchivedSnapshot?.paths == originalSnapshot.paths)
+        #expect(unarchivedSnapshot?.parent == originalSnapshot.parent)
+        #expect(unarchivedSnapshot?.size == originalSnapshot.size)
+        #expect(unarchivedSnapshot?.repositoryId == originalSnapshot.repositoryId)
     }
 
-    func testSnapshotMetadata() throws {
-        let metadata = snapshot.metadata
-
-        XCTAssertEqual(metadata["id"] as? String, snapshot.id)
-        XCTAssertEqual(metadata["hostname"] as? String, snapshot.hostname)
-        XCTAssertEqual(metadata["username"] as? String, snapshot.username)
-        XCTAssertEqual(metadata["size"] as? Int, snapshot.sizeInBytes)
-        XCTAssertEqual(metadata["fileCount"] as? Int, snapshot.fileCount)
-        XCTAssertEqual(metadata["tags"] as? [String], snapshot.tags)
-    }
-
-    func testSnapshotFormatting() throws {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .medium
-
-        let formattedSnapshot = snapshot.formattedDescription
-
-        XCTAssertTrue(formattedSnapshot.contains(snapshot.id))
-        XCTAssertTrue(formattedSnapshot.contains(formatter.string(from: snapshot.time)))
-        XCTAssertTrue(formattedSnapshot.contains(snapshot.hostname))
-        XCTAssertTrue(formattedSnapshot.contains("\(snapshot.fileCount) files"))
-        XCTAssertTrue(formattedSnapshot.contains(ByteCountFormatter.string(
-            fromByteCount: Int64(snapshot.sizeInBytes),
-            countStyle: .file
-        )))
+    @Test
+    func testDescription() {
+        let snapshot = self.snapshot
+        let description = snapshot.description
+        
+        #expect(description.contains("Snapshot test-sna"))
+        #expect(description.contains("Host: test-host"))
+        #expect(description.contains("1 MB")) // Size formatting
+        #expect(description.contains("Tags: test, backup, important"))
+        #expect(description.contains("Paths: /path/to/backup, /another/path"))
     }
 }

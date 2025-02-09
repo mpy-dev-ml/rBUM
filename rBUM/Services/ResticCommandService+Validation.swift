@@ -1,177 +1,209 @@
 import Core
 import Foundation
 
+/// Extension for core validation methods in ResticCommandService
+///
+/// This extension provides fundamental validation methods for repository operations,
+/// focusing on repository configuration, credentials, and key file validation.
+/// It serves as the foundation for all repository-related validations.
 extension ResticCommandService {
-    // MARK: - Validation
-    
-    /// Validates command prerequisites.
+    /// Validates repository configuration and accessibility
     ///
-    /// - Parameters:
-    ///   - command: The command to validate
-    ///   - repository: The target repository
-    ///   - credentials: The repository credentials
-    /// - Throws: ResticCommandError if validation fails
-    func validateCommandPrerequisites(
-        command: ResticCommand,
-        repository: Repository,
-        credentials: RepositoryCredentials
-    ) async throws {
-        // Validate Restic installation
-        guard try await validateResticInstallation() else {
-            throw ResticCommandError.resticNotInstalled
-        }
-        
-        // Validate repository
-        try await validateRepository(repository)
-        
-        // Validate credentials
-        try await validateCredentials(credentials)
-        
-        // Validate command-specific requirements
-        try await validateCommandRequirements(command, for: repository)
-    }
-    
-    /// Validates Restic installation.
-    ///
-    /// - Returns: True if Restic is installed
-    /// - Throws: ResticCommandError if validation fails
-    private func validateResticInstallation() async throws -> Bool {
-        // Check if restic is installed
-        let result = try await xpcService.execute(
-            command: "which",
-            arguments: ["restic"]
-        )
-        
-        return result.exitCode == 0
-    }
-    
-    /// Validates a repository.
+    /// This method performs comprehensive validation of a repository:
+    /// - Validates the repository path exists and is accessible
+    /// - Checks repository credentials
+    /// - Verifies key file if present
     ///
     /// - Parameter repository: The repository to validate
-    /// - Throws: ResticCommandError if validation fails
-    private func validateRepository(_ repository: Repository) async throws {
-        // Check repository path
+    ///
+    /// - Throws:
+    ///   - `ValidationError.emptyRepositoryPath` if the repository path is empty
+    ///   - `ValidationError.repositoryNotFound` if the repository doesn't exist
+    ///   - `ValidationError.repositoryNotAccessible` if the repository cannot be accessed
+    ///   - Other validation errors from credential or key file validation
+    func validateRepository(_ repository: Repository) throws {
+        // Validate repository path
         guard !repository.path.isEmpty else {
-            throw ResticCommandError.invalidRepository("Repository path cannot be empty")
+            throw ValidationError.emptyRepositoryPath
         }
         
-        // Check repository permissions
-        guard try await securityService.hasAccess(to: URL(fileURLWithPath: repository.path)) else {
-            throw ResticCommandError.insufficientPermissions
+        let url = URL(fileURLWithPath: repository.path)
+        
+        // Check if repository exists
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ValidationError.repositoryNotFound(path: repository.path)
         }
         
-        // Check repository settings
-        try validateRepositorySettings(repository.settings)
+        // Check if repository is accessible
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            throw ValidationError.repositoryNotAccessible(path: repository.path)
+        }
+        
+        // Validate repository credentials
+        try validateCredentials(repository.credentials)
     }
     
-    /// Validates repository settings.
+    /// Validates repository credentials
     ///
-    /// - Parameter settings: The settings to validate
-    /// - Throws: ResticCommandError if validation fails
-    private func validateRepositorySettings(_ settings: RepositorySettings) throws {
-        // Check backup sources
-        if let sources = settings.backupSources {
-            guard !sources.isEmpty else {
-                throw ResticCommandError.invalidSettings("Backup sources cannot be empty")
-            }
-        }
-        
-        // Check exclude patterns
-        if let excludes = settings.excludePatterns {
-            for pattern in excludes {
-                guard !pattern.isEmpty else {
-                    throw ResticCommandError.invalidSettings("Exclude pattern cannot be empty")
-                }
-            }
-        }
-        
-        // Check include patterns
-        if let includes = settings.includePatterns {
-            for pattern in includes {
-                guard !pattern.isEmpty else {
-                    throw ResticCommandError.invalidSettings("Include pattern cannot be empty")
-                }
-            }
-        }
-        
-        // Check tags
-        if let tags = settings.tags {
-            for tag in tags {
-                guard !tag.isEmpty else {
-                    throw ResticCommandError.invalidSettings("Tag cannot be empty")
-                }
-            }
-        }
-    }
-    
-    /// Validates repository credentials.
+    /// This method ensures that:
+    /// - The repository password is not empty
+    /// - The key file is valid if one is provided
     ///
-    /// - Parameter credentials: The credentials to validate
-    /// - Throws: ResticCommandError if validation fails
-    private func validateCredentials(_ credentials: RepositoryCredentials) async throws {
-        // Check password
+    /// - Parameter credentials: The repository credentials to validate
+    ///
+    /// - Throws:
+    ///   - `ValidationError.emptyPassword` if the password is empty
+    ///   - Other validation errors from key file validation if a key file is present
+    private func validateCredentials(_ credentials: RepositoryCredentials) throws {
+        // Validate repository password
         guard !credentials.password.isEmpty else {
-            throw ResticCommandError.invalidCredentials("Password cannot be empty")
+            throw ValidationError.emptyPassword
         }
         
-        // Check username if provided
-        if !credentials.username.isEmpty {
-            guard credentials.username.count >= 3 else {
-                throw ResticCommandError.invalidCredentials("Username must be at least 3 characters")
-            }
+        // Validate key file if provided
+        if let keyFile = credentials.keyFile {
+            try validateKeyFile(keyFile)
         }
     }
     
-    /// Validates command-specific requirements.
+    /// Validates a repository key file
     ///
-    /// - Parameters:
-    ///   - command: The command to validate
-    ///   - repository: The target repository
-    /// - Throws: ResticCommandError if validation fails
-    private func validateCommandRequirements(
-        _ command: ResticCommand,
-        for repository: Repository
-    ) async throws {
-        switch command {
-        case .init:
-            // Repository should not exist
-            let repositoryExists = try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path))
-            guard !repositoryExists else {
-                throw ResticCommandError.repositoryExists
-            }
-            
-        case .backup:
-            // Check backup sources
-            guard let sources = repository.settings.backupSources, !sources.isEmpty else {
-                throw ResticCommandError.invalidSettings("Backup sources required")
-            }
-            
-            // Check source permissions
-            for source in sources {
-                let hasAccess = try await securityService.hasAccess(to: URL(fileURLWithPath: source))
-                guard hasAccess else {
-                    throw ResticCommandError.insufficientPermissions
-                }
-            }
-            
-        case .restore:
-            // Check restore target
-            guard let target = repository.settings.restoreTarget else {
-                throw ResticCommandError.invalidSettings("Restore target required")
-            }
-            
-            // Check target permissions
-            let hasAccess = try await securityService.hasAccess(to: URL(fileURLWithPath: target))
-            guard hasAccess else {
-                throw ResticCommandError.insufficientPermissions
-            }
-            
-        case .list:
-            // Repository should exist
-            let repositoryExists = try await fileManager.fileExists(at: URL(fileURLWithPath: repository.path))
-            guard repositoryExists else {
-                throw ResticCommandError.repositoryNotFound
-            }
+    /// This method performs comprehensive validation of a key file:
+    /// - Checks that the key file path is not empty
+    /// - Verifies that the key file exists
+    /// - Ensures the key file is accessible
+    /// - Validates the key file size (must be > 0 and <= 1MB)
+    ///
+    /// - Parameter path: Path to the key file
+    ///
+    /// - Throws:
+    ///   - `ValidationError.emptyKeyFilePath` if the key file path is empty
+    ///   - `ValidationError.keyFileNotFound` if the key file doesn't exist
+    ///   - `ValidationError.keyFileNotAccessible` if the key file cannot be accessed
+    ///   - `ValidationError.emptyKeyFile` if the key file is empty
+    ///   - `ValidationError.keyFileTooLarge` if the key file exceeds 1MB
+    private func validateKeyFile(_ path: String) throws {
+        guard !path.isEmpty else {
+            throw ValidationError.emptyKeyFilePath
+        }
+        
+        let url = URL(fileURLWithPath: path)
+        
+        // Check if key file exists
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ValidationError.keyFileNotFound(path: path)
+        }
+        
+        // Check if key file is accessible
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            throw ValidationError.keyFileNotAccessible(path: path)
+        }
+        
+        // Check key file size
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = attributes[.size] as? Int64 ?? 0
+        
+        guard fileSize > 0 else {
+            throw ValidationError.emptyKeyFile
+        }
+        
+        guard fileSize <= 1024 * 1024 else { // 1MB max
+            throw ValidationError.keyFileTooLarge
+        }
+    }
+}
+
+// MARK: - Validation Errors
+
+/// Errors that can occur during validation operations
+///
+/// This enum defines all possible validation errors that can occur during
+/// repository operations, including:
+/// - Repository validation errors
+/// - Credential validation errors
+/// - Key file validation errors
+/// - Path validation errors
+/// - Tag validation errors
+/// - Exclude pattern validation errors
+enum ValidationError: LocalizedError {
+    // Repository errors
+    case emptyRepositoryPath
+    case repositoryNotFound(path: String)
+    case repositoryNotAccessible(path: String)
+    
+    // Credential errors
+    case emptyPassword
+    case emptyKeyFilePath
+    case keyFileNotFound(path: String)
+    case keyFileNotAccessible(path: String)
+    case emptyKeyFile
+    case keyFileTooLarge
+    
+    // Snapshot errors
+    case invalidSnapshotId
+    case snapshotNotFound(id: String)
+    
+    // Path errors
+    case emptyPath
+    case pathNotFound(path: String)
+    case pathNotAccessible(path: String)
+    case invalidPathFormat(path: String)
+    case pathTooLong(path: String)
+    
+    // Tag errors
+    case emptyTag
+    case invalidTagFormat(tag: String)
+    
+    // Exclude pattern errors
+    case emptyExcludePattern
+    case invalidExcludePattern(pattern: String)
+    case excludePatternTooLong(pattern: String)
+    
+    /// A localized message describing the error
+    var errorDescription: String? {
+        switch self {
+        case .emptyRepositoryPath:
+            return "Repository path cannot be empty"
+        case .repositoryNotFound(let path):
+            return "Repository not found at path: \(path)"
+        case .repositoryNotAccessible(let path):
+            return "Repository is not accessible at path: \(path)"
+        case .emptyPassword:
+            return "Repository password cannot be empty"
+        case .emptyKeyFilePath:
+            return "Key file path cannot be empty"
+        case .keyFileNotFound(let path):
+            return "Key file not found at path: \(path)"
+        case .keyFileNotAccessible(let path):
+            return "Key file is not accessible at path: \(path)"
+        case .emptyKeyFile:
+            return "Key file is empty"
+        case .keyFileTooLarge:
+            return "Key file is too large (max 1MB)"
+        case .invalidSnapshotId:
+            return "Invalid snapshot ID"
+        case .snapshotNotFound(let id):
+            return "Snapshot not found with ID: \(id)"
+        case .emptyPath:
+            return "Path cannot be empty"
+        case .pathNotFound(let path):
+            return "Path not found: \(path)"
+        case .pathNotAccessible(let path):
+            return "Path is not accessible: \(path)"
+        case .invalidPathFormat(let path):
+            return "Path contains invalid characters: \(path)"
+        case .pathTooLong(let path):
+            return "Path is too long: \(path)"
+        case .emptyTag:
+            return "Tag cannot be empty"
+        case .invalidTagFormat(let tag):
+            return "Tag contains invalid characters: \(tag)"
+        case .emptyExcludePattern:
+            return "Exclude pattern cannot be empty"
+        case .invalidExcludePattern(let pattern):
+            return "Exclude pattern contains invalid characters: \(pattern)"
+        case .excludePatternTooLong(let pattern):
+            return "Exclude pattern is too long: \(pattern)"
         }
     }
 }

@@ -59,6 +59,11 @@ final class BackupListViewModel: ObservableObject {
     private let backupService: BackupServiceProtocol
     private let repositoryService: RepositoryServiceProtocol
     private let logger: LoggerProtocol
+    private var sourceTracker: BackupSourceTracker?
+    private var trackedSources: [BackupSource] = []
+    private var pendingChanges: [String: Bool] = [:]
+    private let fileMonitor = FileMonitor()
+    private var sourceStreams: [String: FSEventStream] = [:]
     
     // MARK: - Initialization
     
@@ -75,6 +80,19 @@ final class BackupListViewModel: ObservableObject {
         self.backupService = backupService
         self.repositoryService = repositoryService
         self.logger = logger
+        setupSourceTracking()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSourceChange(_:)),
+            name: .backupSourceChanged,
+            object: nil
+        )
+    }
+    
+    deinit {
+        stopSourceTracking()
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Public Methods
@@ -87,23 +105,51 @@ final class BackupListViewModel: ObservableObject {
             
             let (loadedRepos, loadedSnapshots) = try await (repos, snapshots)
             
+            // Fetch sources for each snapshot concurrently
+            var operations: [BackupOperation] = []
+            try await withThrowingTaskGroup(of: (String, [URL]).self) { group in
+                for snapshot in loadedSnapshots {
+                    group.addTask {
+                        let sources = try await self.fetchSourcesForSnapshot(snapshot.id)
+                        return (snapshot.id, sources)
+                    }
+                }
+                
+                // Collect results as they complete
+                for try await (snapshotId, sources) in group {
+                    if let snapshot = loadedSnapshots.first(where: { $0.id == snapshotId }) {
+                        operations.append(BackupOperation(
+                            id: snapshot.id,
+                            repository: loadedRepos.first ?? Repository(name: "Unknown", url: nil),
+                            sources: sources,
+                            tags: snapshot.tags,
+                            startTime: snapshot.time,
+                            state: .completed(date: snapshot.time),
+                            lastUpdated: snapshot.time
+                        ))
+                    }
+                }
+            }
+            
             await MainActor.run {
                 repositories = loadedRepos
-                backupOperations = loadedSnapshots.map { snapshot in
-                    BackupOperation(
-                        id: snapshot.id,
-                        repository: repositories.first ?? Repository(name: "Unknown", url: nil),
-                        sources: [], // TODO: Add source tracking
-                        tags: snapshot.tags,
-                        startTime: snapshot.time,
-                        state: .completed(date: snapshot.time),
-                        lastUpdated: snapshot.time
-                    )
-                }
+                backupOperations = operations
             }
         } catch {
             logger.error("Failed to load backup operations: \(error.localizedDescription)")
         }
+    }
+    
+    /// Fetches sources for a given snapshot ID
+    /// - Parameter snapshotId: ID of the snapshot to fetch sources for
+    /// - Returns: Array of source URLs
+    private func fetchSourcesForSnapshot(_ snapshotId: String) async throws -> [URL] {
+        guard let snapshot = try await backupService.getSnapshot(id: snapshotId) else {
+            return []
+        }
+        
+        // Convert source paths to URLs
+        return snapshot.sourcePaths.compactMap { URL(fileURLWithPath: $0) }
     }
     
     /// Start a new backup operation
@@ -131,16 +177,104 @@ final class BackupListViewModel: ObservableObject {
     }
     
     /// Cancel a backup operation
-    /// - Parameter operation: The operation to cancel
-    func cancelBackup(_ operation: BackupOperation) async {
-        // TODO: Implement cancellation when supported by BackupService
-        logger.warning("Backup cancellation not yet implemented")
+    func cancelBackup() async {
+        guard let currentBackup = activeBackup else { return }
+        await backupService.cancelCurrentOperation()
+        activeBackup = nil
+        backupQueue.remove(currentBackup)
     }
     
     // MARK: - Private Methods
     
     private func mapBackupState(_ state: BackupState) -> BackupState {
         state
+    }
+    
+    private func trackBackupSource(_ source: BackupSource) {
+        guard !trackedSources.contains(source) else { return }
+        trackedSources.append(source)
+        
+        // Start monitoring the source for changes
+        do {
+            try fileMonitor.startMonitoring(path: source.path) { [weak self] event in
+                self?.handleFileEvent(event, for: source)
+            }
+        } catch {
+            logger.error("Failed to start monitoring source: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleFileEvent(_ event: FileEvent, for source: BackupSource) {
+        switch event {
+        case .modified:
+            pendingChanges[source.id] = true
+            objectWillChange.send()
+        case .deleted:
+            trackedSources.removeAll { $source.id == $0.id }
+            pendingChanges.removeValue(forKey: source.id)
+            objectWillChange.send()
+        }
+    }
+    
+    /// Tracks changes in backup sources using FSEvents
+    private func setupSourceTracking() {
+        guard let sources = try? backupService.getBackupSources() else { return }
+        
+        for source in sources {
+            let stream = FSEventStreamCreate(
+                kCFAllocatorDefault,
+                { _, _, numEvents, eventPaths, eventFlags, _ in
+                    guard let paths = unsafeBitCast(eventPaths, to: NSArray.self) as? [String] else { return }
+                    
+                    for eventIndex in 0..<numEvents {
+                        let path = paths[eventIndex]
+                        let flags = eventFlags[eventIndex]
+                        let isModified = flags.contains(.itemModified) || 
+                            flags.contains(.itemCreated) || 
+                            flags.contains(.itemRemoved)
+                        
+                        if isModified {
+                            NotificationCenter.default.post(
+                                name: .backupSourceChanged,
+                                object: nil,
+                                userInfo: ["path": path]
+                            )
+                        }
+                    }
+                },
+                nil,
+                [source.path] as CFArray,
+                FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+                1.0,
+                FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents)
+            )
+            
+            FSEventStreamScheduleWithRunLoop(stream, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+            FSEventStreamStart(stream)
+            
+            sourceStreams[source.id] = stream
+        }
+    }
+    
+    /// Stops tracking changes for all sources
+    private func stopSourceTracking() {
+        for stream in sourceStreams.values {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
+        sourceStreams.removeAll()
+    }
+    
+    /// Updates the backup status when source changes are detected
+    @objc private func handleSourceChange(_ notification: Notification) {
+        guard let path = notification.userInfo?["path"] as? String else { return }
+        
+        Task {
+            if let source = try? await backupService.getBackupSources().first(where: { $0.path == path }) {
+                try? await backupService.getBackupStatus(for: source)
+            }
+        }
     }
 }
 
