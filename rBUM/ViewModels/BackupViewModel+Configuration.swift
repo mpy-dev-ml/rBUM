@@ -70,4 +70,65 @@ extension BackupViewModel {
             "total_tags": .string("\(configuration.tags.count)")
         ])
     }
+
+    /// Load saved configuration state
+    func loadConfiguration() {
+        do {
+            let config = try configurationStorage.load()
+            self.configuration = config
+            self.includeHidden = config.includeHidden
+            self.verifyAfterBackup = config.verifyAfterBackup
+            
+            logger.debug("Loaded configuration: \(config.name)", privacy: .public)
+        } catch {
+            logger.error("Failed to load configuration: \(error.localizedDescription)", privacy: .public)
+            // Use defaults if loading fails
+            resetToDefaults()
+        }
+    }
+    
+    /// Save current configuration state
+    func saveConfiguration() {
+        let config = BackupConfiguration(
+            id: configuration.id,
+            name: configuration.name,
+            description: configuration.description,
+            enabled: configuration.enabled,
+            schedule: configuration.schedule,
+            sources: configuration.sources,
+            includeHidden: includeHidden,
+            verifyAfterBackup: verifyAfterBackup,
+            repository: configuration.repository
+        )
+        
+        do {
+            try configurationStorage.save(config)
+            logger.debug("Saved configuration: \(config.name)", privacy: .public)
+        } catch {
+            logger.error("Failed to save configuration: \(error.localizedDescription)", privacy: .public)
+            self.error = error
+            self.showError = true
+        }
+    }
+    
+    /// Reset configuration to defaults
+    func resetToDefaults() {
+        configuration = BackupConfiguration(
+            name: "Default Backup",
+            description: "Default backup configuration",
+            enabled: true,
+            includeHidden: false,
+            verifyAfterBackup: true
+        )
+        
+        includeHidden = false
+        verifyAfterBackup = true
+        
+        do {
+            try configurationStorage.save(configuration)
+            logger.debug("Reset configuration to defaults", privacy: .public)
+        } catch {
+            logger.error("Failed to save default configuration: \(error.localizedDescription)", privacy: .public)
+        }
+    }
 }

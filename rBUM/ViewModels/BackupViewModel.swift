@@ -47,6 +47,15 @@ final class BackupViewModel: ObservableObject {
     @Published var error: Error?
     @Published var showError = false
     @Published var showBackupSheet = false
+    @Published private(set) var configurationIssue: String?
+    @Published private(set) var backupStatus: ResticBackupStatus?
+    @Published private(set) var currentOperationDescription: String = ""
+    @Published private(set) var currentProgress: Double = 0
+    @Published private(set) var indeterminateProgress: Bool = false
+    @Published private(set) var processedFiles: Int = 0
+    @Published private(set) var totalFiles: Int?
+    @Published var includeHidden: Bool = false
+    @Published var verifyAfterBackup: Bool = true
 
     // MARK: - Private Properties
 

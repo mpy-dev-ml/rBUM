@@ -63,4 +63,47 @@ extension BackupViewModel {
             }
         }
     }
+
+    /// Validate the current backup configuration
+    func validateConfiguration() async throws {
+        // Validate basic configuration
+        if includeHidden {
+            // Check if we have permissions to access hidden files
+            try await securityService.validateHiddenFileAccess()
+        }
+        
+        if verifyAfterBackup {
+            // Ensure we have enough disk space for verification
+            try await validateAvailableSpace()
+        }
+        
+        // Update configuration issue if any
+        await MainActor.run {
+            configurationIssue = nil
+        }
+    }
+    
+    /// Validate available disk space for backup operation
+    private func validateAvailableSpace() async throws {
+        guard let repository = repository else {
+            throw BackupError.missingRepository("Repository not configured")
+        }
+        
+        let requiredSpace = try await calculateRequiredSpace()
+        let availableSpace = try await fileManager.availableSpace(at: repository.url)
+        
+        if availableSpace < requiredSpace {
+            throw BackupError.insufficientSpace(
+                "Insufficient space available. Required: \(formatBytes(requiredSpace)), " +
+                "Available: \(formatBytes(availableSpace))"
+            )
+        }
+    }
+    
+    /// Format bytes into human-readable string
+    private func formatBytes(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
 }
