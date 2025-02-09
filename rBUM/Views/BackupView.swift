@@ -10,193 +10,213 @@ import Core
 import OSLog
 import SwiftUI
 
-/// View for managing backup operations to a Restic repository
+// MARK: - Backup Configuration View
+/// View for configuring backup settings
+private struct BackupConfigurationView: View {
+    @ObservedObject var viewModel: BackupViewModel
+    
+    var body: some View {
+        Section("Configuration") {
+            Toggle("Include Hidden Files", isOn: $viewModel.includeHidden)
+            
+            Button {
+                viewModel.showSourcePicker()
+            } label: {
+                HStack {
+                    Text("Select Source")
+                    Spacer()
+                    Image(systemName: "folder.badge.plus")
+                }
+            }
+            
+            ForEach(viewModel.selectedSources, id: \.self) { source in
+                HStack {
+                    Text(source.lastPathComponent)
+                    Spacer()
+                    Button {
+                        viewModel.removeSource(source)
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Backup Progress View
+/// View for displaying backup progress
+private struct BackupProgressView: View {
+    let progress: BackupProgress
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ProgressView(
+                value: Double(progress.processedFiles),
+                total: Double(progress.totalFiles)
+            )
+            Text("Files: \(progress.processedFiles)/\(progress.totalFiles)")
+            if let timeRemaining = progress.estimatedTimeRemaining {
+                Text("Time remaining: \(formatDuration(timeRemaining))")
+            }
+            Text("Speed: \(formatSpeed(progress.speed))")
+        }
+        .padding()
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: duration) ?? "Unknown"
+    }
+    
+    private func formatSpeed(_ bytesPerSecond: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return "\(formatter.string(fromByteCount: bytesPerSecond))/s"
+    }
+}
+
+// MARK: - Backup Actions View
+/// View for backup action buttons
+private struct BackupActionsView: View {
+    @ObservedObject var viewModel: BackupViewModel
+    
+    var body: some View {
+        Section {
+            if viewModel.backupState.isInProgress {
+                if let progress = viewModel.backupProgress {
+                    BackupProgressView(progress: progress)
+                }
+                Button(role: .destructive) {
+                    viewModel.cancelBackup()
+                } label: {
+                    Text("Cancel Backup")
+                }
+            } else {
+                Button {
+                    viewModel.startBackup()
+                } label: {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                    } else {
+                        Text("Start Backup")
+                    }
+                }
+                .disabled(!viewModel.canStartBackup)
+            }
+        }
+    }
+}
+
+// MARK: - Main Backup View
+/// Main view for backup configuration and control
 struct BackupView: View {
-    /// View model managing the backup state and operations
     @StateObject private var viewModel: BackupViewModel
-    /// Environment value for dismissing the view
     @Environment(\.dismiss) private var dismiss
-
-    /// Initialize the backup view
-    /// - Parameter repository: Repository to backup to
+    
     init(repository: Repository) {
-        let logger = Logger(subsystem: "dev.mpy.rBUM", category: "backup")
-        let fileManager = FileManager.default
+        _viewModel = StateObject(wrappedValue: BackupViewModel(repository: repository))
+    }
+    
+    var body: some View {
+        Form {
+            BackupConfigurationView(viewModel: viewModel)
+            
+            TagsSection(
+                tags: viewModel.selectedTags,
+                onRemove: viewModel.removeTag,
+                onAdd: viewModel.addTag
+            )
+            
+            BackupActionsView(viewModel: viewModel)
+        }
+        .padding()
+        .alert(
+            "Error",
+            isPresented: $viewModel.showError,
+            actions: {
+                Button("OK", action: { viewModel.dismissError() })
+            },
+            message: {
+                Text(viewModel.errorMessage ?? "An unknown error occurred")
+            }
+        )
+    }
+}
 
-        // Initialize security service first
-        let securityService = DefaultSecurityService()
-        
-        // Initialize base services
-        let keychainService = KeychainService(
-            logger: logger,
-            securityService: securityService
-        )
-        
-        let bookmarkService = BookmarkService(
-            logger: logger,
-            securityService: securityService,
-            keychainService: keychainService
-        )
-        
-        let sandboxMonitor = SandboxMonitor(
-            logger: logger,
-            securityService: securityService
-        )
-
-        // Update security service with dependencies
-        securityService.configure(
-            logger: logger,
-            bookmarkService: bookmarkService,
-            keychainService: keychainService,
-            sandboxMonitor: sandboxMonitor
-        )
-
-        // Initialize dependent services
-        let xpcService = ResticXPCService(
-            securityService: securityService,
-            sandboxMonitor: sandboxMonitor,
-            logger: logger
-        )
-
-        let resticService = ResticCommandService(
-            securityService: securityService,
-            xpcService: xpcService,
-            keychainService: keychainService,
-            fileManager: fileManager,
-            logger: logger
-        )
-
-        let backupService = BackupService(
-            resticService: resticService,
-            keychainService: keychainService,
-            logger: logger
-        )
-
-        let credentialsManager = KeychainCredentialsManager(
-            keychainService: keychainService,
-            logger: logger
-        )
-
-        _viewModel = StateObject(
-            wrappedValue: BackupViewModel(
-                repository: repository,
-                backupService: backupService,
-                credentialsService: credentialsManager,
-                securityService: securityService,
-                bookmarkService: bookmarkService,
-                logger: logger
+// MARK: - Preview Provider
+struct BackupView_Previews: PreviewProvider {
+    static var previews: some View {
+        BackupView(
+            repository: Repository(
+                name: "Test Repository",
+                url: URL(fileURLWithPath: "/tmp/test")
             )
         )
     }
+}
 
+// MARK: - Backup View Components
+/// Component for displaying and managing backup tags
+private struct TagsSection: View {
+    let tags: [String]
+    let onRemove: (String) -> Void
+    let onAdd: () -> Void
+    
     var body: some View {
-        VStack(spacing: 20) {
-            if viewModel.backupState.isInProgress {
-                VStack(spacing: 8) {
-                    ProgressView(
-                        value: viewModel.backupState.progress?.percentComplete ?? 0,
-                        total: 100
-                    ) {
-                        Text(viewModel.backupState.progressMessage)
-                            .font(.headline)
-                    }
-                    .progressViewStyle(.linear)
-
-                    HStack {
-                        Text(
-                            "\(viewModel.backupState.progress?.processedFiles ?? 0)/" +
-                                "\(viewModel.backupState.progress?.totalFiles ?? 0) files"
-                        )
-                        Spacer()
-                        Text("\(Int(viewModel.backupState.progress?.percentComplete ?? 0))%")
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-                .padding()
-            } else {
-                Text(viewModel.backupState.progressMessage)
-                    .font(.headline)
-                    .padding()
-            }
-
-            if viewModel.selectedPaths.isEmpty {
-                Button(
-                    role: .none,
-                    action: {
-                        Task {
-                            await viewModel.selectPaths()
-                        }
-                    },
-                    label: {
-                        Text("Select Files")
-                            .frame(maxWidth: .infinity)
-                    }
-                )
-                .buttonStyle(.borderedProminent)
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Selected Files:")
-                        .font(.headline)
-
-                    ForEach(
-                        viewModel.selectedPaths,
-                        id: \.absoluteString
-                    ) { path in
-                        HStack {
-                            Image(systemName: "doc.fill")
-                            Text(path.lastPathComponent)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding(.vertical)
-
-                HStack(spacing: 20) {
+        Section("Tags") {
+            ForEach(tags, id: \.self) { tag in
+                HStack {
+                    Text(tag)
+                    Spacer()
                     Button(
-                        role: .none,
-                        action: {
-                            Task {
-                                await viewModel.startBackup()
-                            }
-                        },
+                        action: { onRemove(tag) },
                         label: {
-                            Text("Start Backup")
-                                .frame(maxWidth: .infinity)
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundColor(.red)
                         }
                     )
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.backupState.isInProgress)
-
-                    if viewModel.backupState.isInProgress {
-                        Button(
-                            role: .cancel,
-                            action: {
-                                Task {
-                                    await viewModel.cancelBackup()
-                                }
-                            },
-                            label: {
-                                Text("Cancel")
-                                    .frame(maxWidth: .infinity)
-                            }
-                        )
-                        .buttonStyle(.bordered)
-                    }
                 }
-                .frame(maxWidth: .infinity)
             }
+            Button("Add Tag", action: onAdd)
         }
-        .frame(width: 400)
+    }
+}
+
+/// Component for displaying backup progress
+private struct ProgressSection: View {
+    let progress: BackupProgress
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ProgressView(
+                value: Double(progress.processedFiles),
+                total: Double(progress.totalFiles)
+            )
+            Text("Files: \(progress.processedFiles)/\(progress.totalFiles)")
+            if let timeRemaining = progress.estimatedTimeRemaining {
+                Text("Time remaining: \(formatDuration(timeRemaining))")
+            }
+            Text("Speed: \(formatSpeed(progress.speed))")
+        }
         .padding()
-        .alert("Backup Failed", isPresented: $viewModel.showErrorAlert) {
-            Button("OK") {
-                dismiss()
-            }
-        } message: {
-            Text(viewModel.backupState.errorMessage ?? "An unknown error occurred")
-        }
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: duration) ?? "Unknown"
+    }
+    
+    private func formatSpeed(_ bytesPerSecond: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return "\(formatter.string(fromByteCount: bytesPerSecond))/s"
     }
 }
 

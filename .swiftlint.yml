@@ -12,8 +12,10 @@ opt_in_rules:
   - operator_usage_whitespace
   - redundant_nil_coalescing
   - sorted_imports
-  - unused_import
   - vertical_parameter_alignment_on_call
+
+analyzer_rules:
+  - unused_import
 
 excluded:
   - Carthage
