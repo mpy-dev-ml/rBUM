@@ -35,12 +35,12 @@ import Security
 /// 3. Handles connection interruptions
 /// 4. Provides operation tracking
 @available(macOS 13.0, *)
-@objc public final class ResticXPCService: NSObject, ResticServiceProtocol {
+@objc public final class ResticXPCService: NSObject, ResticServiceProtocol, XPCConnectionStateDelegate {
     // MARK: - Properties
 
-    /// XPC connection to the Restic service
-    @objc private var connection: NSXPCConnection?
-
+    /// XPC connection manager
+    private let connectionManager: XPCConnectionManager
+    
     /// Serial queue for synchronizing operations
     @objc private let queue: DispatchQueue
 
@@ -56,12 +56,17 @@ import Security
     /// Security service for handling permissions
     @objc private let securityService: SecurityServiceProtocol
     
+    /// Message queue for handling XPC commands
+    private let messageQueue: XPCMessageQueue
+    
+    /// Task for processing the message queue
+    private var queueProcessor: Task<Void, Never>?
+    
+    /// Health monitor for service status
+    private let healthMonitor: XPCHealthMonitor
+    
     // MARK: - Initialization
     
-    /// Initialize a new Restic XPC service
-    /// - Parameters:
-    ///   - logger: Logger for service operations
-    ///   - securityService: Security service for handling permissions
     @objc public init(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol
@@ -71,9 +76,78 @@ import Security
         self.queue = DispatchQueue(label: "dev.mpy.rBUM.resticXPC", qos: .userInitiated)
         self.isHealthy = false
         self.activeBookmarks = [:]
+        self.messageQueue = XPCMessageQueue(logger: logger)
+        
+        // Initialize connection manager
+        self.connectionManager = XPCConnectionManager(
+            logger: logger,
+            securityService: securityService
+        )
+        
+        // Initialize health monitor
+        self.healthMonitor = XPCHealthMonitor(
+            connectionManager: connectionManager,
+            logger: logger
+        )
+        
         super.init()
         
-        setupConnection()
+        // Set up connection manager delegate
+        Task {
+            await connectionManager.setDelegate(self)
+            try await establishConnection()
+            await healthMonitor.startMonitoring()
+        }
+    }
+    
+    deinit {
+        Task {
+            await healthMonitor.stopMonitoring()
+        }
+    }
+    
+    // MARK: - Connection Management
+    
+    private func establishConnection() async throws {
+        _ = try await connectionManager.establishConnection()
+        self.isHealthy = true
+    }
+    
+    // MARK: - XPCConnectionStateDelegate
+    
+    func connectionStateDidChange(from oldState: XPCConnectionState, to newState: XPCConnectionState) {
+        switch newState {
+        case .active:
+            self.isHealthy = true
+            startQueueProcessor()
+            Task {
+                await healthMonitor.startMonitoring()
+            }
+        case .failed:
+            self.isHealthy = false
+            stopQueueProcessor()
+            Task {
+                await healthMonitor.stopMonitoring()
+            }
+        default:
+            self.isHealthy = false
+        }
+        
+        logger.info("XPC connection state changed: \(oldState) -> \(newState)", privacy: .public)
+    }
+    
+    // MARK: - Command Execution
+    
+    private func executeCommand(_ config: XPCCommandConfig) async throws -> ProcessResult {
+        let connection = try await connectionManager.establishConnection()
+        
+        guard let remote = connection.remoteObjectProxyWithErrorHandler({ error in
+            self.logger.error("Remote proxy error: \(error.localizedDescription)", privacy: .public)
+        }) as? ResticXPCProtocol else {
+            throw ResticXPCError.invalidRemoteObject
+        }
+        
+        return try await remote.execute(config: config, progress: ProgressTracker())
     }
     
     // MARK: - ResticServiceProtocol Implementation
@@ -83,9 +157,11 @@ import Security
         try await validatePermissions(for: url)
         
         let result = try await executeCommand(
-            "init",
-            arguments: ["--repository", url.path],
-            at: url
+            XPCCommandConfig(
+                command: "init",
+                arguments: ["--repository", url.path],
+                workingDirectory: url
+            )
         )
         
         guard result.status == 0 else {
@@ -97,14 +173,27 @@ import Security
         try await validateConnection()
         try await validatePermissions(for: [source, destination])
         
-        let result = try await executeCommand(
-            "backup",
-            arguments: [source.path, "--repository", destination.path],
-            at: destination
+        let config = XPCCommandConfig(
+            command: "backup",
+            arguments: ["--repository", destination.path, source.path],
+            workingDirectory: source
         )
         
-        guard result.status == 0 else {
-            throw ResticError.backupFailed(result.error ?? "Unknown error")
+        let messageId = await enqueueCommand(config)
+        
+        // Wait for completion
+        for try await notification in NotificationCenter.default.notifications(named: .xpcCommandCompleted) {
+            guard let notificationMessageId = notification.userInfo?["messageId"] as? UUID,
+                  notificationMessageId == messageId else {
+                continue
+            }
+            
+            if let result = notification.userInfo?["result"] as? ProcessResult {
+                guard result.status == 0 else {
+                    throw ResticError.backupFailed(result.error ?? "Unknown error")
+                }
+                return
+            }
         }
     }
     
@@ -112,9 +201,11 @@ import Security
         try await validateConnection()
         
         let result = try await executeCommand(
-            "snapshots",
-            arguments: ["--json"],
-            at: nil
+            XPCCommandConfig(
+                command: "snapshots",
+                arguments: ["--json"],
+                workingDirectory: nil
+            )
         )
         
         guard result.status == 0 else {
@@ -129,9 +220,11 @@ import Security
         try await validatePermissions(for: [source, destination])
         
         let result = try await executeCommand(
-            "restore",
-            arguments: ["latest", "--target", destination.path, "--repository", source.path],
-            at: destination
+            XPCCommandConfig(
+                command: "restore",
+                arguments: ["latest", "--target", destination.path, "--repository", source.path],
+                workingDirectory: destination
+            )
         )
         
         guard result.status == 0 else {
@@ -155,6 +248,7 @@ public enum ResticXPCError: LocalizedError {
     case operationCancelled
     case invalidResponse
     case invalidArguments
+    case invalidRemoteObject
     
     public var errorDescription: String? {
         switch self {
@@ -180,6 +274,8 @@ public enum ResticXPCError: LocalizedError {
             return "Invalid response from XPC service"
         case .invalidArguments:
             return "Invalid arguments provided to XPC service"
+        case .invalidRemoteObject:
+            return "Invalid remote object"
         }
     }
 }
