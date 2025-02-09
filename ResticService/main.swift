@@ -3,23 +3,63 @@
 //  rBUM
 //
 //  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
+//  Last updated: 9 February 2025
 //
 //  Created by Matthew Yeager on 05/02/2025.
 //
 
-import Core
 import Foundation
+import os.log
 
-// Create the delegate for the service.
-let serviceDelegate = ServiceDelegate()
+// MARK: - Service Configuration
 
-// Set up the one NSXPCListener for this service. It will handle all incoming connections.
-let serviceListener = NSXPCListener.service()
-serviceListener.delegate = serviceDelegate
+/// The bundle identifier for the XPC service
+private let serviceBundleIdentifier = "dev.mpy.ResticService"
 
-// Resuming the serviceListener starts this service. This method does not return.
-serviceListener.resume()
+/// Logger for the XPC service main process
+private let logger = Logger(
+    subsystem: serviceBundleIdentifier,
+    category: "ServiceMain"
+)
+
+// MARK: - Main Entry Point
+
+logger.info("Starting Restic XPC Service...")
+
+// Verify we're running as an XPC service
+guard NSXPCConnection.current() != nil else {
+    logger.error("Process not running as XPC service")
+    exit(1)
+}
+
+// Create and configure the service instance
+let service = ResticService()
+
+// Create and configure the XPC listener
+let listener = NSXPCListener.service()
+listener.delegate = service
+
+// Set up signal handling for graceful shutdown
+signal(SIGTERM) { _ in
+    logger.info("Received SIGTERM, initiating graceful shutdown...")
+    
+    // Perform any cleanup here if needed
+    
+    exit(0)
+}
+
+signal(SIGINT) { _ in
+    logger.info("Received SIGINT, initiating graceful shutdown...")
+    
+    // Perform any cleanup here if needed
+    
+    exit(0)
+}
+
+// Start the service
+logger.info("Resuming XPC listener...")
+listener.resume()
+
+// Run the main loop
+logger.info("Entering main run loop...")
+RunLoop.main.run()

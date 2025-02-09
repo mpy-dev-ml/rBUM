@@ -13,29 +13,133 @@
 
 import Foundation
 
-/// The protocol that this service will vend as its API. This protocol will also need to be visible to the process
-/// hosting the service.
-@objc protocol ResticServiceProtocol {
-    /// Replace the API of this protocol with an API appropriate to the service you are vending.
-    func performCalculation(firstNumber: Int, secondNumber: Int, with reply: @escaping (Int) -> Void)
+/// Represents the result of a Restic command execution
+@objc public class ResticCommandResult: NSObject, NSSecureCoding {
+    public static var supportsSecureCoding: Bool { true }
+    
+    public let output: String
+    public let error: String
+    public let exitCode: Int32
+    
+    public init(output: String, error: String, exitCode: Int32) {
+        self.output = output
+        self.error = error
+        self.exitCode = exitCode
+        super.init()
+    }
+    
+    public func encode(with coder: NSCoder) {
+        coder.encode(output, forKey: "output")
+        coder.encode(error, forKey: "error")
+        coder.encode(exitCode, forKey: "exitCode")
+    }
+    
+    public required init?(coder: NSCoder) {
+        output = coder.decodeObject(of: NSString.self, forKey: "output") as? String ?? ""
+        error = coder.decodeObject(of: NSString.self, forKey: "error") as? String ?? ""
+        exitCode = coder.decodeInt32(forKey: "exitCode")
+        super.init()
+    }
+}
+
+/// The protocol that defines the XPC service API for executing Restic commands
+@objc public protocol ResticServiceProtocol {
+    /// Initialises a new repository at the specified location
+    /// - Parameters:
+    ///   - repositoryURL: Security-scoped bookmark data for the repository location
+    ///   - password: Repository password (will be securely handled)
+    ///   - reply: Completion handler with the command result
+    func initialiseRepository(
+        at repositoryURL: Data,
+        password: String,
+        with reply: @escaping (ResticCommandResult) -> Void
+    )
+    
+    /// Creates a new backup snapshot
+    /// - Parameters:
+    ///   - repositoryURL: Security-scoped bookmark data for the repository
+    ///   - sourcePaths: Array of security-scoped bookmark data for source paths
+    ///   - password: Repository password
+    ///   - excludePatterns: Array of patterns to exclude
+    ///   - reply: Completion handler with the command result
+    func createBackup(
+        repository repositoryURL: Data,
+        sourcePaths: [Data],
+        password: String,
+        excludePatterns: [String],
+        with reply: @escaping (ResticCommandResult) -> Void
+    )
+    
+    /// Lists snapshots in the repository
+    /// - Parameters:
+    ///   - repositoryURL: Security-scoped bookmark data for the repository
+    ///   - password: Repository password
+    ///   - reply: Completion handler with the command result
+    func listSnapshots(
+        repository repositoryURL: Data,
+        password: String,
+        with reply: @escaping (ResticCommandResult) -> Void
+    )
+    
+    /// Restores files from a snapshot
+    /// - Parameters:
+    ///   - repositoryURL: Security-scoped bookmark data for the repository
+    ///   - targetPath: Security-scoped bookmark data for the restore target
+    ///   - snapshotID: ID of the snapshot to restore from
+    ///   - password: Repository password
+    ///   - paths: Optional specific paths to restore (nil for entire snapshot)
+    ///   - reply: Completion handler with the command result
+    func restore(
+        repository repositoryURL: Data,
+        to targetPath: Data,
+        snapshot snapshotID: String,
+        password: String,
+        paths: [String]?,
+        with reply: @escaping (ResticCommandResult) -> Void
+    )
+    
+    /// Verifies repository integrity
+    /// - Parameters:
+    ///   - repositoryURL: Security-scoped bookmark data for the repository
+    ///   - password: Repository password
+    ///   - reply: Completion handler with the command result
+    func verifyRepository(
+        at repositoryURL: Data,
+        password: String,
+        with reply: @escaping (ResticCommandResult) -> Void
+    )
+    
+    /// Cancels any running Restic operation
+    /// - Parameter reply: Completion handler indicating if cancel was successful
+    func cancelOperation(with reply: @escaping (Bool) -> Void)
+    
+    /// Validates that a security-scoped bookmark is still valid
+    /// - Parameters:
+    ///   - bookmarkData: The bookmark data to validate
+    ///   - reply: Completion handler with validation result and any error
+    func validateBookmark(_ bookmarkData: Data, with reply: @escaping (Bool, Error?) -> Void)
 }
 
 /*
- To use the service from an application or other process, use NSXPCConnection to establish a connection to the service by doing something like this:
+ To use the service from the main application:
 
-     connectionToService = NSXPCConnection(serviceName: "dev.mpy.ResticService")
-     connectionToService.remoteObjectInterface = NSXPCInterface(with: ResticServiceProtocol.self)
-     connectionToService.resume()
+     let connection = NSXPCConnection(serviceName: "dev.mpy.ResticService")
+     connection.remoteObjectInterface = NSXPCInterface(with: ResticServiceProtocol.self)
+     connection.resume()
 
- Once you have a connection to the service, you can use it like this:
-
-     if let proxy = connectionToService.remoteObjectProxy as? ResticServiceProtocol {
-         proxy.performCalculation(firstNumber: 23, secondNumber: 19) { result in
-             NSLog("Result of calculation is: \(result)")
+     if let proxy = connection.remoteObjectProxy as? ResticServiceProtocol {
+         // Create security-scoped bookmarks for file access
+         let repoBookmark = try fileManager.bookmarkData(for: repoURL)
+         
+         proxy.initialiseRepository(at: repoBookmark, password: "secure-password") { result in
+             if result.exitCode == 0 {
+                 print("Repository initialised successfully")
+             } else {
+                 print("Error: \(result.error)")
+             }
          }
      }
 
- And, when you are finished with the service, clean up the connection like this:
-
-     connectionToService.invalidate()
+     // Always clean up when finished
+     connection.invalidate()
  */

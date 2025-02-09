@@ -1,190 +1,4 @@
-//
-//  BackupConfiguration.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
 import Foundation
-
-/// Represents a backup configuration
-public struct BackupConfiguration: Codable, Equatable {
-    /// Name of the backup configuration
-    public let name: String
-    
-    /// Source directories to backup
-    public let sources: Set<URL>
-    
-    /// Patterns for excluding files and directories
-    public let exclusionPatterns: Set<ExclusionPattern>
-    
-    /// Groups of related exclusion patterns
-    public let exclusionPatternGroups: Set<ExclusionPatternGroup>
-    
-    /// Create a new backup configuration
-    /// - Parameters:
-    ///   - name: Name of the backup configuration
-    ///   - sources: Source directories to backup
-    ///   - exclusionPatterns: Patterns for excluding files and directories
-    ///   - exclusionPatternGroups: Groups of related exclusion patterns
-    /// - Throws: ConfigurationError if validation fails
-    public init(
-        name: String,
-        sources: Set<URL>,
-        exclusionPatterns: Set<ExclusionPattern> = [],
-        exclusionPatternGroups: Set<ExclusionPatternGroup> = []
-    ) throws {
-        // Validate name
-        guard !name.isEmpty else {
-            throw ConfigurationError.invalidName("Backup configuration name cannot be empty")
-        }
-        
-        // Validate sources
-        guard !sources.isEmpty else {
-            throw ConfigurationError.noSourcesSpecified("At least one source must be specified")
-        }
-        
-        // Validate each source
-        try sources.forEach { source in
-            guard source.isFileURL else {
-                let errorMessage = "Source must be a file URL: \(source)"
-                throw ConfigurationError.invalidSource(errorMessage)
-            }
-            
-            let resourceValues = try source.resourceValues(forKeys: [.isDirectoryKey])
-            guard resourceValues.isDirectory == true else {
-                let errorMessage = "Source must be a directory: \(source)"
-                throw ConfigurationError.invalidSource(errorMessage)
-            }
-            
-            guard (try? source.checkResourceIsReachable()) == true else {
-                let errorMessage = "Source directory is not accessible: \(source)"
-                throw ConfigurationError.sourceAccessFailed(errorMessage)
-            }
-        }
-        
-        // Validate patterns
-        try exclusionPatterns.forEach { pattern in
-            try pattern.validate()
-        }
-        
-        // Validate pattern groups
-        try exclusionPatternGroups.forEach { group in
-            try group.validate()
-        }
-        
-        self.name = name
-        self.sources = sources
-        self.exclusionPatterns = exclusionPatterns
-        self.exclusionPatternGroups = exclusionPatternGroups
-    }
-    
-    /// Check if a path should be excluded from backup
-    /// - Parameters:
-    ///   - path: Path to check
-    ///   - parentMatched: Whether a parent directory was matched
-    /// - Returns: Tuple containing whether the path is excluded and why
-    public func shouldExclude(
-        path: String,
-        parentMatched: Bool = false
-    ) -> (excluded: Bool, reason: String?) {
-        // Get all enabled patterns
-        let activeGroups = exclusionPatternGroups.filter(\.enabled)
-        let groupPatterns = activeGroups.flatMap { group in
-            group.patterns
-        }
-        let allPatterns = exclusionPatterns.union(groupPatterns)
-        
-        // Sort by priority
-        let sortedPatterns = allPatterns.sorted { $0.priority > $1.priority }
-        
-        // Check each pattern
-        for pattern in sortedPatterns {
-            let matches = pattern.matches(
-                path: path,
-                parentMatched: parentMatched
-            )
-            if matches {
-                let isInherited = parentMatched
-                return (true, pattern.matchDescription(isInherited: isInherited))
-            }
-        }
-        
-        return (false, nil)
-    }
-    
-    /// Returns a validation error message if the configuration is invalid, nil otherwise
-    func validate() -> String? {
-        return BackupConfigurationValidator.validate(self)
-    }
-}
-
-/// Represents a group of related exclusion patterns
-public struct ExclusionPatternGroup: Codable, Equatable, Identifiable {
-    /// Unique identifier for the group
-    public let id: UUID
-    
-    /// Name of the group
-    public let name: String
-    
-    /// Description of what this group excludes
-    public let description: String?
-    
-    /// Whether this group is enabled
-    public let enabled: Bool
-    
-    /// Patterns in this group
-    public let patterns: Set<ExclusionPattern>
-    
-    /// Create a new pattern group
-    /// - Parameters:
-    ///   - id: Unique identifier for the group
-    ///   - name: Name of the group
-    ///   - description: Description of what this group excludes
-    ///   - enabled: Whether this group is enabled
-    ///   - patterns: Patterns in this group
-    /// - Throws: ConfigurationError if validation fails
-    public init(
-        id: UUID = UUID(),
-        name: String,
-        description: String? = nil,
-        enabled: Bool = true,
-        patterns: Set<ExclusionPattern>
-    ) throws {
-        // Validate group name
-        guard !name.isEmpty else {
-            throw ConfigurationError.invalidPatternGroup("Pattern group name cannot be empty")
-        }
-        
-        // Validate patterns
-        guard !patterns.isEmpty else {
-            throw ConfigurationError.invalidPatternGroup("Pattern group must contain at least one pattern")
-        }
-        
-        // Validate each pattern
-        try patterns.forEach { pattern in
-            try pattern.validate()
-        }
-        
-        self.id = id
-        self.name = name
-        self.description = description
-        self.enabled = enabled
-        self.patterns = patterns
-    }
-    
-    /// Validate the pattern group
-    /// - Throws: ConfigurationError if validation fails
-    public func validate() throws {
-        // Validate each pattern
-        try patterns.forEach { pattern in
-            try pattern.validate()
-        }
-    }
-}
 
 /// Represents a pattern for excluding files and directories from backup
 public struct ExclusionPattern: Codable, Equatable, Hashable {
@@ -380,9 +194,12 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         
         // Check pattern type is allowed
         guard rules.allowedPatternTypes.contains(patternType) else {
-            throw ConfigurationError.invalidExclusionPattern(
-                "Pattern type '\(patternType)' is not allowed for category '\(category.displayName)'"
-            )
+            let types = rules.allowedPatternTypes.map(\.rawValue)
+            let msg = """
+                '\(patternType)' not allowed in '\(category.displayName)'.
+                Allowed: \(types.joined(separator: ", "))
+                """
+            throw ConfigurationError.invalidExclusionPattern(msg)
         }
         
         // Check directory requirement
@@ -482,5 +299,56 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         let baseDescription = "Excluded by \(category.displayName) pattern '\(pattern)' " +
             "(Priority: \(priority.description))"
         return isInherited ? "\(baseDescription) [Inherited]" : baseDescription
+    }
+    
+    /// Validates if a path matches this exclusion pattern
+    ///
+    /// - Parameter path: The path to check
+    /// - Returns: A tuple containing whether the path matches and any error that occurred
+    public func matches(_ path: String) -> (matches: Bool, error: Error?) {
+        switch patternType {
+        case .glob:
+            return matchesGlobPattern(path)
+        case .regex:
+            return matchesRegexPattern(path)
+        case .exact:
+            return (path == pattern, nil)
+        }
+    }
+    
+    /// Matches a path against a glob pattern
+    private func matchesGlobPattern(_ path: String) -> (matches: Bool, error: Error?) {
+        // Convert glob to regex pattern
+        let regexPattern = pattern
+            .replacingOccurrences(of: ".", with: "\\.")
+            .replacingOccurrences(of: "*", with: ".*")
+            .replacingOccurrences(of: "?", with: ".")
+        
+        do {
+            let regex = try NSRegularExpression(
+                pattern: "^" + regexPattern + "$",
+                options: []
+            )
+            let range = NSRange(location: 0, length: path.utf16.count)
+            let matches = regex.matches(in: path, range: range)
+            return (!matches.isEmpty, nil)
+        } catch {
+            return (false, error)
+        }
+    }
+    
+    /// Matches a path against a regex pattern
+    private func matchesRegexPattern(_ path: String) -> (matches: Bool, error: Error?) {
+        do {
+            let regex = try NSRegularExpression(
+                pattern: pattern,
+                options: []
+            )
+            let range = NSRange(location: 0, length: path.utf16.count)
+            let matches = regex.matches(in: path, range: range)
+            return (!matches.isEmpty, nil)
+        } catch {
+            return (false, error)
+        }
     }
 }
