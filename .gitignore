@@ -38,5 +38,6 @@ DerivedData/
 
 # SwiftLint
 lint_report.json
+swiftlint_report.csv
 
 !.githooks
