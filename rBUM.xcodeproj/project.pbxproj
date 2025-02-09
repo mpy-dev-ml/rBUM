@@ -97,6 +97,7 @@
 		8DBB44622D580BF3006E2E76 /* Core_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 8DBB44612D580BF3006E2E76 /* Core_Private.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		8DBB44642D580C7B006E2E76 /* Core-Swift.h in Headers */ = {isa = PBXBuildFile; fileRef = 8DBB44632D580C7B006E2E76 /* Core-Swift.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		8DBB446B2D5813E3006E2E76 /* module.private.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8DBB44672D580E1C006E2E76 /* module.private.modulemap */; };
+		8DD28C1A2D58FB0200B7541A /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DD28C192D58FB0200B7541A /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,6 +150,13 @@
 			remoteGlobalIDString = 8D3E9FEB2D5122C600C21FE0;
 			remoteInfo = Core;
 		};
+		8DD28C1B2D58FB3100B7541A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8D3E9DD12D51219800C21FE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8D3E9FEB2D5122C600C21FE0;
+			remoteInfo = Core;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -173,7 +181,20 @@
 		8DBB44652D580E1C006E2E76 /* Core_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Core_Private.h; sourceTree = "<group>"; };
 		8DBB44662D580E1C006E2E76 /* Core-Swift.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Core-Swift.h"; sourceTree = "<group>"; };
 		8DBB44672D580E1C006E2E76 /* module.private.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.private.modulemap; sourceTree = "<group>"; };
+		8DD28C192D58FB0200B7541A /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		8DD28C1D2D58FD9500B7541A /* rBUMTests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = rBUMTests.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8DD28C182D58FADF00B7541A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DD28C1A2D58FB0200B7541A /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		8D386F4A2D54D6AE00FAFA66 /* Development */ = {
@@ -186,6 +207,7 @@
 		8D3E9DD02D51219800C21FE0 = {
 			isa = PBXGroup;
 			children = (
+				8DD28C1D2D58FD9500B7541A /* rBUMTests.xctestplan */,
 				8DBB44632D580C7B006E2E76 /* Core-Swift.h */,
 				8DBB44612D580BF3006E2E76 /* Core_Private.h */,
 				8D8E74532D57CC2A00AFB5ED /* OSLogger.h */,
@@ -342,6 +364,7 @@
 		8DB70A0B2D5388D500F71C4B /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				8DD28C192D58FB0200B7541A /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -415,11 +438,13 @@
 			buildConfigurationList = 8D3E9E012D51219900C21FE0 /* Build configuration list for PBXNativeTarget "rBUMTests" */;
 			buildPhases = (
 				8D3E9DE62D51219900C21FE0 /* Sources */,
+				8DD28C182D58FADF00B7541A /* Frameworks */,
 				8D3E9DE82D51219900C21FE0 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8DD28C1C2D58FB3100B7541A /* PBXTargetDependency */,
 				8D3E9DEC2D51219900C21FE0 /* PBXTargetDependency */,
 			);
 			name = rBUMTests;
@@ -773,6 +798,11 @@
 			isa = PBXTargetDependency;
 			target = 8D3E9FEB2D5122C600C21FE0 /* Core */;
 			targetProxy = 8D8E74502D57BDB000AFB5ED /* PBXContainerItemProxy */;
+		};
+		8DD28C1C2D58FB3100B7541A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8D3E9FEB2D5122C600C21FE0 /* Core */;
+			targetProxy = 8DD28C1B2D58FB3100B7541A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 

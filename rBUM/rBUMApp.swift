@@ -24,145 +24,87 @@ struct RBUMApp: App {
     private let repositoryStorage: RepositoryStorageProtocol
     private let resticService: ResticCommandServiceProtocol
     private let repositoryCreationService: RepositoryCreationServiceProtocol
+    private let fileSearchService: FileSearchServiceProtocol
+    private let restoreService: RestoreServiceProtocol
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        let dependencies = setupCoreDependencies()
-        let securityServices = setupSecurityServices(dependencies)
+        let dependencies = AppSetup.setupCoreDependencies()
+        let securityServices = AppSetup.setupSecurityServices(dependencies)
         
-        credentialsManager = setupCredentialsManager(
+        credentialsManager = AppSetup.setupCredentialsManager(
             dependencies: dependencies,
             keychainService: securityServices.keychainService
         )
         
-        repositoryStorage = setupRepositoryStorage(dependencies.fileManager)
+        repositoryStorage = AppSetup.setupRepositoryStorage(dependencies.fileManager)
         
-        resticService = setupResticService(
-            dependencies: dependencies,
-            securityServices: securityServices
-        )
-        
-        repositoryCreationService = setupRepositoryCreationService(
+        resticService = AppSetup.setupResticService(
             dependencies: dependencies,
             securityServices: securityServices
         )
         
-        logger.debug(
-            "App initialized",
-            file: #file,
-            function: #function,
-            line: #line
+        repositoryCreationService = AppSetup.setupRepositoryCreationService(
+            dependencies: dependencies,
+            securityServices: securityServices
         )
         
-        // Setup app delegate
-        setupAppDelegate()
-    }
-    
-    private struct CoreDependencies {
-        let fileManager: FileManagerProtocol
-        let dateProvider: DateProviderProtocol
-        let notificationCenter: NotificationCenter
-    }
-    
-    private struct SecurityServices {
-        let securityService: SecurityServiceProtocol
-        let keychainService: KeychainServiceProtocol
-        let bookmarkService: BookmarkServiceProtocol
-        let sandboxMonitor: SandboxMonitor
-        let xpcService: ResticXPCServiceProtocol
-    }
-    
-    private func setupCoreDependencies() -> CoreDependencies {
-        CoreDependencies(
-            fileManager: DefaultFileManager(),
-            dateProvider: DateProvider(),
-            notificationCenter: .default
-        )
-    }
-    
-    private func setupSecurityServices(_ dependencies: CoreDependencies) -> SecurityServices {
-        let securityService = ServiceFactory.createSecurityService(logger: logger)
-        let keychainService = ServiceFactory.createKeychainService(logger: logger)
-        let bookmarkService = ServiceFactory.createBookmarkService(
-            logger: logger,
-            securityService: securityService,
-            keychainService: keychainService
+        fileSearchService = AppSetup.setupFileSearchService(
+            dependencies: dependencies,
+            securityServices: securityServices,
+            resticService: resticService,
+            logger: logger
         )
         
-        let sandboxMonitor = SandboxMonitor(
-            logger: logger,
-            securityService: securityService
+        restoreService = AppSetup.setupRestoreService(
+            dependencies: dependencies,
+            securityServices: securityServices,
+            resticService: resticService,
+            logger: logger
         )
         
-        let xpcService = ServiceFactory.createXPCService(
-            logger: logger,
-            securityService: securityService
-        ) as! ResticXPCServiceProtocol
-        
-        return SecurityServices(
-            securityService: securityService,
-            keychainService: keychainService,
-            bookmarkService: bookmarkService,
-            sandboxMonitor: sandboxMonitor,
-            xpcService: xpcService
-        )
-    }
-    
-    private func setupCredentialsManager(
-        dependencies: CoreDependencies,
-        keychainService: KeychainServiceProtocol
-    ) -> KeychainCredentialsManagerProtocol {
-        KeychainCredentialsManager(
-            logger: logger,
-            keychainService: keychainService,
-            dateProvider: dependencies.dateProvider,
-            notificationCenter: dependencies.notificationCenter
-        )
-    }
-    
-    private func setupRepositoryStorage(
-        _ fileManager: FileManagerProtocol
-    ) -> RepositoryStorageProtocol {
-        do {
-            return try DefaultRepositoryStorage(
-                fileManager: fileManager,
-                logger: logger
-            )
-        } catch {
-            logger.error(
-                "Failed to initialize repository storage: \(error.localizedDescription)",
-                file: #file,
-                function: #function,
-                line: #line
-            )
-            fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
-        }
-    }
-    
-    private func setupResticService(
-        dependencies: CoreDependencies,
-        securityServices: SecurityServices
-    ) -> ResticCommandServiceProtocol {
-        ResticCommandService(
-            logger: logger,
-            securityService: securityServices.securityService,
-            xpcService: securityServices.xpcService,
-            keychainService: securityServices.keychainService
-        ) as! any ResticCommandServiceProtocol
-    }
-    
-    private func setupRepositoryCreationService(
-        dependencies: CoreDependencies,
-        securityServices: SecurityServices
-    ) -> RepositoryCreationServiceProtocol {
-        DefaultRepositoryCreationService(
-            logger: logger,
-            securityService: resticService as! SecurityServiceProtocol,
-            bookmarkService: securityServices.bookmarkService,
-            keychainService: securityServices.keychainService
-        ) as! any RepositoryCreationServiceProtocol
+        logger.debug("App initialised", privacy: .public)
     }
 
+    var body: some Scene {
+        WindowGroup {
+            ContentView(
+                credentialsManager: credentialsManager,
+                repositoryStorage: repositoryStorage,
+                resticService: resticService,
+                repositoryCreationService: repositoryCreationService,
+                fileSearchService: fileSearchService,
+                restoreService: restoreService
+            )
+            .onAppear {
+                logger.info(
+                    "ContentView appeared",
+                    file: #file,
+                    function: #function,
+                    line: #line
+                )
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 900, height: 600)
+        .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    checkForUpdates()
+                }
+                .keyboardShortcut("U", modifiers: [.command, .shift])
+            }
+            SidebarCommands()
+        }
+
+        #if os(macOS)
+            Settings {
+                SettingsView()
+            }
+        #endif
+    }
+    
     // MARK: - Private Methods
 
     private func setupAppDelegate() {
@@ -268,110 +210,75 @@ struct RBUMApp: App {
         }
     }
 
-    var body: some Scene {
-        WindowGroup {
-            ContentView(
-                credentialsManager: credentialsManager,
-                creationService: repositoryCreationService
+    // MARK: - App Delegate
+
+    final class AppDelegate: NSObject, NSApplicationDelegate {
+        private let logger = LoggerFactory.createLogger(category: "AppDelegate")
+
+        func applicationDidFinishLaunching(_: Notification) {
+            logger.info(
+                "Application did finish launching",
+                file: #file,
+                function: #function,
+                line: #line
             )
-            .onAppear {
-                logger.info(
-                    "ContentView appeared",
-                    file: #file,
-                    function: #function,
-                    line: #line
-                )
-            }
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 900, height: 600)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates...") {
-                    checkForUpdates()
-                }
-                .keyboardShortcut("U", modifiers: [.command, .shift])
-            }
-            SidebarCommands()
+
+            // Register for sleep/wake notifications
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self,
+                selector: #selector(handleSleepNotification(_:)),
+                name: NSWorkspace.willSleepNotification,
+                object: nil
+            )
+
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self,
+                selector: #selector(handleWakeNotification(_:)),
+                name: NSWorkspace.didWakeNotification,
+                object: nil
+            )
         }
 
-        #if os(macOS)
-            Settings {
-                SettingsView()
-            }
-        #endif
-    }
-}
+        func applicationWillTerminate(_: Notification) {
+            logger.info(
+                "Application will terminate",
+                file: #file,
+                function: #function,
+                line: #line
+            )
 
-// MARK: - App Delegate
+            // Unregister observers
+            NSWorkspace.shared.notificationCenter.removeObserver(self)
+        }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let logger = LoggerFactory.createLogger(category: "AppDelegate")
+        func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
+            logger.info(
+                "Application requested to terminate",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            return .terminateNow
+        }
 
-    func applicationDidFinishLaunching(_: Notification) {
-        logger.info(
-            "Application did finish launching",
-            file: #file,
-            function: #function,
-            line: #line
-        )
+        @objc private func handleSleepNotification(_: Notification) {
+            logger.info(
+                "System is going to sleep",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            handleSleepState()
+        }
 
-        // Register for sleep/wake notifications
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(handleSleepNotification(_:)),
-            name: NSWorkspace.willSleepNotification,
-            object: nil
-        )
-
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(handleWakeNotification(_:)),
-            name: NSWorkspace.didWakeNotification,
-            object: nil
-        )
-    }
-
-    func applicationWillTerminate(_: Notification) {
-        logger.info(
-            "Application will terminate",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-
-        // Unregister observers
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
-    }
-
-    func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
-        logger.info(
-            "Application requested to terminate",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        return .terminateNow
-    }
-
-    @objc private func handleSleepNotification(_: Notification) {
-        logger.info(
-            "System is going to sleep",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        handleSleepState()
-    }
-
-    @objc private func handleWakeNotification(_: Notification) {
-        logger.info(
-            "System woke from sleep",
-            file: #file,
-            function: #function,
-            line: #line
-        )
-        handleWakeState()
+        @objc private func handleWakeNotification(_: Notification) {
+            logger.info(
+                "System woke from sleep",
+                file: #file,
+                function: #function,
+                line: #line
+            )
+            handleWakeState()
+        }
     }
 }

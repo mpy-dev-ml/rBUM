@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "0B07441B-4953-48E6-B37B-87A325280534",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:rBUM.xcodeproj",
+        "identifier" : "8D3E9DE92D51219900C21FE0",
+        "name" : "rBUMTests"
+      }
+    }
+  ],
+  "version" : 1
+}
