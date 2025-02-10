@@ -12,7 +12,7 @@ extension PermissionManager {
     private func validateFileExists(at url: URL) async throws {
         guard fileManager.fileExists(atPath: url.path) else {
             logger.error("File does not exist", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.fileNotFound(url)
         }
@@ -22,27 +22,28 @@ extension PermissionManager {
         let resourceValues = try url.resourceValues(forKeys: [
             .isReadableKey,
             .isWritableKey,
-            .fileProtectionKey
+            .fileProtectionKey,
         ])
 
         guard resourceValues.isReadable else {
             logger.error("File is not readable", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.readAccessDenied(url)
         }
 
         guard resourceValues.isWritable else {
             logger.error("File is not writable", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.writeAccessDenied(url)
         }
 
         if let protection = resourceValues.fileProtection,
-           protection == .complete {
+           protection == .complete
+        {
             logger.error("File is encrypted", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.fileEncrypted(url)
         }
@@ -53,7 +54,7 @@ extension PermissionManager {
 
         guard securityScopedURL.startAccessingSecurityScopedResource() else {
             logger.error("Failed to access security-scoped resource", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.sandboxAccessDenied(url)
         }
@@ -68,13 +69,14 @@ extension PermissionManager {
     private func validateSandboxPermissions(for url: URL) throws {
         let resourceValues = try url.resourceValues(forKeys: [
             .volumeIsReadOnlyKey,
-            .volumeSupportsFileCloningKey
+            .volumeSupportsFileCloningKey,
         ])
 
         if let isReadOnly = resourceValues.volumeIsReadOnly,
-           isReadOnly {
+           isReadOnly
+        {
             logger.error("Volume is read-only", metadata: [
-                "path": .string(url.path)
+                "path": .string(url.path),
             ])
             throw PermissionError.readOnlyVolume(url)
         }

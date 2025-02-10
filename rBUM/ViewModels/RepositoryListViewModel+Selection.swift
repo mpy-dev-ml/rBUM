@@ -1,11 +1,3 @@
-//
-//  RepositoryListViewModel+Selection.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 
@@ -15,19 +7,19 @@ extension RepositoryListViewModel {
     func selectRepository(_ repository: Repository) {
         selectedRepository = repository
     }
-    
+
     /// Deselects the currently selected repository
     func deselectRepository() {
         selectedRepository = nil
     }
-    
+
     /// Checks if a repository is currently selected
     /// - Parameter repository: The repository to check
     /// - Returns: True if the repository is selected
     func isSelected(_ repository: Repository) -> Bool {
-        return selectedRepository?.id == repository.id
+        selectedRepository?.id == repository.id
     }
-    
+
     /// Updates the selection after a repository is deleted
     /// - Parameter repository: The deleted repository
     func handleRepositoryDeletion(_ repository: Repository) {

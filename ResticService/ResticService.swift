@@ -1,13 +1,3 @@
-//
-//  ResticService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 05/02/2025.
-//
-
 import Core
 import Foundation
 import os.log
@@ -55,29 +45,29 @@ private extension OSLog {
 /// 4. Provides a secure interface for Restic operations
 final class ResticService: NSObject, NSXPCListenerDelegate {
     // MARK: - Properties
-    
+
     /// Queue for serializing operations
     private let queue = DispatchQueue(label: "dev.mpy.rBUM.ResticService")
-    
+
     /// Logger for recording operations
     private let logger: LoggerProtocol
-    
+
     /// Recorder for security operations
     private let securityRecorder: SecurityOperationRecorder
-    
+
     /// Current task being executed
     private var currentTask: Process?
-    
+
     // MARK: - Initialization
-    
+
     override init() {
-        self.logger = Logger()
-        self.securityRecorder = SecurityOperationRecorder()
+        logger = Logger()
+        securityRecorder = SecurityOperationRecorder()
         super.init()
     }
-    
+
     // MARK: - XPC Connection Management
-    
+
     /// Validates and accepts new XPC connections
     ///
     /// This method:
@@ -97,30 +87,30 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
         // Set up interfaces
         newConnection.exportedInterface = NSXPCInterface(with: ResticServiceProtocol.self)
         newConnection.exportedObject = self
-        
+
         // Set up handlers
         newConnection.invalidationHandler = { [weak self] in
             self?.handleInvalidation()
         }
-        
+
         newConnection.interruptionHandler = { [weak self] in
             self?.handleInterruption()
         }
-        
+
         // Record connection
         securityRecorder.recordOperation(
             url: URL(fileURLWithPath: "xpc"),
             type: .xpc,
             status: .success
         )
-        
+
         // Resume connection
         newConnection.resume()
         return true
     }
-    
+
     // MARK: - Connection Event Handlers
-    
+
     /// Handles connection invalidation
     private func handleInvalidation() {
         logger.log(level: .error, message: "XPC connection invalidated")
@@ -131,7 +121,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             error: "Connection invalidated"
         )
     }
-    
+
     /// Handles connection interruption
     private func handleInterruption() {
         logger.log(level: .error, message: "XPC connection interrupted")
@@ -142,9 +132,9 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             error: "Connection interrupted"
         )
     }
-    
+
     // MARK: - Protocol Implementation
-    
+
     func initialiseRepository(
         at repositoryURL: Data,
         password: String,
@@ -154,12 +144,12 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             do {
                 let arguments = ["init", "--repo", repositoryURL]
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Repository initialised at \(repositoryURL, privacy: .private)")
                 reply(result)
             } catch {
@@ -172,7 +162,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     func createBackup(
         repository repositoryURL: Data,
         sourcePaths: [Data],
@@ -183,22 +173,22 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
         queue.async {
             do {
                 var arguments = ["backup", "--repo", repositoryURL]
-                
+
                 // Add exclude patterns
                 for pattern in excludePatterns {
                     arguments.append(contentsOf: ["--exclude", pattern])
                 }
-                
+
                 // Add source paths
                 arguments.append(contentsOf: sourcePaths)
-                
+
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Backup completed to \(repositoryURL, privacy: .private)")
                 reply(result)
             } catch {
@@ -211,7 +201,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     func listSnapshots(
         repository repositoryURL: Data,
         password: String,
@@ -221,12 +211,12 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             do {
                 let arguments = ["snapshots", "--repo", repositoryURL, "--json"]
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 reply(result)
             } catch {
                 self.logger.error("Failed to list snapshots: \(error.localizedDescription)")
@@ -238,7 +228,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     func restore(
         repository repositoryURL: Data,
         to targetPath: Data,
@@ -253,20 +243,20 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
                     "restore",
                     "--repo", repositoryURL,
                     "--target", targetPath,
-                    snapshotID
+                    snapshotID,
                 ]
-                
-                if let paths = paths {
+
+                if let paths {
                     arguments.append(contentsOf: paths)
                 }
-                
+
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Restore completed to \(targetPath, privacy: .private)")
                 reply(result)
             } catch {
@@ -279,7 +269,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     func verifyRepository(
         at repositoryURL: Data,
         password: String,
@@ -289,12 +279,12 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             do {
                 let arguments = ["check", "--repo", repositoryURL]
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Repository verification completed")
                 reply(result)
             } catch {
@@ -307,21 +297,21 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     func cancelOperation(with reply: @escaping (Bool) -> Void) {
         queue.async {
             guard let task = self.currentTask else {
                 reply(false)
                 return
             }
-            
+
             task.terminate()
             self.currentTask = nil
             self.logger.info("Operation cancelled")
             reply(true)
         }
     }
-    
+
     func validateBookmark(_ bookmarkData: Data, with reply: @escaping (Bool, Error?) -> Void) {
         queue.async {
             do {
@@ -333,7 +323,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             }
         }
     }
-    
+
     /// Executes a Restic command with the specified arguments and environment
     ///
     /// This method:
@@ -353,33 +343,33 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
     ) throws -> ResticCommandResult {
         let task = Process()
         currentTask = task
-        
+
         let outputPipe = Pipe()
         let errorPipe = Pipe()
-        
+
         task.executableURL = URL(fileURLWithPath: "/usr/local/bin/restic")
         task.arguments = arguments
         task.environment = environment
         task.standardOutput = outputPipe
         task.standardError = errorPipe
-        
+
         securityRecorder.recordOperation(
             url: task.executableURL!,
             type: .xpc,
             status: .success
         )
-        
+
         try task.run()
         task.waitUntilExit()
-        
+
         let outputData = try outputPipe.fileHandleForReading.readToEnd() ?? Data()
         let errorData = try errorPipe.fileHandleForReading.readToEnd() ?? Data()
-        
+
         let output = String(data: outputData, encoding: .utf8) ?? ""
         let error = String(data: errorData, encoding: .utf8) ?? ""
-        
+
         currentTask = nil
-        
+
         let status: SecurityOperationStatus = task.terminationStatus == 0 ? .success : .failure
         securityRecorder.recordOperation(
             url: task.executableURL!,
@@ -387,7 +377,7 @@ final class ResticService: NSObject, NSXPCListenerDelegate {
             status: status,
             error: error.isEmpty ? nil : error
         )
-        
+
         return ResticCommandResult(
             output: output,
             error: error,

@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-extension DevelopmentKeychainService {
+public extension DevelopmentKeychainService {
     // MARK: - Core Operations
 
     /// Saves data to the development keychain for the specified key.
@@ -11,7 +11,7 @@ extension DevelopmentKeychainService {
     ///   - key: The key to associate with the data
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Throws: `KeychainError` if the save operation fails
-    public func save(_ data: Data, for key: String, accessGroup: String?) throws {
+    func save(_ data: Data, for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "save",
             error: KeychainError.saveFailed(status: errSecIO)
@@ -31,7 +31,7 @@ extension DevelopmentKeychainService {
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Returns: The data stored in the keychain
     /// - Throws: `KeychainError` if the load operation fails or the item is not found
-    public func load(for key: String, accessGroup: String?) throws -> Data {
+    func load(for key: String, accessGroup: String?) throws -> Data {
         try simulateFailureIfNeeded(
             operation: "load",
             error: KeychainError.loadFailed(status: errSecItemNotFound)
@@ -50,7 +50,7 @@ extension DevelopmentKeychainService {
     ///   - key: The key associated with the data
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Throws: `KeychainError` if the delete operation fails or the item is not found
-    public func delete(for key: String, accessGroup: String?) throws {
+    func delete(for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "delete",
             error: KeychainError.deleteFailed(status: errSecItemNotFound)
@@ -70,7 +70,7 @@ extension DevelopmentKeychainService {
     ///   - key: The key associated with the data
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Throws: `KeychainError` if the update operation fails or the item is not found
-    public func update(_ data: Data, for key: String, accessGroup: String?) throws {
+    func update(_ data: Data, for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "update",
             error: KeychainError.updateFailed(status: errSecItemNotFound)

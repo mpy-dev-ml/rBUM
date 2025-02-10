@@ -1,13 +1,3 @@
-//
-//  RestoreServiceProtocol.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 05/02/2025.
-//
-
 import Foundation
 
 /// Protocol for managing restore operations from backups

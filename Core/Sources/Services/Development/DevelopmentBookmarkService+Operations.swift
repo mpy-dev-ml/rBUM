@@ -1,11 +1,3 @@
-//
-//  DevelopmentBookmarkService+Operations.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 // MARK: - Bookmark Operations Extension
@@ -28,7 +20,7 @@ public extension DevelopmentBookmarkService {
 
             logger.debug("Created bookmark", metadata: [
                 "url": "\(url.path)",
-                "size": "\(data.count)"
+                "size": "\(data.count)",
             ])
 
             collectMetrics()
@@ -52,7 +44,7 @@ public extension DevelopmentBookmarkService {
             }
 
             logger.debug("Resolved bookmark", metadata: [
-                "url": "\(url.path)"
+                "url": "\(url.path)",
             ])
 
             return url
@@ -79,7 +71,7 @@ public extension DevelopmentBookmarkService {
 
             logger.debug("Validated bookmark", metadata: [
                 "url": "\(url.path)",
-                "validation_count": "\(updatedEntry.validationCount)"
+                "validation_count": "\(updatedEntry.validationCount)",
             ])
 
             collectMetrics()

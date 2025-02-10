@@ -29,23 +29,23 @@ extension ResticCommandService {
     ) throws {
         // Validate repository
         try validateRepository(repository)
-        
+
         // Validate snapshot if provided
-        if let snapshot = snapshot {
+        if let snapshot {
             try validateSnapshot(snapshot, in: repository)
         }
-        
+
         // Validate path if provided
-        if let path = path {
+        if let path {
             try validatePath(path)
         }
-        
+
         // Validate tags if provided
-        if let tags = tags {
+        if let tags {
             try validateTags(tags)
         }
     }
-    
+
     /// Validates that a snapshot exists in the specified repository
     ///
     /// This method checks:
@@ -67,23 +67,23 @@ extension ResticCommandService {
         guard !snapshot.id.isEmpty else {
             throw ValidationError.invalidSnapshotId
         }
-        
+
         // Check if snapshot exists in repository
         let result = try await runCommand(
             .listSnapshots(repository: repository),
             validateOutput: false
         )
-        
+
         let snapshots = try JSONDecoder().decode(
             [ResticSnapshot].self,
             from: result.output.data(using: .utf8) ?? Data()
         )
-        
+
         guard snapshots.contains(where: { $0.id == snapshot.id }) else {
             throw ValidationError.snapshotNotFound(id: snapshot.id)
         }
     }
-    
+
     /// Validates the format and content of backup tags
     ///
     /// This method ensures that each tag:
@@ -101,7 +101,7 @@ extension ResticCommandService {
             guard !tag.isEmpty else {
                 throw ValidationError.emptyTag
             }
-            
+
             // Tags should only contain alphanumeric characters, hyphens, and underscores
             let pattern = "^[a-zA-Z0-9-_]+$"
             guard tag.range(of: pattern, options: .regularExpression) != nil else {

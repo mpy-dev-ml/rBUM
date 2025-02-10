@@ -20,8 +20,8 @@ import os.log
     @objc private(set) var totalPermissions: Int = 0
     @objc private(set) var permissionFailures: Int = 0
 
-    @objc public override init() {
-        self.logger = Logger(subsystem: "dev.mpy.rbum", category: "SecurityMetrics")
+    @objc override public init() {
+        logger = Logger(subsystem: "dev.mpy.rbum", category: "SecurityMetrics")
         super.init()
     }
 

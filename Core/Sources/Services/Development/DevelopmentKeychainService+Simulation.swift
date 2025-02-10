@@ -12,7 +12,7 @@ extension DevelopmentKeychainService {
             return
         }
 
-        let random = Double.random(in: 0...1)
+        let random = Double.random(in: 0 ... 1)
         if random < failureRate {
             throw error
         }

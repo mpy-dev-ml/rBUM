@@ -24,7 +24,7 @@ extension BackupViewModel {
 
     /// Validate repository configuration
     func validateRepository() async throws {
-        guard let repository = repository else {
+        guard let repository else {
             throw BackupError.missingRepository("No repository selected")
         }
 
@@ -39,7 +39,7 @@ extension BackupViewModel {
 
     /// Validate backup credentials
     func validateCredentials() async throws {
-        guard let repository = repository else { return }
+        guard let repository else { return }
 
         // Check if credentials exist
         guard try await credentialsService.loadCredentials(for: repository) != nil else {
@@ -52,7 +52,7 @@ extension BackupViewModel {
         let settings = configuration.settings
 
         // Validate compression level
-        guard settings.compression >= 0 && settings.compression <= 9 else {
+        guard settings.compression >= 0, settings.compression <= 9 else {
             throw BackupError.invalidSettings("Compression level must be between 0 and 9")
         }
 
@@ -71,35 +71,35 @@ extension BackupViewModel {
             // Check if we have permissions to access hidden files
             try await securityService.validateHiddenFileAccess()
         }
-        
+
         if verifyAfterBackup {
             // Ensure we have enough disk space for verification
             try await validateAvailableSpace()
         }
-        
+
         // Update configuration issue if any
         await MainActor.run {
             configurationIssue = nil
         }
     }
-    
+
     /// Validate available disk space for backup operation
     private func validateAvailableSpace() async throws {
-        guard let repository = repository else {
+        guard let repository else {
             throw BackupError.missingRepository("Repository not configured")
         }
-        
+
         let requiredSpace = try await calculateRequiredSpace()
         let availableSpace = try await fileManager.availableSpace(at: repository.url)
-        
+
         if availableSpace < requiredSpace {
             throw BackupError.insufficientSpace(
                 "Insufficient space available. Required: \(formatBytes(requiredSpace)), " +
-                "Available: \(formatBytes(availableSpace))"
+                    "Available: \(formatBytes(availableSpace))"
             )
         }
     }
-    
+
     /// Format bytes into human-readable string
     private func formatBytes(_ bytes: UInt64) -> String {
         let formatter = ByteCountFormatter()

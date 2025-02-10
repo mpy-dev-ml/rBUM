@@ -11,7 +11,7 @@ public protocol FileSearchServiceProtocol {
         pattern: String,
         in repository: Repository
     ) async throws -> [FileMatch]
-    
+
     /// Get all versions of a specific file
     /// - Parameters:
     ///   - path: Full path of the file
@@ -30,7 +30,7 @@ public struct FileMatch: Identifiable, Hashable {
     public let size: UInt64
     public let modTime: Date
     public let snapshot: ResticSnapshot
-    
+
     public init(
         id: UUID = UUID(),
         path: String,
@@ -54,7 +54,7 @@ public struct FileVersion: Identifiable, Hashable {
     public let modTime: Date
     public let snapshot: ResticSnapshot
     public let hash: String
-    
+
     public init(
         id: UUID = UUID(),
         path: String,
@@ -78,12 +78,12 @@ public enum FileSearchError: LocalizedError {
     case searchFailed(String)
     case snapshotInaccessible
     case repositoryLocked
-    
+
     public var errorDescription: String? {
         switch self {
-        case .invalidPattern(let pattern):
+        case let .invalidPattern(pattern):
             "Invalid search pattern: \(pattern)"
-        case .searchFailed(let reason):
+        case let .searchFailed(reason):
             "File search failed: \(reason)"
         case .snapshotInaccessible:
             "Cannot access snapshot"

@@ -5,38 +5,38 @@ import SwiftUI
 @MainActor
 public final class RepositoryDiscoveryViewModel: ObservableObject {
     // MARK: - Published Properties
-    
+
     /// List of discovered repositories
     @Published private(set) var discoveredRepositories: [DiscoveredRepository] = []
-    
+
     /// Current scanning status
     @Published private(set) var scanningStatus: ScanningStatus = .idle
-    
+
     /// Any error that occurred during operations
     @Published private(set) var error: RepositoryDiscoveryError?
-    
+
     // MARK: - Private Properties
-    
+
     private let discoveryService: RepositoryDiscoveryProtocol
     private let logger: Logger
-    
+
     private var scanTask: Task<Void, Never>?
-    
+
     // MARK: - Types
-    
+
     /// Information about scanning progress
     public struct ScanProgress: Equatable {
         /// Number of items scanned
         public let scannedItems: Int
         /// Number of repositories found
         public let foundRepositories: Int
-        
+
         public init(scannedItems: Int, foundRepositories: Int) {
             self.scannedItems = scannedItems
             self.foundRepositories = foundRepositories
         }
     }
-    
+
     /// Represents the current scanning status
     public enum ScanningStatus: Equatable {
         /// No scanning operation in progress
@@ -48,9 +48,9 @@ public final class RepositoryDiscoveryViewModel: ObservableObject {
         /// Scan completed
         case completed(foundCount: Int)
     }
-    
+
     // MARK: - Initialisation
-    
+
     /// Creates a new repository discovery view model
     /// - Parameters:
     ///   - discoveryService: Service for discovering repositories
@@ -62,9 +62,9 @@ public final class RepositoryDiscoveryViewModel: ObservableObject {
         self.discoveryService = discoveryService
         self.logger = logger
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Starts scanning for repositories at the specified URL
     /// - Parameters:
     ///   - url: The URL to scan
@@ -74,17 +74,17 @@ public final class RepositoryDiscoveryViewModel: ObservableObject {
             logger.warning("Scan already in progress")
             return
         }
-        
+
         error = nil
         discoveredRepositories = []
         scanningStatus = .scanning(progress: .init(scannedItems: 0, foundRepositories: 0))
-        
+
         scanTask = Task { [weak self] in
-            guard let self = self else { return }
-            
+            guard let self else { return }
+
             do {
                 let repositories = try await discoveryService.scanLocation(url, recursive: recursive)
-                
+
                 // Update UI with results
                 await MainActor.run {
                     self.discoveredRepositories = repositories
@@ -100,7 +100,7 @@ public final class RepositoryDiscoveryViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Cancels the current scanning operation
     public func cancelScan() {
         logger.info("Cancelling scan")
@@ -108,30 +108,30 @@ public final class RepositoryDiscoveryViewModel: ObservableObject {
         discoveryService.cancelDiscovery()
         scanningStatus = .idle
     }
-    
+
     /// Adds a discovered repository to the app for management
     /// - Parameter repository: The repository to add
     public func addRepository(_ repository: DiscoveredRepository) async throws {
         logger.info("Adding repository: \(repository.url.path)")
-        
+
         // First verify the repository
         guard try await discoveryService.verifyRepository(repository) else {
             throw RepositoryDiscoveryError.invalidRepository(repository.url)
         }
-        
+
         // Index the repository for searching
         try await discoveryService.indexRepository(repository)
-        
+
         logger.info("Repository added and indexed successfully")
     }
-    
+
     /// Clears any error state
     public func clearError() {
         error = nil
     }
-    
+
     // MARK: - Deinit
-    
+
     deinit {
         cancelScan()
     }

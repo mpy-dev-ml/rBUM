@@ -14,13 +14,13 @@ import Foundation
 /// ```swift
 /// class MyService: LifecycleManaged {
 ///     private(set) var state: ServiceState = .uninitialized
-///     
+///
 ///     func initialize() async throws {
 ///         state = .initializing
 ///         // Perform setup
 ///         state = .ready
 ///     }
-///     
+///
 ///     func shutdown() async {
 ///         // Clean up resources
 ///         state = .shutdown
@@ -54,10 +54,12 @@ public extension LifecycleManaged where Self: LoggingService {
     ///
     /// - Throws: Any error that occurs during initialisation
     func initialize() async throws {
-        logger.info("Initialising service...",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.info(
+            "Initialising service...",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // Override in concrete implementations
     }
 
@@ -65,10 +67,12 @@ public extension LifecycleManaged where Self: LoggingService {
     /// Concrete implementations should override this method to add
     /// their specific shutdown logic.
     func shutdown() async {
-        logger.info("Shutting down service...",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.info(
+            "Shutting down service...",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // Override in concrete implementations
     }
 }
@@ -83,7 +87,7 @@ public extension LifecycleManaged {
             throw ServiceError.invalidState("Cannot perform \(operation) in state: \(state)")
         }
     }
-    
+
     /// Validate that the service can perform operations
     /// - Parameter operation: Name of the operation being validated
     /// - Throws: ServiceError if operations are not allowed
@@ -92,7 +96,7 @@ public extension LifecycleManaged {
             throw ServiceError.invalidState("Cannot perform \(operation) in state: \(state)")
         }
     }
-    
+
     /// Validate that the service can transition to a new state
     /// - Parameters:
     ///   - newState: Target state to transition to
@@ -102,7 +106,7 @@ public extension LifecycleManaged {
         guard state.canTransitionTo(newState) else {
             throw ServiceError.invalidStateTransition(
                 "Cannot transition from \(state) to \(newState) " +
-                "during \(operation)"
+                    "during \(operation)"
             )
         }
     }

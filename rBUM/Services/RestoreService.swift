@@ -1,16 +1,3 @@
-//
-//  RestoreService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Core
 import Foundation
 
@@ -70,7 +57,7 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
         try await measure("Restore Files") {
             // Create operation ID
             let operationId = UUID()
-            
+
             do {
                 // Start operation
                 try await startRestoreOperation(
@@ -79,36 +66,36 @@ final class RestoreService: BaseSandboxedService, RestoreServiceProtocol, Health
                     repository: repository,
                     target: target
                 )
-                
+
                 // Validate prerequisites
                 try await validateRestorePrerequisites(
                     snapshot: snapshot,
                     repository: repository,
                     target: target
                 )
-                
+
                 // Execute restore
                 try await resticService.restore(
                     from: URL(fileURLWithPath: repository.path),
                     to: URL(fileURLWithPath: target)
                 )
-                
+
                 // Complete operation
                 await completeRestoreOperation(operationId, success: true)
-                
+
                 logger.info(
                     "Restore completed",
                     metadata: [
                         "snapshot": .string(snapshot.id),
                         "repository": .string(repository.id.uuidString),
                         "target": .string(target),
-                        "paths": .string(paths.joined(separator: ", "))
+                        "paths": .string(paths.joined(separator: ", ")),
                     ],
                     file: #file,
                     function: #function,
                     line: #line
                 )
-                
+
             } catch {
                 // Handle failure
                 await completeRestoreOperation(operationId, success: false, error: error)
@@ -143,25 +130,25 @@ public enum RestoreError: LocalizedError {
     case insufficientPermissions
     case operationNotFound
     case operationFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .snapshotNotFound:
-            return "Snapshot not found in repository"
+            "Snapshot not found in repository"
         case .snapshotInaccessible:
-            return "Snapshot is not accessible"
+            "Snapshot is not accessible"
         case .targetNotFound:
-            return "Restore target not found"
+            "Restore target not found"
         case .targetNotWritable:
-            return "Restore target is not writable"
+            "Restore target is not writable"
         case .insufficientSpace:
-            return "Insufficient space at restore target"
+            "Insufficient space at restore target"
         case .insufficientPermissions:
-            return "Insufficient permissions for restore target"
+            "Insufficient permissions for restore target"
         case .operationNotFound:
-            return "Restore operation not found"
-        case .operationFailed(let message):
-            return "Restore operation failed: \(message)"
+            "Restore operation not found"
+        case let .operationFailed(message):
+            "Restore operation failed: \(message)"
         }
     }
 }

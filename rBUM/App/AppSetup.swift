@@ -4,14 +4,14 @@ import Foundation
 /// Handles app setup and dependency injection
 enum AppSetup {
     // MARK: - Types
-    
+
     struct CoreDependencies {
         let fileManager: FileManagerProtocol
         let dateProvider: DateProviderProtocol
         let notificationCenter: NotificationCenter
         let repositoryLock: NSLock
     }
-    
+
     struct SecurityServices {
         let securityService: SecurityServiceProtocol
         let keychainService: KeychainServiceProtocol
@@ -19,9 +19,9 @@ enum AppSetup {
         let sandboxMonitor: SandboxMonitor
         let xpcService: ResticXPCServiceProtocol
     }
-    
+
     // MARK: - Setup Methods
-    
+
     static func setupCoreDependencies() -> CoreDependencies {
         CoreDependencies(
             fileManager: DefaultFileManager(),
@@ -30,7 +30,7 @@ enum AppSetup {
             repositoryLock: NSLock()
         )
     }
-    
+
     static func setupSecurityServices(_ dependencies: CoreDependencies) -> SecurityServices {
         let logger = LoggerFactory.createLogger(category: "SecurityServices")
         let securityService = ServiceFactory.createSecurityService(logger: logger)
@@ -40,17 +40,17 @@ enum AppSetup {
             securityService: securityService,
             keychainService: keychainService
         )
-        
+
         let sandboxMonitor = SandboxMonitor(
             logger: logger,
             securityService: securityService
         )
-        
+
         let xpcService = ServiceFactory.createXPCService(
             logger: logger,
             securityService: securityService
         ) as! ResticXPCServiceProtocol
-        
+
         return SecurityServices(
             securityService: securityService,
             keychainService: keychainService,
@@ -59,7 +59,7 @@ enum AppSetup {
             xpcService: xpcService
         )
     }
-    
+
     static func setupCredentialsManager(
         dependencies: CoreDependencies,
         keychainService: KeychainServiceProtocol
@@ -72,7 +72,7 @@ enum AppSetup {
             notificationCenter: dependencies.notificationCenter
         )
     }
-    
+
     static func setupRepositoryStorage(
         _ fileManager: FileManagerProtocol
     ) -> RepositoryStorageProtocol {
@@ -90,7 +90,7 @@ enum AppSetup {
             fatalError("Failed to initialize repository storage: \(error.localizedDescription)")
         }
     }
-    
+
     static func setupResticService(
         dependencies: CoreDependencies,
         securityServices: SecurityServices
@@ -103,7 +103,7 @@ enum AppSetup {
             keychainService: securityServices.keychainService
         ) as! any ResticCommandServiceProtocol
     }
-    
+
     static func setupRepositoryCreationService(
         dependencies: CoreDependencies,
         securityServices: SecurityServices
@@ -116,7 +116,7 @@ enum AppSetup {
             keychainService: securityServices.keychainService
         ) as! any RepositoryCreationServiceProtocol
     }
-    
+
     static func setupFileSearchService(
         dependencies: CoreDependencies,
         securityServices: SecurityServices,
@@ -129,7 +129,7 @@ enum AppSetup {
             logger: logger
         )
     }
-    
+
     static func setupRestoreService(
         dependencies: CoreDependencies,
         securityServices: SecurityServices,

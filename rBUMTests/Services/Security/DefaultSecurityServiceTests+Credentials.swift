@@ -1,6 +1,6 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension DefaultSecurityServiceTests {
     // MARK: - Credential Management Tests
@@ -23,7 +23,7 @@ extension DefaultSecurityServiceTests {
             mockLogger,
             contains: [
                 "Successfully saved credentials",
-                "Successfully loaded credentials"
+                "Successfully loaded credentials",
             ]
         )
     }
@@ -47,7 +47,7 @@ extension DefaultSecurityServiceTests {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully removed credentials"
+                "Successfully removed credentials",
             ]
         )
     }

@@ -43,7 +43,7 @@ extension ResticXPCService {
             ) {
                 url.stopAccessingSecurityScopedResource()
             }
-            
+
             logger.debug(
                 "Stopped accessing resource",
                 metadata: ["path": .string(path)],
@@ -52,25 +52,25 @@ extension ResticXPCService {
                 line: #line
             )
         }
-        
+
         activeBookmarks.removeAll()
     }
-    
+
     /// Clean up all resources associated with the service
     func cleanupResources() {
         // Stop accessing security-scoped resources
         stopAccessingResources()
-        
+
         // Cancel any pending operations
-        pendingOperations.forEach { operation in
+        for operation in pendingOperations {
             operation.cancel()
         }
         pendingOperations.removeAll()
-        
+
         // Invalidate connection
         connection?.invalidate()
         connection = nil
-        
+
         logger.debug(
             "Cleaned up all resources",
             file: #file,
@@ -78,7 +78,7 @@ extension ResticXPCService {
             line: #line
         )
     }
-    
+
     /// Validates that all required resources are accessible
     /// - Throws: ResticXPCError if any required resource is inaccessible
     func validateResources() throws {
@@ -93,23 +93,23 @@ extension ResticXPCService {
             ) else {
                 throw ResticXPCError.invalidBookmark(path: path)
             }
-            
+
             if isStale {
                 throw ResticXPCError.staleBookmark(path: path)
             }
-            
+
             guard url.startAccessingSecurityScopedResource() else {
                 throw ResticXPCError.accessDenied(path: path)
             }
-            
+
             url.stopAccessingSecurityScopedResource()
         }
-        
+
         // Check connection
         guard connection != nil else {
             throw ResticXPCError.connectionNotEstablished
         }
-        
+
         // Check pending operations
         for operation in pendingOperations where operation.isCancelled {
             pendingOperations.removeAll { $0 === operation }

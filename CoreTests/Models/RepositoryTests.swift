@@ -1,15 +1,5 @@
-//
-//  RepositoryTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
-@testable import Core
 import XCTest
+@testable import Core
 
 final class RepositoryTests: XCTestCase {
     // MARK: - Properties
@@ -59,7 +49,7 @@ final class RepositoryTests: XCTestCase {
             lastBackup: nil,
             status: .ready
         )
-        
+
         let repository2 = Repository(
             id: repository1.id,
             name: "Test Repository 1",
@@ -68,10 +58,10 @@ final class RepositoryTests: XCTestCase {
             lastBackup: nil,
             status: .ready
         )
-        
+
         XCTAssertEqual(repository1, repository2)
     }
-    
+
     func testRepositoryInequality() {
         let repository1 = Repository(
             id: UUID(),
@@ -81,7 +71,7 @@ final class RepositoryTests: XCTestCase {
             lastBackup: nil,
             status: .ready
         )
-        
+
         let repository2 = Repository(
             id: UUID(),
             name: "Test Repository 2",
@@ -90,7 +80,7 @@ final class RepositoryTests: XCTestCase {
             lastBackup: nil,
             status: .ready
         )
-        
+
         XCTAssertNotEqual(repository1, repository2)
     }
 

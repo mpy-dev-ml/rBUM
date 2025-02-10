@@ -16,53 +16,59 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         case performance
         /// Custom category
         case custom(String)
-        
+
         /// Whether this category inherits to subdirectories by default
         public var inheritsByDefault: Bool {
             switch self {
-            case .system, .security: return true
-            case .user, .temporary, .performance, .custom: return false
+            case .system,
+                 .security: true
+            case .user,
+                 .temporary,
+                 .performance,
+                 .custom: false
             }
         }
-        
+
         /// Display name for the category
         public var displayName: String {
             switch self {
-            case .system: return "System"
-            case .user: return "User"
-            case .temporary: return "Temporary"
-            case .security: return "Security"
-            case .performance: return "Performance"
-            case .custom(let name): return "Custom: \(name)"
+            case .system: "System"
+            case .user: "User"
+            case .temporary: "Temporary"
+            case .security: "Security"
+            case .performance: "Performance"
+            case let .custom(name): "Custom: \(name)"
             }
         }
-        
+
         /// Validation rules for this category
         public var validationRules: ValidationRules {
             switch self {
             case .system:
-                return ValidationRules(
+                ValidationRules(
                     allowedPatternTypes: [.glob, .exact],
                     requiresDirectory: false,
                     maxPatternLength: 100,
                     disallowedPatterns: ["/*", "/**", "*"]
                 )
             case .security:
-                return ValidationRules(
+                ValidationRules(
                     allowedPatternTypes: [.exact],
                     requiresDirectory: false,
                     maxPatternLength: 255,
                     disallowedPatterns: ["/*", "/**", "*"]
                 )
             case .performance:
-                return ValidationRules(
+                ValidationRules(
                     allowedPatternTypes: [.glob, .exact],
                     requiresDirectory: true,
                     maxPatternLength: 100,
                     disallowedPatterns: []
                 )
-            case .user, .temporary, .custom:
-                return ValidationRules(
+            case .user,
+                 .temporary,
+                 .custom:
+                ValidationRules(
                     allowedPatternTypes: [.glob, .exact, .regex],
                     requiresDirectory: false,
                     maxPatternLength: 255,
@@ -71,7 +77,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             }
         }
     }
-    
+
     /// Type of pattern matching to use
     public enum PatternType: String, Codable {
         /// Exact string match
@@ -81,7 +87,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         /// Regular expression
         case regex
     }
-    
+
     /// Rules for validating patterns
     public struct ValidationRules {
         /// Allowed pattern types
@@ -93,7 +99,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         /// Patterns that are not allowed
         public let disallowedPatterns: Set<String>
     }
-    
+
     /// Priority level for exclusion patterns
     public enum Priority: Int, Codable, Comparable {
         /// Highest priority, always applied first
@@ -106,55 +112,55 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         case low = -100
         /// Custom priority level
         case custom(Int)
-        
+
         public static func < (lhs: Priority, rhs: Priority) -> Bool {
             lhs.rawValue < rhs.rawValue
         }
-        
+
         /// Raw value for sorting
         public var rawValue: Int {
             switch self {
-            case .critical: return 1000
-            case .high: return 100
-            case .normal: return 0
-            case .low: return -100
-            case .custom(let value): return value
+            case .critical: 1000
+            case .high: 100
+            case .normal: 0
+            case .low: -100
+            case let .custom(value): value
             }
         }
-        
+
         /// Description of the priority level
         public var description: String {
             switch self {
-            case .critical: return "Critical"
-            case .high: return "High"
-            case .normal: return "Normal"
-            case .low: return "Low"
-            case .custom(let value): return "Custom(\(value))"
+            case .critical: "Critical"
+            case .high: "High"
+            case .normal: "Normal"
+            case .low: "Low"
+            case let .custom(value): "Custom(\(value))"
             }
         }
     }
-    
+
     /// The pattern to match against
     public let pattern: String
-    
+
     /// Type of pattern matching to use
     public let patternType: PatternType
-    
+
     /// Whether this is a directory pattern
     public let isDirectory: Bool
-    
+
     /// Priority of this pattern
     public let priority: Priority
-    
+
     /// Category of this pattern
     public let category: Category
-    
+
     /// Whether this pattern should inherit to subdirectories
     public let inheritsToSubdirectories: Bool
-    
+
     /// Group this pattern belongs to, if any
     public let groupId: UUID?
-    
+
     /// Create a new exclusion pattern
     /// - Parameters:
     ///   - pattern: The pattern to match against
@@ -181,48 +187,48 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         self.inheritsToSubdirectories = inheritsToSubdirectories ?? category.inheritsByDefault
         self.groupId = groupId
     }
-    
+
     /// Validate the pattern
     /// - Throws: ConfigurationError if validation fails
     public func validate() throws {
         guard !pattern.isEmpty else {
             throw ConfigurationError.invalidExclusionPattern("Exclusion pattern cannot be empty")
         }
-        
+
         // Get validation rules for this category
         let rules = category.validationRules
-        
+
         // Check pattern type is allowed
         guard rules.allowedPatternTypes.contains(patternType) else {
             let types = rules.allowedPatternTypes.map(\.rawValue)
             let msg = """
-                '\(patternType)' not allowed in '\(category.displayName)'.
-                Allowed: \(types.joined(separator: ", "))
-                """
+            '\(patternType)' not allowed in '\(category.displayName)'.
+            Allowed: \(types.joined(separator: ", "))
+            """
             throw ConfigurationError.invalidExclusionPattern(msg)
         }
-        
+
         // Check directory requirement
-        if rules.requiresDirectory && !isDirectory {
+        if rules.requiresDirectory, !isDirectory {
             throw ConfigurationError.invalidExclusionPattern(
                 "Patterns in category '\(category.displayName)' must be directory patterns"
             )
         }
-        
+
         // Check pattern length
         guard pattern.count <= rules.maxPatternLength else {
             throw ConfigurationError.invalidExclusionPattern(
                 "Pattern exceeds maximum length of \(rules.maxPatternLength) characters"
             )
         }
-        
+
         // Check for disallowed patterns
         guard !rules.disallowedPatterns.contains(pattern) else {
             throw ConfigurationError.invalidExclusionPattern(
                 "Pattern '\(pattern)' is not allowed in category '\(category.displayName)'"
             )
         }
-        
+
         // Ensure pattern doesn't contain invalid characters
         let invalidCharacters = CharacterSet(charactersIn: "<>:|")
         guard pattern.rangeOfCharacter(from: invalidCharacters) == nil else {
@@ -230,7 +236,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
                 "Pattern contains invalid characters: \(pattern)"
             )
         }
-        
+
         // Validate regex patterns compile
         if patternType == .regex {
             do {
@@ -242,7 +248,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             }
         }
     }
-    
+
     /// Check if a path matches this pattern
     /// - Parameters:
     ///   - path: Path to check
@@ -250,12 +256,12 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
     /// - Returns: True if the path matches, false otherwise
     public func matches(path: String, parentMatched: Bool = false) -> Bool {
         // If a parent matched and we inherit, it's a match
-        if parentMatched && inheritsToSubdirectories {
+        if parentMatched, inheritsToSubdirectories {
             return true
         }
-        
+
         let pathURL = URL(fileURLWithPath: path)
-        
+
         // If this is a directory pattern and the path isn't a directory, no match
         if isDirectory {
             let isDirectory = (try? pathURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
@@ -263,7 +269,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
                 return false
             }
         }
-        
+
         // Match based on pattern type
         switch patternType {
         case .exact:
@@ -271,7 +277,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
         case .glob:
             // Use path.matches() for pattern matching when available in macOS 14+
             // For now, use simple string matching
-            if pattern.hasPrefix("*") && pattern.hasSuffix("*") {
+            if pattern.hasPrefix("*"), pattern.hasSuffix("*") {
                 let subpattern = pattern.dropFirst().dropLast()
                 return path.contains(subpattern)
             } else if pattern.hasPrefix("*") {
@@ -287,11 +293,11 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             guard let regex = try? NSRegularExpression(pattern: pattern) else {
                 return false
             }
-            let range = NSRange(path.startIndex..<path.endIndex, in: path)
+            let range = NSRange(path.startIndex ..< path.endIndex, in: path)
             return regex.firstMatch(in: path, range: range) != nil
         }
     }
-    
+
     /// Get a description of why this pattern matched
     /// - Parameter isInherited: Whether the match was inherited from a parent directory
     /// - Returns: A description of the match
@@ -300,7 +306,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             "(Priority: \(priority.description))"
         return isInherited ? "\(baseDescription) [Inherited]" : baseDescription
     }
-    
+
     /// Validates if a path matches this exclusion pattern
     ///
     /// - Parameter path: The path to check
@@ -308,14 +314,14 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
     public func matches(_ path: String) -> (matches: Bool, error: Error?) {
         switch patternType {
         case .glob:
-            return matchesGlobPattern(path)
+            matchesGlobPattern(path)
         case .regex:
-            return matchesRegexPattern(path)
+            matchesRegexPattern(path)
         case .exact:
-            return (path == pattern, nil)
+            (path == pattern, nil)
         }
     }
-    
+
     /// Matches a path against a glob pattern
     private func matchesGlobPattern(_ path: String) -> (matches: Bool, error: Error?) {
         // Convert glob to regex pattern
@@ -323,7 +329,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             .replacingOccurrences(of: ".", with: "\\.")
             .replacingOccurrences(of: "*", with: ".*")
             .replacingOccurrences(of: "?", with: ".")
-        
+
         do {
             let regex = try NSRegularExpression(
                 pattern: "^" + regexPattern + "$",
@@ -336,7 +342,7 @@ public struct ExclusionPattern: Codable, Equatable, Hashable {
             return (false, error)
         }
     }
-    
+
     /// Matches a path against a regex pattern
     private func matchesRegexPattern(_ path: String) -> (matches: Bool, error: Error?) {
         do {

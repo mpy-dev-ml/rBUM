@@ -8,16 +8,16 @@ public enum ConfigurationError: LocalizedError {
     case invalidSource(String)
     case invalidExclusionPattern(String)
     case invalidPatternGroup(String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .invalidName(let message),
-             .noSourcesSpecified(let message),
-             .sourceAccessFailed(let message),
-             .invalidSource(let message),
-             .invalidExclusionPattern(let message),
-             .invalidPatternGroup(let message):
-            return message
+        case let .invalidName(message),
+             let .noSourcesSpecified(message),
+             let .sourceAccessFailed(message),
+             let .invalidSource(message),
+             let .invalidExclusionPattern(message),
+             let .invalidPatternGroup(message):
+            message
         }
     }
 }

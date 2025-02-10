@@ -23,7 +23,7 @@ public extension LifecycleManaged where Self: LoggingService {
             function: function,
             line: line
         )
-        
+
         // Log additional context if available
         if let serviceError = error as? ServiceError {
             logger.error(
@@ -33,10 +33,10 @@ public extension LifecycleManaged where Self: LoggingService {
                 line: line
             )
         }
-        
+
         return error
     }
-    
+
     /// Handle an error by transitioning to the error state and logging, then rethrowing
     /// - Parameters:
     ///   - error: Error to handle
@@ -60,7 +60,7 @@ public extension LifecycleManaged where Self: LoggingService {
             line: line
         )
     }
-    
+
     /// Handle an error by transitioning to the error state and logging, then returning a default value
     /// - Parameters:
     ///   - error: Error to handle
@@ -87,7 +87,7 @@ public extension LifecycleManaged where Self: LoggingService {
         )
         return defaultValue
     }
-    
+
     /// Handle an error by transitioning to the error state and logging, then executing a recovery block
     /// - Parameters:
     ///   - error: Error to handle

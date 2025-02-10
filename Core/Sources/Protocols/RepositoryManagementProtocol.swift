@@ -66,31 +66,31 @@ public protocol RepositoryManagementProtocol {
     /// - Returns: Results of the pruning operation
     /// - Throws: BackupError if the operation fails
     func pruneSnapshots(in repository: Repository, policy: RetentionPolicy) async throws -> PruningResult
-    
+
     /// Retrieves the list of backup tags.
     ///
     /// - Returns: An array of backup tags
     /// - Throws: BackupError if the tags cannot be retrieved
     func getBackupTags() throws -> [BackupTag]
-    
+
     /// Adds a new backup tag.
     ///
     /// - Parameter tag: The tag to add
     /// - Throws: BackupError if the tag cannot be added
     func addBackupTag(_ tag: BackupTag) throws
-    
+
     /// Removes a backup tag.
     ///
     /// - Parameter tag: The tag to remove
     /// - Throws: BackupError if the tag cannot be removed
     func removeBackupTag(_ tag: BackupTag) throws
-    
+
     /// Retrieves the backup queue state.
     ///
     /// - Returns: The current backup queue state
     /// - Throws: BackupError if the queue state cannot be retrieved
     func getBackupQueueState() throws -> BackupQueueState
-    
+
     /// Updates the backup queue state.
     ///
     /// - Parameter state: The new queue state to set

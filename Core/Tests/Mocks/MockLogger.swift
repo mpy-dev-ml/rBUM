@@ -1,11 +1,3 @@
-//
-//  MockLogger.swift
-//  Core
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 import os.log
 

@@ -26,7 +26,7 @@ extension BackupViewModel {
 
         logger.info("Added source to backup configuration", metadata: [
             "source": .string(url.path),
-            "total_sources": .string("\(configuration.sources.count)")
+            "total_sources": .string("\(configuration.sources.count)"),
         ])
     }
 
@@ -36,7 +36,7 @@ extension BackupViewModel {
         configuration.sources.removeAll { $0.url == url }
         logger.info("Removed source from backup configuration", metadata: [
             "source": .string(url.path),
-            "total_sources": .string("\(configuration.sources.count)")
+            "total_sources": .string("\(configuration.sources.count)"),
         ])
     }
 
@@ -46,7 +46,7 @@ extension BackupViewModel {
         configuration.settings = settings
         logger.info("Updated backup settings", metadata: [
             "compression": .string("\(settings.compression)"),
-            "encryption": .string("\(settings.encryption)")
+            "encryption": .string("\(settings.encryption)"),
         ])
     }
 
@@ -57,7 +57,7 @@ extension BackupViewModel {
         configuration.tags.append(contentsOf: newTags)
         logger.info("Added tags to backup configuration", metadata: [
             "new_tags": .string("\(newTags)"),
-            "total_tags": .string("\(configuration.tags.count)")
+            "total_tags": .string("\(configuration.tags.count)"),
         ])
     }
 
@@ -67,7 +67,7 @@ extension BackupViewModel {
         configuration.tags.removeAll { tags.contains($0) }
         logger.info("Removed tags from backup configuration", metadata: [
             "removed_tags": .string("\(tags)"),
-            "total_tags": .string("\(configuration.tags.count)")
+            "total_tags": .string("\(configuration.tags.count)"),
         ])
     }
 
@@ -75,10 +75,10 @@ extension BackupViewModel {
     func loadConfiguration() {
         do {
             let config = try configurationStorage.load()
-            self.configuration = config
-            self.includeHidden = config.includeHidden
-            self.verifyAfterBackup = config.verifyAfterBackup
-            
+            configuration = config
+            includeHidden = config.includeHidden
+            verifyAfterBackup = config.verifyAfterBackup
+
             logger.debug("Loaded configuration: \(config.name)", privacy: .public)
         } catch {
             logger.error("Failed to load configuration: \(error.localizedDescription)", privacy: .public)
@@ -86,7 +86,7 @@ extension BackupViewModel {
             resetToDefaults()
         }
     }
-    
+
     /// Save current configuration state
     func saveConfiguration() {
         let config = BackupConfiguration(
@@ -100,17 +100,17 @@ extension BackupViewModel {
             verifyAfterBackup: verifyAfterBackup,
             repository: configuration.repository
         )
-        
+
         do {
             try configurationStorage.save(config)
             logger.debug("Saved configuration: \(config.name)", privacy: .public)
         } catch {
             logger.error("Failed to save configuration: \(error.localizedDescription)", privacy: .public)
             self.error = error
-            self.showError = true
+            showError = true
         }
     }
-    
+
     /// Reset configuration to defaults
     func resetToDefaults() {
         configuration = BackupConfiguration(
@@ -120,10 +120,10 @@ extension BackupViewModel {
             includeHidden: false,
             verifyAfterBackup: true
         )
-        
+
         includeHidden = false
         verifyAfterBackup = true
-        
+
         do {
             try configurationStorage.save(configuration)
             logger.debug("Reset configuration to defaults", privacy: .public)

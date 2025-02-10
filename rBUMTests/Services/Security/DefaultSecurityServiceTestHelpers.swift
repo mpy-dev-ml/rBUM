@@ -1,11 +1,3 @@
-//
-//  DefaultSecurityServiceTestHelpers.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 import XCTest
@@ -16,13 +8,13 @@ extension DefaultSecurityServiceTests {
         let baseURL = try URL.temporaryTestDirectory(name: "test-repositories")
         return baseURL.appendingPathComponent(name)
     }
-    
+
     /// Helper to create a test repository with credentials
     func createTestRepository(name: String) throws -> Repository {
         let url = try createTestRepositoryURL(name: name)
         let id = UUID()
         let repository = Repository(id: id, url: url)
-        
+
         // Create test credentials
         let credentials = RepositoryCredentials(
             username: "test-user",
@@ -32,18 +24,18 @@ extension DefaultSecurityServiceTests {
             credentials,
             forId: id.uuidString
         )
-        
+
         return repository
     }
-    
+
     /// Helper to validate repository access
     func validateRepositoryAccess(_ repository: Repository) async throws -> Bool {
-        return try await service.validateRepositoryAccess(repository.url)
+        try await service.validateRepositoryAccess(repository.url)
     }
-    
+
     /// Helper to clean up test URLs
     func cleanupTestURLs(_ urls: URL...) {
-        urls.forEach { url in
+        for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
     }

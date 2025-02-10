@@ -8,20 +8,20 @@ public struct XPCQueuedMessage: Identifiable {
     var retryCount: Int
     var lastAttempt: Date?
     var status: MessageStatus
-    
+
     public enum MessageStatus {
         case pending
         case inProgress
         case completed
         case failed(Error)
     }
-    
+
     init(command: XPCCommandConfig) {
-        self.id = UUID()
+        id = UUID()
         self.command = command
-        self.createdAt = Date()
-        self.retryCount = 0
-        self.status = .pending
+        createdAt = Date()
+        retryCount = 0
+        status = .pending
     }
 }
 
@@ -29,17 +29,17 @@ public struct XPCQueuedMessage: Identifiable {
 @available(macOS 13.0, *)
 public actor XPCMessageQueue {
     // MARK: - Properties
-    
+
     private var messages: [XPCQueuedMessage]
     private let maxRetries: Int
     private let retryDelay: TimeInterval
     private let logger: LoggerProtocol
-    
+
     /// Current health status
     private(set) var currentStatus: XPCHealthStatus
-    
+
     // MARK: - Initialization
-    
+
     /// Initializes a new XPC message queue
     /// - Parameters:
     ///   - maxRetries: Maximum number of retries for failed messages
@@ -53,12 +53,12 @@ public actor XPCMessageQueue {
         self.maxRetries = maxRetries
         self.retryDelay = retryDelay
         self.logger = logger
-        self.currentStatus = .unknown
-        self.messages = []
+        currentStatus = .unknown
+        messages = []
     }
-    
+
     // MARK: - Queue Management
-    
+
     /// Enqueue a new command for execution
     /// - Parameter command: The command configuration to queue
     /// - Returns: The ID of the queued message
@@ -68,14 +68,14 @@ public actor XPCMessageQueue {
         logger.debug("Enqueued message \(message.id)", privacy: .public)
         return message.id
     }
-    
+
     /// Get the next pending message for processing
     /// - Returns: The next message to process, if any
     public func nextPendingMessage() -> XPCQueuedMessage? {
         guard let index = messages.firstIndex(where: { $0.status == .pending }) else {
             return nil
         }
-        
+
         // Check if message is in progress
         if case .inProgress = messages[index].status {
             let msgId = messages[index].id
@@ -85,7 +85,7 @@ public actor XPCMessageQueue {
             )
             return nil
         }
-        
+
         // Check if message is completed
         if case .completed = messages[index].status {
             let msgId = messages[index].id
@@ -95,12 +95,12 @@ public actor XPCMessageQueue {
             )
             return nil
         }
-        
+
         messages[index].status = .inProgress
         messages[index].lastAttempt = Date()
         return messages[index]
     }
-    
+
     /// Handle completion of a message
     /// - Parameters:
     ///   - id: The message ID
@@ -110,21 +110,21 @@ public actor XPCMessageQueue {
             logger.error("Message \(id) not found for completion", privacy: .public)
             return
         }
-        
-        if let error = error {
+
+        if let error {
             handleMessageFailure(at: index, error: error)
         } else {
             messages[index].status = .completed
             logger.debug("Message \(id) completed successfully", privacy: .public)
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func handleMessageFailure(at index: Int, error: Error) {
         messages[index].retryCount += 1
         let msgId = messages[index].id
-        
+
         if messages[index].retryCount >= maxRetries {
             messages[index].status = .failed(error)
             logger.error(
@@ -139,21 +139,22 @@ public actor XPCMessageQueue {
             )
         }
     }
-    
+
     /// Clean up completed and failed messages
     public func cleanup() {
         messages.removeAll { message in
             switch message.status {
-            case .completed, .failed:
-                return true
+            case .completed,
+                 .failed:
+                true
             default:
-                return false
+                false
             }
         }
     }
-    
+
     // MARK: - Queue Status
-    
+
     /// Represents the current status of the message queue
     public struct QueueStatus {
         /// Number of pending messages
@@ -165,7 +166,7 @@ public actor XPCMessageQueue {
         /// Number of failed messages
         public let failed: Int
     }
-    
+
     /// Get the current queue status
     /// - Returns: Current status of the message queue
     public func queueStatus() async -> QueueStatus {
@@ -173,7 +174,7 @@ public actor XPCMessageQueue {
         var inProgress = 0
         var completed = 0
         var failed = 0
-        
+
         for message in messages {
             switch message.status {
             case .pending:
@@ -186,7 +187,7 @@ public actor XPCMessageQueue {
                 failed += 1
             }
         }
-        
+
         return QueueStatus(
             pending: pending,
             inProgress: inProgress,

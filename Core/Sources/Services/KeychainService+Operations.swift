@@ -1,9 +1,9 @@
 import Foundation
 import Security
 
-extension KeychainService {
+public extension KeychainService {
     // MARK: - Operations
-    
+
     /// Saves data to the keychain.
     ///
     /// - Parameters:
@@ -11,7 +11,7 @@ extension KeychainService {
     ///   - key: The key to save the data under
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Throws: KeychainError if save fails
-    public func save(_ data: Data, for key: String, accessGroup: String? = nil) throws {
+    func save(_ data: Data, for key: String, accessGroup: String? = nil) throws {
         try queue.sync {
             var query = baseQuery(for: key, accessGroup: accessGroup)
             query[kSecValueData as String] = data
@@ -39,7 +39,7 @@ extension KeychainService {
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Returns: The retrieved data, or nil if not found
     /// - Throws: KeychainError if retrieval fails
-    public func retrieve(for key: String, accessGroup: String? = nil) throws -> Data? {
+    func retrieve(for key: String, accessGroup: String? = nil) throws -> Data? {
         try queue.sync {
             var query = baseQuery(for: key, accessGroup: accessGroup)
             query[kSecReturnData as String] = true
@@ -68,7 +68,7 @@ extension KeychainService {
     ///   - key: The key to delete data for
     ///   - accessGroup: Optional access group for sharing keychain items
     /// - Throws: KeychainError if deletion fails
-    public func delete(for key: String, accessGroup: String? = nil) throws {
+    func delete(for key: String, accessGroup: String? = nil) throws {
         try queue.sync {
             let query = baseQuery(for: key, accessGroup: accessGroup)
             let status = SecItemDelete(query as CFDictionary)

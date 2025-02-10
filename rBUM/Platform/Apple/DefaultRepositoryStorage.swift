@@ -1,16 +1,3 @@
-//
-//  DefaultRepositoryStorage.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 02/02/2025.
-//
-
 import Core
 import Foundation
 
@@ -39,9 +26,9 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
         self.logger = logger
         self.securityService = securityService
         self.minimumRequiredSpace = minimumRequiredSpace
-        self.encoder = JSONEncoder()
-        self.encoder.outputFormatting = .prettyPrinted
-        self.decoder = JSONDecoder()
+        encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        decoder = JSONDecoder()
 
         if let url = storageURL {
             self.storageURL = url
@@ -67,7 +54,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     func save(_ repository: Repository) async throws {
         logger.debug("Saving repository", metadata: [
             "id": .string(repository.id.uuidString),
-            "name": .string(repository.name)
+            "name": .string(repository.name),
         ])
 
         try await validateRepository(repository)
@@ -78,11 +65,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try data.write(to: fileURL, options: .atomic)
 
             logger.info("Saved repository successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to save repository", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.saveFailed(error)
         }
@@ -107,7 +94,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
                     } catch {
                         logger.error("Failed to load repository", metadata: [
                             "path": .string(url.path),
-                            "error": .string(error.localizedDescription)
+                            "error": .string(error.localizedDescription),
                         ])
                         return nil
                     }
@@ -115,13 +102,13 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
             logger.info("Loaded repositories", metadata: [
-                "count": .string("\(repositories.count)")
+                "count": .string("\(repositories.count)"),
             ])
             return repositories
 
         } catch {
             logger.error("Failed to load repositories", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.loadFailed(error)
         }
@@ -130,7 +117,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     func delete(_ repository: Repository) async throws {
         logger.debug("Deleting repository", metadata: [
             "id": .string(repository.id.uuidString),
-            "name": .string(repository.name)
+            "name": .string(repository.name),
         ])
 
         do {
@@ -138,11 +125,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try fileManager.removeItem(at: fileURL)
 
             logger.info("Deleted repository successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to delete repository", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.deleteFailed(error)
         }
@@ -151,7 +138,7 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
     func updateStatus(_ repository: Repository, status: RepositoryStatus) async throws {
         logger.debug("Updating repository status", metadata: [
             "id": .string(repository.id.uuidString),
-            "status": .string("\(status)")
+            "status": .string("\(status)"),
         ])
 
         do {
@@ -161,11 +148,11 @@ final class DefaultRepositoryStorage: RepositoryStorageProtocol {
             try await save(updated)
 
             logger.info("Updated repository status successfully", metadata: [
-                "id": .string(repository.id.uuidString)
+                "id": .string(repository.id.uuidString),
             ])
         } catch {
             logger.error("Failed to update repository status", metadata: [
-                "error": .string(error.localizedDescription)
+                "error": .string(error.localizedDescription),
             ])
             throw RepositoryError.updateFailed(error)
         }

@@ -1,11 +1,3 @@
-//
-//  RepositoryListViewModel.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 import os.log
@@ -124,15 +116,15 @@ final class RepositoryListViewModel: ObservableObject {
         case accessDenied(String)
         case securityRequirementsFailed(String)
         case refreshFailed(String)
-        
+
         var errorDescription: String? {
             switch self {
-            case .accessDenied(let message):
-                return "Access denied: \(message)"
-            case .securityRequirementsFailed(let message):
-                return "Security requirements failed: \(message)"
-            case .refreshFailed(let message):
-                return "Refresh failed: \(message)"
+            case let .accessDenied(message):
+                "Access denied: \(message)"
+            case let .securityRequirementsFailed(message):
+                "Security requirements failed: \(message)"
+            case let .refreshFailed(message):
+                "Refresh failed: \(message)"
             }
         }
     }

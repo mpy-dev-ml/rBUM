@@ -1,11 +1,3 @@
-//
-//  ServiceFactory.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 import Foundation
 
 /// Factory for creating services with appropriate implementations based on build configuration
@@ -38,7 +30,7 @@ import Foundation
 /// 4. Manages service lifecycles
 public enum ServiceFactory {
     // MARK: - Properties
-    
+
     /// Development configuration for debug builds
     static let developmentConfiguration = DevelopmentConfiguration()
 }

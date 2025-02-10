@@ -3,7 +3,7 @@ import Foundation
 
 extension ResticCommandService {
     // MARK: - Command Building
-    
+
     /// Builds command arguments for a Restic command.
     ///
     /// - Parameters:
@@ -17,16 +17,16 @@ extension ResticCommandService {
     ) async throws -> [String] {
         switch command {
         case .init:
-            return try await buildInitArguments(for: repository)
+            try await buildInitArguments(for: repository)
         case .backup:
-            return try await buildBackupArguments(for: repository)
+            try await buildBackupArguments(for: repository)
         case .restore:
-            return try await buildRestoreArguments(for: repository)
+            try await buildRestoreArguments(for: repository)
         case .list:
-            return try await buildListArguments(for: repository)
+            try await buildListArguments(for: repository)
         }
     }
-    
+
     /// Builds command environment variables.
     ///
     /// - Parameters:
@@ -41,43 +41,43 @@ extension ResticCommandService {
         additional: [String: String]? = nil
     ) async throws -> [String: String] {
         var environment = [String: String]()
-        
+
         // Add repository path
         environment["RESTIC_REPOSITORY"] = repository.path
-        
+
         // Add credentials
         environment["RESTIC_PASSWORD"] = credentials.password
         if !credentials.username.isEmpty {
             environment["RESTIC_USERNAME"] = credentials.username
         }
-        
+
         // Add additional variables
-        if let additional = additional {
+        if let additional {
             environment.merge(additional) { current, _ in current }
         }
-        
+
         return environment
     }
-    
+
     // MARK: - Private Command Building
-    
+
     private func buildInitArguments(for repository: Repository) async throws -> [String] {
         var arguments = ["init"]
-        
+
         // Add repository path
         arguments.append(repository.path)
-        
+
         return arguments
     }
-    
+
     private func buildBackupArguments(for repository: Repository) async throws -> [String] {
         var arguments = ["backup"]
-        
+
         // Add source paths
         if let sources = repository.settings.backupSources {
             arguments.append(contentsOf: sources)
         }
-        
+
         // Add exclude patterns
         if let excludes = repository.settings.excludePatterns {
             for pattern in excludes {
@@ -85,7 +85,7 @@ extension ResticCommandService {
                 arguments.append(pattern)
             }
         }
-        
+
         // Add tags
         if let tags = repository.settings.tags {
             for tag in tags {
@@ -93,19 +93,19 @@ extension ResticCommandService {
                 arguments.append(tag)
             }
         }
-        
+
         return arguments
     }
-    
+
     private func buildRestoreArguments(for repository: Repository) async throws -> [String] {
         var arguments = ["restore", "latest"]
-        
+
         // Add target directory
         if let target = repository.settings.restoreTarget {
             arguments.append("--target")
             arguments.append(target)
         }
-        
+
         // Add include patterns
         if let includes = repository.settings.includePatterns {
             for pattern in includes {
@@ -113,22 +113,22 @@ extension ResticCommandService {
                 arguments.append(pattern)
             }
         }
-        
+
         return arguments
     }
-    
+
     private func buildListArguments(for repository: Repository) async throws -> [String] {
         var arguments = ["snapshots"]
-        
+
         // Add JSON output format
         arguments.append("--json")
-        
+
         // Add path filter
         if let path = repository.settings.pathFilter {
             arguments.append("--path")
             arguments.append(path)
         }
-        
+
         // Add tag filter
         if let tags = repository.settings.tags {
             for tag in tags {
@@ -136,7 +136,7 @@ extension ResticCommandService {
                 arguments.append(tag)
             }
         }
-        
+
         return arguments
     }
 }

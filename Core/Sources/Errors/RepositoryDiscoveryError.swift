@@ -48,46 +48,46 @@ import Foundation
 public enum RepositoryDiscoveryError: LocalizedError {
     /// Access to the specified location was denied
     case accessDenied(URL)
-    
+
     /// The specified location is not accessible
     case locationNotAccessible(URL)
-    
+
     /// Invalid repository structure found
     case invalidRepository(URL)
-    
+
     /// Repository verification failed
     case verificationFailed(URL, String)
-    
+
     /// General error during discovery
     case discoveryFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .accessDenied(let url):
-            return "Access denied to location: \(url.path)"
-        case .locationNotAccessible(let url):
-            return "Location not accessible: \(url.path)"
-        case .invalidRepository(let url):
-            return "Invalid repository structure at: \(url.path)"
-        case .verificationFailed(let url, let reason):
-            return "Repository verification failed at \(url.path): \(reason)"
-        case .discoveryFailed(let reason):
-            return "Repository discovery failed: \(reason)"
+        case let .accessDenied(url):
+            "Access denied to location: \(url.path)"
+        case let .locationNotAccessible(url):
+            "Location not accessible: \(url.path)"
+        case let .invalidRepository(url):
+            "Invalid repository structure at: \(url.path)"
+        case let .verificationFailed(url, reason):
+            "Repository verification failed at \(url.path): \(reason)"
+        case let .discoveryFailed(reason):
+            "Repository discovery failed: \(reason)"
         }
     }
-    
+
     public var recoverySuggestion: String? {
         switch self {
         case .accessDenied:
-            return "Please ensure you have appropriate permissions and try again."
+            "Please ensure you have appropriate permissions and try again."
         case .locationNotAccessible:
-            return "Please check if the location exists and is accessible."
+            "Please check if the location exists and is accessible."
         case .invalidRepository:
-            return "The location does not contain a valid Restic repository structure."
+            "The location does not contain a valid Restic repository structure."
         case .verificationFailed:
-            return "Please ensure the repository is not corrupted and try again."
+            "Please ensure the repository is not corrupted and try again."
         case .discoveryFailed:
-            return "Please try the operation again. If the problem persists, check the logs for more details."
+            "Please try the operation again. If the problem persists, check the logs for more details."
         }
     }
 }

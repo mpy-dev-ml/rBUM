@@ -1,19 +1,6 @@
-//
-//  LoggerFactoryTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
-@testable import Core
 import os.log
 import XCTest
+@testable import Core
 
 final class LoggerFactoryTests: XCTestCase {
     // MARK: - Properties
@@ -47,7 +34,7 @@ final class LoggerFactoryTests: XCTestCase {
         XCTAssertNotNil(logger1)
         XCTAssertNotNil(logger2)
 
-        for loggerIndex in 0..<5 {
+        for loggerIndex in 0 ..< 5 {
             let logger = factory.createLogger(category: "test\(loggerIndex)")
             XCTAssertNotNil(logger)
         }

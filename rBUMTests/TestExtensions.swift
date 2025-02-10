@@ -1,14 +1,6 @@
-//
-//  TestExtensions.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension XCTestCase {
     /// Waits for a condition to be true with a timeout
@@ -28,7 +20,7 @@ extension XCTestCase {
         defer { timer.invalidate() }
         wait(for: [expectation], timeout: timeout)
     }
-    
+
     /// Asserts that a closure throws an error
     /// - Parameters:
     ///   - expectedError: The expected error type

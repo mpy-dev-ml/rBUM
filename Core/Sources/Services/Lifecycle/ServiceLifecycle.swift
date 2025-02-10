@@ -1,16 +1,3 @@
-//
-//  ServiceLifecycle.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// Service lifecycle management framework for rBUM.
@@ -27,11 +14,11 @@ import Foundation
 /// class MyService: LifecycleManaged, LoggingService {
 ///     private(set) var state: ServiceState = .uninitialized
 ///     let logger: LoggerProtocol
-///     
+///
 ///     init(logger: LoggerProtocol) {
 ///         self.logger = logger
 ///     }
-///     
+///
 ///     func performOperation() throws {
 ///         try validateUsable(for: "performOperation")
 ///         // Perform operation
@@ -107,10 +94,12 @@ public extension LifecycleManaged where Self: LoggingService {
     ///
     /// - Throws: Any error that occurs during initialisation
     func initialize() async throws {
-        logger.info("Initialising service...",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.info(
+            "Initialising service...",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // Override in concrete implementations
     }
 
@@ -118,10 +107,12 @@ public extension LifecycleManaged where Self: LoggingService {
     /// Concrete implementations should override this method to add
     /// their specific shutdown logic.
     func shutdown() async {
-        logger.info("Shutting down service...",
-                    file: #file,
-                    function: #function,
-                    line: #line)
+        logger.info(
+            "Shutting down service...",
+            file: #file,
+            function: #function,
+            line: #line
+        )
         // Override in concrete implementations
     }
 }

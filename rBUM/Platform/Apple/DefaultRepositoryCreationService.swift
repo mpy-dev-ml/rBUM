@@ -1,22 +1,10 @@
-//
-//  DefaultRepositoryCreationService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 02/02/2025.
-//
-
 import Core
 import Foundation
 
 /// Service for creating and managing default repository locations on macOS
 public final class DefaultRepositoryCreationService: BaseSandboxedService, DefaultRepositoryCreationProtocol,
-    HealthCheckable {
+    HealthCheckable
+{
     // MARK: - Properties
 
     private let bookmarkService: BookmarkServiceProtocol

@@ -1,16 +1,3 @@
-//
-//  BackupViewModel.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Core
 import Foundation
 import os.log
@@ -81,7 +68,7 @@ final class BackupViewModel: ObservableObject {
         self.securityService = securityService
         self.bookmarkService = bookmarkService
         self.logger = logger
-        self.configuration = BackupConfiguration()
+        configuration = BackupConfiguration()
     }
 }
 
@@ -255,7 +242,7 @@ extension BackupViewModel {
     }
 
     private func validateConfiguration() async throws {
-        guard let configuration = configuration else {
+        guard let configuration else {
             throw BackupError.missingConfiguration("No backup configuration")
         }
 
@@ -282,10 +269,10 @@ extension BackupViewModel {
     }
 
     private func validateCompressionSettings() async throws -> Bool {
-        guard let configuration = configuration else { return false }
+        guard let configuration else { return false }
 
         // Check compression level
-        guard (1...9).contains(configuration.settings.compressionLevel) else {
+        guard (1 ... 9).contains(configuration.settings.compressionLevel) else {
             return false
         }
 
@@ -299,7 +286,7 @@ extension BackupViewModel {
     }
 
     private func validateEncryptionSettings() async throws -> Bool {
-        guard let configuration = configuration else { return false }
+        guard let configuration else { return false }
 
         // Check encryption key
         guard !configuration.settings.encryptionKey.isEmpty else {
@@ -315,7 +302,7 @@ extension BackupViewModel {
     }
 
     private func validateScheduleSettings() async throws -> Bool {
-        guard let configuration = configuration else { return false }
+        guard let configuration else { return false }
 
         // Check schedule interval
         guard configuration.schedule?.interval > 0 else {
@@ -339,7 +326,8 @@ extension BackupViewModel {
     private func performBackupOperation() async throws {
         guard let repository = configuration.repository,
               let source = configuration.sources.first,
-              let configuration = configuration else {
+              let configuration
+        else {
             throw BackupError.invalidState("Missing required state")
         }
 
@@ -391,7 +379,7 @@ extension BackupViewModel {
             logger.debug("Backup progress updated", metadata: [
                 "processed_files": .string("\(backupProgress.processedFiles)"),
                 "processed_bytes": .string("\(backupProgress.processedBytes)"),
-                "percent_complete": .string("\(backupProgress.percentComplete)")
+                "percent_complete": .string("\(backupProgress.percentComplete)"),
             ])
         }
     }
@@ -440,7 +428,7 @@ extension BackupViewModel {
                 Line: \(#line)
                 """,
                 metadata: [
-                    "error": .string("\(error)")
+                    "error": .string("\(error)"),
                 ]
             )
             showError = true
@@ -454,7 +442,7 @@ extension BackupViewModel {
             // Log completion
             logger.info("Backup completed successfully", metadata: [
                 "repository": .string(configuration.repository?.id.uuidString ?? "unknown"),
-                "source": .string(configuration.sources.first?.url.path ?? "unknown")
+                "source": .string(configuration.sources.first?.url.path ?? "unknown"),
             ])
         }
     }

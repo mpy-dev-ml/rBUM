@@ -1,13 +1,13 @@
 import Foundation
 import Security
 
-extension KeychainService {
+public extension KeychainService {
     // MARK: - Health Check
-    
+
     /// Performs a health check on the keychain service.
     ///
     /// - Returns: True if the service is healthy
-    public func performHealthCheck() async -> Bool {
+    func performHealthCheck() async -> Bool {
         logger.info(
             "Performing keychain health check",
             file: #file,

@@ -1,11 +1,3 @@
-//
-//  DevelopmentSecurityService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 import os.log
 
@@ -13,16 +5,16 @@ import os.log
 @objc public class DevelopmentConfiguration: NSObject {
     /// Whether to simulate permission request failures
     @objc public let shouldSimulatePermissionFailures: Bool
-    
+
     /// Whether to simulate bookmark failures
     @objc public let shouldSimulateBookmarkFailures: Bool
-    
+
     /// Whether to simulate access failures
     @objc public let shouldSimulateAccessFailures: Bool
-    
+
     /// Artificial delay to add to operations (in seconds)
     @objc public let artificialDelay: TimeInterval
-    
+
     /// Initialize a new development configuration
     /// - Parameters:
     ///   - shouldSimulatePermissionFailures: Whether to simulate permission failures
@@ -41,13 +33,13 @@ import os.log
         self.artificialDelay = artificialDelay
         super.init()
     }
-    
+
     /// Default configuration for development environment
     ///
     /// Returns a `DevelopmentConfiguration` instance with default settings for
     /// simulating security operations in a development environment.
     @objc public static var `default`: DevelopmentConfiguration {
-        return DevelopmentConfiguration()
+        DevelopmentConfiguration()
     }
 }
 
@@ -57,34 +49,34 @@ import os.log
     // MARK: - Properties
 
     /// Logger instance for recording security-related events
-    internal let logger: LoggerProtocol
-    
+    let logger: LoggerProtocol
+
     /// Configuration for controlling development behavior
     private let configuration: DevelopmentConfiguration
-    
+
     /// Serial queue for synchronising access to shared resources
-    internal let queue = DispatchQueue(label: "dev.mpy.rbum.security")
+    let queue = DispatchQueue(label: "dev.mpy.rbum.security")
 
     /// Dictionary mapping URLs to their security-scoped bookmark data
-    internal var bookmarks: [URL: Data] = [:]
+    var bookmarks: [URL: Data] = [:]
 
     /// Metrics collector for tracking security operations
-    internal let metrics: SecurityMetrics
+    let metrics: SecurityMetrics
 
     /// Recorder for logging security operations
-    internal let operationRecorder: SecurityOperationRecorder
+    let operationRecorder: SecurityOperationRecorder
 
     /// Simulator for controlling operation behaviour
-    internal let simulator: SecuritySimulator
+    let simulator: SecuritySimulator
 
     /// File manager for file system operations
-    internal let fileManager: FileManager
-    
+    let fileManager: FileManager
+
     /// Bookmark service for managing security-scoped bookmarks
-    internal let bookmarkService: BookmarkServiceProtocol
-    
+    let bookmarkService: BookmarkServiceProtocol
+
     /// Keychain service for secure storage
-    internal let keychainService: KeychainServiceProtocol
+    let keychainService: KeychainServiceProtocol
 
     // MARK: - Initialization
 
@@ -104,20 +96,20 @@ import os.log
         self.bookmarkService = bookmarkService
         self.keychainService = keychainService
         self.configuration = configuration
-        self.fileManager = FileManager.default
-        
+        fileManager = FileManager.default
+
         // Initialize development tools
-        self.metrics = SecurityMetrics(logger: logger as! Logger)
-        self.operationRecorder = SecurityOperationRecorder(logger: logger as! Logger)
-        self.simulator = SecuritySimulator(
+        metrics = SecurityMetrics(logger: logger as! Logger)
+        operationRecorder = SecurityOperationRecorder(logger: logger as! Logger)
+        simulator = SecuritySimulator(
             logger: logger as! Logger,
             configuration: configuration
         )
         super.init()
     }
-    
+
     // MARK: - SecurityServiceProtocol
-    
+
     /// Requests permission for accessing a URL
     ///
     /// Simulates a permission request and returns the result.
@@ -127,20 +119,20 @@ import os.log
     /// - Throws: `SecurityError` if permission is denied
     @objc public func requestPermission(for url: URL) async throws -> Bool {
         try await simulator.simulateDelay()
-        
+
         if configuration.shouldSimulateAccessFailures {
             throw SecurityError.permissionDenied("Permission denied (simulated)")
         }
-        
+
         operationRecorder.recordOperation(
             url: url,
             type: SecurityOperationType.permission,
             status: SecurityOperationStatus.success
         )
-        
+
         return true
     }
-    
+
     /// Creates a security-scoped bookmark for a URL
     ///
     /// Simulates bookmark creation and returns the bookmark data.
@@ -150,28 +142,28 @@ import os.log
     /// - Throws: `SecurityError` if bookmark creation fails
     @objc public func createBookmark(for url: URL) throws -> Data {
         try simulator.simulateDelay()
-        
+
         if configuration.shouldSimulateBookmarkFailures {
             throw SecurityError.bookmarkCreationFailed("Bookmark creation failed (simulated)")
         }
-        
+
         let bookmark = try url.bookmarkData(
             options: .withSecurityScope,
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
-        
+
         bookmarks[url] = bookmark
-        
+
         operationRecorder.recordOperation(
             url: url,
             type: SecurityOperationType.bookmark,
             status: SecurityOperationStatus.success
         )
-        
+
         return bookmark
     }
-    
+
     /// Validates a security-scoped bookmark for a URL
     ///
     /// Simulates bookmark validation and returns the result.
@@ -182,23 +174,23 @@ import os.log
     /// - Throws: `SecurityError` if bookmark validation fails
     @objc public func validateBookmark(_ bookmark: Data, for url: URL) throws -> Bool {
         try simulator.simulateDelay()
-        
+
         if configuration.shouldSimulateBookmarkFailures {
             throw SecurityError.bookmarkInvalid("Bookmark validation failed (simulated)")
         }
-        
+
         let isValid = bookmarks[url] == bookmark
-        
+
         operationRecorder.recordOperation(
             url: url,
             type: SecurityOperationType.bookmark,
             status: isValid ? SecurityOperationStatus.success : SecurityOperationStatus.failure,
             error: isValid ? nil : "Bookmark mismatch"
         )
-        
+
         return isValid
     }
-    
+
     /// Starts accessing a URL
     ///
     /// Simulates starting access to a URL.
@@ -207,18 +199,18 @@ import os.log
     /// - Throws: `SecurityError` if access is denied
     @objc public func startAccessing(_ url: URL) throws {
         try simulator.simulateDelay()
-        
+
         if configuration.shouldSimulateAccessFailures {
             throw SecurityError.accessDenied("Access denied (simulated)")
         }
-        
+
         operationRecorder.recordOperation(
             url: url,
             type: SecurityOperationType.access,
             status: SecurityOperationStatus.success
         )
     }
-    
+
     /// Stops accessing a URL
     ///
     /// Simulates stopping access to a URL.

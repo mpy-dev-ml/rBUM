@@ -6,7 +6,7 @@ import Security
 /// Extension providing resource management capabilities for DefaultSecurityService
 extension DefaultSecurityService {
     // MARK: - Resource Management
-    
+
     /// Starts accessing a security-scoped resource.
     ///
     /// - Parameter url: The URL of the resource to access
@@ -14,24 +14,24 @@ extension DefaultSecurityService {
     public func startAccessing(_ url: URL) async throws -> Bool {
         let id = UUID()
         let type: SecurityOperationType = .startAccess
-        
+
         return try await withOperation(id: id, type: type) {
             // Check if we have permission
             guard try await checkSecurityScopedAccess(to: url) else {
                 return false
             }
-            
+
             // Start accessing resource
             guard url.startAccessingSecurityScopedResource() else {
                 return false
             }
-            
+
             // Monitor resource access
             sandboxMonitor.monitorAccess(to: url)
             return true
         }
     }
-    
+
     /// Stops accessing a security-scoped resource.
     ///
     /// - Parameter url: The URL of the resource to stop accessing
@@ -39,7 +39,7 @@ extension DefaultSecurityService {
         url.stopAccessingSecurityScopedResource()
         sandboxMonitor.stopMonitoring(url)
     }
-    
+
     /// Performs an operation with proper resource management.
     ///
     /// - Parameters:
@@ -47,18 +47,18 @@ extension DefaultSecurityService {
     ///   - type: Type of security operation being performed
     ///   - operation: The operation to perform
     /// - Returns: The result of the operation
-    internal func withOperation<T>(
+    func withOperation<T>(
         id: UUID,
         type: SecurityOperationType,
         operation: () async throws -> T
     ) async throws -> T {
         // Record operation start
         try await recordOperationStart(id: id, type: type)
-        
+
         do {
             // Perform operation
             let result = try await operation()
-            
+
             // Record successful completion
             try await recordOperationEnd(id: id, type: type, error: nil)
             return result
@@ -68,7 +68,7 @@ extension DefaultSecurityService {
             throw error
         }
     }
-    
+
     /// Records the start of a security operation.
     ///
     /// - Parameters:
@@ -78,7 +78,7 @@ extension DefaultSecurityService {
         accessQueue.async(flags: .barrier) {
             self.activeOperations.insert(id)
         }
-        
+
         logger.info(
             "Starting security operation: \(type)",
             metadata: ["operationId": "\(id)"],
@@ -87,7 +87,7 @@ extension DefaultSecurityService {
             line: #line
         )
     }
-    
+
     /// Records the end of a security operation.
     ///
     /// - Parameters:
@@ -102,8 +102,8 @@ extension DefaultSecurityService {
         accessQueue.async(flags: .barrier) {
             self.activeOperations.remove(id)
         }
-        
-        if let error = error {
+
+        if let error {
             logger.error(
                 "Security operation failed: \(type), Error: \(error)",
                 metadata: ["operationId": "\(id)"],

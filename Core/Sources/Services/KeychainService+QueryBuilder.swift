@@ -3,7 +3,7 @@ import Security
 
 extension KeychainService {
     // MARK: - Query Building
-    
+
     /// Builds a base keychain query.
     ///
     /// - Parameters:
@@ -16,7 +16,7 @@ extension KeychainService {
             kSecAttrService as String: "dev.mpy.rBUM",
             kSecAttrAccount as String: key,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-            kSecAttrSynchronizable as String: false
+            kSecAttrSynchronizable as String: false,
         ]
 
         if let accessGroup {

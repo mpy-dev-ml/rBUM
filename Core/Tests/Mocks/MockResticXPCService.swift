@@ -1,11 +1,3 @@
-//
-//  MockResticXPCService.swift
-//  Core
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 /// A mock XPC service used for testing and initialization to break circular dependencies
@@ -26,7 +18,7 @@ public final class MockResticXPCService: NSObject, ResticXPCServiceProtocol {
     public private(set) var usedPassword: String?
     public var snapshotsToReturn: [String] = []
 
-    public override init() {
+    override public init() {
         super.init()
     }
 

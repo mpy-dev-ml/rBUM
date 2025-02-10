@@ -1,11 +1,3 @@
-//
-//  MockLoggerExtensions.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 
@@ -23,7 +15,7 @@ extension MockLogger {
         self.metadata.append(metadata ?? [:])
         privacyLevels.append(privacy)
     }
-    
+
     /// Verifies that a message was logged
     func verifyMessageLogged(
         _ message: String,
@@ -33,13 +25,13 @@ extension MockLogger {
         guard let index = messages.firstIndex(of: message) else {
             return false
         }
-        
+
         if let expectedMetadata = metadata {
             guard self.metadata[index] == expectedMetadata else {
                 return false
             }
         }
-        
+
         return privacyLevels[index] == privacy
     }
 }

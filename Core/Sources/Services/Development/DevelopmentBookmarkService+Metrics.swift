@@ -1,11 +1,3 @@
-//
-//  DevelopmentBookmarkService+Metrics.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 // MARK: - Metrics Extension

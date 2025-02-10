@@ -1,11 +1,3 @@
-//
-//  TestValidationUtilities.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 
@@ -18,22 +10,22 @@ enum TestValidationUtilities {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return false
         }
-        
+
         let requiredFiles = [
             "config",
             "data",
             "index",
             "keys",
-            "snapshots"
+            "snapshots",
         ]
-        
+
         return requiredFiles.allSatisfy { file in
             FileManager.default.fileExists(
                 atPath: url.appendingPathComponent(file).path
             )
         }
     }
-    
+
     /// Validates that a backup operation completed successfully
     /// - Parameters:
     ///   - sourceURL: The source directory URL
@@ -49,39 +41,39 @@ enum TestValidationUtilities {
             includingPropertiesForKeys: nil,
             options: .skipsHiddenFiles
         )
-        
+
         // Get backup files
         let backupFiles = try FileManager.default.contentsOfDirectory(
             at: backupURL,
             includingPropertiesForKeys: nil,
             options: .skipsHiddenFiles
         )
-        
+
         // Compare file counts
         guard sourceFiles.count == backupFiles.count else {
             return false
         }
-        
+
         // Compare file contents
         for sourceFile in sourceFiles {
             let fileName = sourceFile.lastPathComponent
             let backupFile = backupURL.appendingPathComponent(fileName)
-            
+
             guard FileManager.default.fileExists(atPath: backupFile.path) else {
                 return false
             }
-            
+
             let sourceData = try Data(contentsOf: sourceFile)
             let backupData = try Data(contentsOf: backupFile)
-            
+
             guard sourceData == backupData else {
                 return false
             }
         }
-        
+
         return true
     }
-    
+
     /// Validates that a file has the expected content
     /// - Parameters:
     ///   - url: The URL of the file to validate

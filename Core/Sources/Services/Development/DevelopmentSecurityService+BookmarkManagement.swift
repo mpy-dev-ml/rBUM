@@ -1,20 +1,12 @@
-//
-//  DevelopmentSecurityService+BookmarkManagement.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 import os.log
 
 // Import security-related models
 @_implementationOnly import struct Core.SecurityMetrics
 @_implementationOnly import struct Core.SecurityOperationRecorder
-@_implementationOnly import struct Core.SecuritySimulator
-@_implementationOnly import enum Core.SecurityOperationType
 @_implementationOnly import enum Core.SecurityOperationStatus
+@_implementationOnly import enum Core.SecurityOperationType
+@_implementationOnly import struct Core.SecuritySimulator
 
 @available(macOS 13.0, *)
 public extension DevelopmentSecurityService {
@@ -101,7 +93,7 @@ public extension DevelopmentSecurityService {
             bookmarkDataIsStale: &isStale
         )
 
-        if let url = url, resolvedURL != url {
+        if let url, resolvedURL != url {
             throw SecurityError.bookmarkResolutionFailed("URL mismatch")
         }
 

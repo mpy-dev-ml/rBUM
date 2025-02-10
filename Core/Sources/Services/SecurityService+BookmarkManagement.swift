@@ -2,7 +2,7 @@ import Foundation
 
 extension SecurityService {
     // MARK: - Bookmark Management
-    
+
     /// Get active bookmark for a URL
     /// - Parameter url: URL to get bookmark for
     /// - Returns: Bookmark data if available
@@ -27,7 +27,7 @@ extension SecurityService {
     func removeActiveBookmark(for url: URL) {
         _ = bookmarkQueue.sync { activeBookmarks.removeValue(forKey: url) }
     }
-    
+
     /// Create a security-scoped bookmark for a URL
     /// - Parameter url: URL to create bookmark for
     /// - Returns: Bookmark data
@@ -101,7 +101,7 @@ extension SecurityService {
             throw SecurityError.bookmarkResolutionFailed(error.localizedDescription)
         }
     }
-    
+
     /// Persist access to a URL by creating and storing a bookmark
     /// - Parameter url: URL to persist access for
     /// - Returns: Created bookmark data

@@ -1,14 +1,6 @@
-//
-//  FileTestHelpers.swift
-//  rBUMTests
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension XCTestCase {
     func createTemporaryFile(
@@ -20,7 +12,7 @@ extension XCTestCase {
         try content.write(to: tempURL, atomically: true, encoding: .utf8)
         return tempURL
     }
-    
+
     func createTemporaryDirectory() throws -> URL {
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

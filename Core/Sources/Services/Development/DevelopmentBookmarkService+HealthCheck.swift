@@ -1,11 +1,3 @@
-//
-//  DevelopmentBookmarkService+HealthCheck.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 // MARK: - HealthCheck Extension
@@ -27,14 +19,14 @@ public extension DevelopmentBookmarkService {
                     "avg_access_time": String(format: "%.3f", metrics.averageAccessTime),
                     "memory_usage": "\(metrics.resourceUsage.memoryUsage)",
                     "disk_usage": "\(metrics.resourceUsage.diskUsage)",
-                    "cpu_usage": String(format: "%.1f", metrics.resourceUsage.cpuUsage)
+                    "cpu_usage": String(format: "%.1f", metrics.resourceUsage.cpuUsage),
                 ]
             )
         }
 
         logger.debug("Health check completed", metadata: [
             "status": "\(status.isHealthy)",
-            "details": "\(status.details)"
+            "details": "\(status.details)",
         ])
 
         return status

@@ -16,7 +16,7 @@ extension BackupService {
         case sourceAccessDenied
         case destinationAccessDenied
         case executionFailed(Error)
-        
+
         public var errorDescription: String? {
             switch self {
             case .invalidRepository:
@@ -37,7 +37,7 @@ extension BackupService {
                 "Access denied to source directory"
             case .destinationAccessDenied:
                 "Access denied to destination directory"
-            case .executionFailed(let error):
+            case let .executionFailed(error):
                 "Backup execution failed: \(error.localizedDescription)"
             }
         }

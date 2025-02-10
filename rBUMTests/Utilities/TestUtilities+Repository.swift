@@ -1,6 +1,6 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Repository Test Utilities
 
@@ -39,7 +39,7 @@ extension XCTestCase {
             repository.location.appendingPathComponent("data"),
             repository.location.appendingPathComponent("snapshots"),
             repository.location.appendingPathComponent("keys"),
-            repository.location.appendingPathComponent("index")
+            repository.location.appendingPathComponent("index"),
         ]
 
         for directory in directories {
@@ -84,7 +84,8 @@ extension XCTestCase {
         while let url = enumerator?.nextObject() as? URL {
             var isDirectory: ObjCBool = false
             if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory),
-               !isDirectory.boolValue {
+               !isDirectory.boolValue
+            {
                 try fileManager.removeItem(at: url)
             }
         }

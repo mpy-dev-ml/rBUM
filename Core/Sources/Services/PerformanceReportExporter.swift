@@ -10,17 +10,17 @@ public struct PerformanceReportExporter {
         case json
         /// Portable Document Format
         case pdf
-        
+
         /// File extension for the format
         var fileExtension: String {
             switch self {
-            case .csv: return "csv"
-            case .json: return "json"
-            case .pdf: return "pdf"
+            case .csv: "csv"
+            case .json: "json"
+            case .pdf: "pdf"
             }
         }
     }
-    
+
     /// Export configuration options
     public struct ExportConfig {
         /// Whether to include alerts in the export
@@ -31,7 +31,7 @@ public struct PerformanceReportExporter {
         public let timeZone: TimeZone
         /// Format string for dates in the export
         public let dateFormat: String
-        
+
         /// Initialises a new export configuration
         /// - Parameters:
         ///   - includeAlerts: Whether to include alerts (default: true)
@@ -50,16 +50,16 @@ public struct PerformanceReportExporter {
             self.dateFormat = dateFormat
         }
     }
-    
+
     private let dateFormatter: DateFormatter
-    
+
     /// Initialises a new performance report exporter
     /// - Parameter timeZone: Time zone for date formatting (default: current)
     public init(timeZone: TimeZone = .current) {
-        self.dateFormatter = DateFormatter()
-        self.dateFormatter.timeZone = timeZone
+        dateFormatter = DateFormatter()
+        dateFormatter.timeZone = timeZone
     }
-    
+
     /// Export performance report to specified format
     /// - Parameters:
     ///   - report: Performance report to export
@@ -75,7 +75,7 @@ public struct PerformanceReportExporter {
     ) throws -> Data {
         dateFormatter.dateFormat = config.dateFormat
         dateFormatter.timeZone = config.timeZone
-        
+
         switch format {
         case .csv:
             return try exportToCSV(report: report, alerts: alerts, config: config)
@@ -85,9 +85,9 @@ public struct PerformanceReportExporter {
             return try exportToPDF(report: report, alerts: alerts, config: config)
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func exportToCSV(
         report: PerformanceReport,
         alerts: [PerformanceAlert],
@@ -95,7 +95,7 @@ public struct PerformanceReportExporter {
     ) throws -> Data {
         var csvString = "Performance Report\n"
         csvString += "Period: \(formatDate(report.period.start)) - \(formatDate(report.period.end))\n\n"
-        
+
         // Summary Statistics
         csvString += "Summary Statistics\n"
         csvString += "Average Operation Duration (ms),\(report.statistics.averageOperationDuration)\n"
@@ -106,30 +106,30 @@ public struct PerformanceReportExporter {
         csvString += "Average Backup Speed (B/s),\(report.statistics.averageBackupSpeed)\n"
         csvString += "Total Operations,\(report.statistics.totalOperations)\n"
         csvString += "Failed Operations,\(report.statistics.failedOperations)\n\n"
-        
+
         if config.includeRawMetrics {
             csvString += "\nRaw Metrics\n"
             csvString += "Timestamp,Metric,Value,Unit\n"
-            report.metrics.forEach { metric in
+            for metric in report.metrics {
                 let timestamp = formatDate(metric.timestamp)
                 csvString += "\(timestamp),\(metric.name),\(metric.value),\(metric.unit.description)\n"
             }
         }
-        
-        if config.includeAlerts && !alerts.isEmpty {
+
+        if config.includeAlerts, !alerts.isEmpty {
             csvString += "\nPerformance Alerts\n"
             csvString += "Timestamp,Severity,Type,Message\n"
-            alerts.forEach { alert in
+            for alert in alerts {
                 let timestamp = formatDate(alert.timestamp)
                 let severity = String(describing: alert.severity)
                 let type = alert.type.localizedDescription
                 csvString += "\(timestamp),\(severity),\(type),\(alert.message)\n"
             }
         }
-        
+
         return csvString.data(using: .utf8) ?? Data()
     }
-    
+
     private func exportToJSON(
         report: PerformanceReport,
         alerts: [PerformanceAlert],
@@ -138,7 +138,7 @@ public struct PerformanceReportExporter {
         var json: [String: Any] = [
             "period": [
                 "start": formatDate(report.period.start),
-                "end": formatDate(report.period.end)
+                "end": formatDate(report.period.end),
             ],
             "statistics": [
                 "averageOperationDuration": report.statistics.averageOperationDuration,
@@ -148,10 +148,10 @@ public struct PerformanceReportExporter {
                 "peakCPUUsage": report.statistics.peakCPUUsage,
                 "averageBackupSpeed": report.statistics.averageBackupSpeed,
                 "totalOperations": report.statistics.totalOperations,
-                "failedOperations": report.statistics.failedOperations
-            ]
+                "failedOperations": report.statistics.failedOperations,
+            ],
         ]
-        
+
         if config.includeRawMetrics {
             json["metrics"] = report.metrics.map { metric in
                 [
@@ -159,29 +159,29 @@ public struct PerformanceReportExporter {
                     "name": metric.name,
                     "value": metric.value,
                     "unit": metric.unit.description,
-                    "metadata": metric.metadata ?? [:]
+                    "metadata": metric.metadata ?? [:],
                 ]
             }
         }
-        
-        if config.includeAlerts && !alerts.isEmpty {
+
+        if config.includeAlerts, !alerts.isEmpty {
             json["alerts"] = alerts.map { alert in
                 [
                     "timestamp": formatDate(alert.timestamp),
                     "severity": String(describing: alert.severity),
                     "type": alert.type.localizedDescription,
                     "message": alert.message,
-                    "context": alert.context
+                    "context": alert.context,
                 ]
             }
         }
-        
+
         return try JSONSerialization.data(
             withJSONObject: json,
             options: [.prettyPrinted, .sortedKeys]
         )
     }
-    
+
     private func exportToPDF(
         report: PerformanceReport,
         alerts: [PerformanceAlert],
@@ -192,7 +192,7 @@ public struct PerformanceReportExporter {
         let content = """
         Performance Report
         Period: \(formatDate(report.period.start)) - \(formatDate(report.period.end))
-        
+
         Summary Statistics:
         - Average Operation Duration: \(report.statistics.averageOperationDuration) ms
         - Operation Success Rate: \(report.statistics.operationSuccessRate)%
@@ -203,24 +203,24 @@ public struct PerformanceReportExporter {
         - Total Operations: \(report.statistics.totalOperations)
         - Failed Operations: \(report.statistics.failedOperations)
         """
-        
+
         return content.data(using: .utf8) ?? Data()
     }
-    
+
     private func formatDate(_ date: Date) -> String {
-        return dateFormatter.string(from: date)
+        dateFormatter.string(from: date)
     }
-    
+
     private func formatBytes(_ bytes: UInt64) -> String {
         let units = ["B", "KB", "MB", "GB", "TB"]
         var value = Double(bytes)
         var unitIndex = 0
-        
-        while value > 1024 && unitIndex < units.count - 1 {
+
+        while value > 1024, unitIndex < units.count - 1 {
             value /= 1024
             unitIndex += 1
         }
-        
+
         return String(format: "%.2f %@", value, units[unitIndex])
     }
 }

@@ -1,11 +1,3 @@
-//
-//  DevelopmentXPCService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 import Foundation
 
 /// Development mock implementation of ResticXPCProtocol
@@ -102,14 +94,14 @@ import Foundation
         if simulateConnectionFailureIfNeeded(completion: completion) {
             return
         }
-        
+
         if simulateTimeoutIfNeeded(completion: completion) {
             return
         }
-        
+
         handleCommand(config, completion: completion)
     }
-    
+
     /// Execute a command through XPC using individual parameters
     /// - Parameters:
     ///   - command: The command to execute
@@ -142,41 +134,41 @@ import Foundation
             timeout: timeout,
             auditSessionId: auditSessionId
         )
-        
+
         executeCommand(config: config, completion: completion)
     }
-    
+
     private func handleCommand(
         _ config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
     ) {
         logCommandExecution(config)
-        
+
         queue.async {
             self.processCommand(config, completion: completion)
         }
     }
-    
+
     private func processCommand(
         _ config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
     ) {
         simulateArtificialDelay()
         simulateExecutionTime()
-        
+
         if shouldSimulateTimeout(config) {
             handleTimeout(config, completion: completion)
             return
         }
-        
+
         if configuration.shouldSimulateCommandFailures {
             handleCommandFailure(config, completion: completion)
             return
         }
-        
+
         handleSuccessfulExecution(config, completion: completion)
     }
-    
+
     private func logCommandExecution(_ config: XPCCommandConfig) {
         logger.debug(
             """
@@ -191,21 +183,21 @@ import Foundation
             line: #line
         )
     }
-    
+
     private func simulateArtificialDelay() {
         if configuration.artificialDelay > 0 {
             Thread.sleep(forTimeInterval: configuration.artificialDelay)
         }
     }
-    
+
     private func simulateExecutionTime() {
         Thread.sleep(forTimeInterval: configuration.commandExecutionTime)
     }
-    
+
     private func shouldSimulateTimeout(_ config: XPCCommandConfig) -> Bool {
-        return config.command.contains("timeout")
+        config.command.contains("timeout")
     }
-    
+
     private func handleTimeout(
         _ config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
@@ -218,7 +210,7 @@ import Foundation
         )
         completion(nil)
     }
-    
+
     private func handleCommandFailure(
         _ config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
@@ -232,10 +224,10 @@ import Foundation
         completion([
             "success": false,
             "error": "Simulated command failure",
-            "exitCode": 1
+            "exitCode": 1,
         ])
     }
-    
+
     private func handleSuccessfulExecution(
         _ config: XPCCommandConfig,
         completion: @escaping ([String: Any]?) -> Void
@@ -249,7 +241,7 @@ import Foundation
         completion([
             "success": true,
             "output": "Simulated command output",
-            "exitCode": 0
+            "exitCode": 0,
         ])
     }
 
@@ -337,16 +329,16 @@ import Foundation
 @objc public class ExecutionConfig: NSObject {
     /// The command to execute
     @objc public let command: String
-    
+
     /// Arguments for the command
     @objc public let arguments: [String]
-    
+
     /// Environment variables
     @objc public let environment: [String: String]
-    
+
     /// Working directory for command execution
     @objc public let workingDirectory: URL
-    
+
     @objc public init(
         command: String,
         arguments: [String],
@@ -372,7 +364,7 @@ enum DevelopmentXPCError: LocalizedError {
     case connectionFailed
     case sandboxViolation
     case securityError
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidCommand:

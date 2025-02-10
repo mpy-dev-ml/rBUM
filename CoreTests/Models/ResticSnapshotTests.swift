@@ -1,28 +1,15 @@
-//
-//  ResticSnapshotTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
-@testable import Core
 import Testing
+@testable import Core
 
 struct ResticSnapshotTests {
     // MARK: - Properties
 
-    let sampleDate = Date(timeIntervalSince1970: 1707469339) // Fixed date for testing
+    let sampleDate = Date(timeIntervalSince1970: 1_707_469_339) // Fixed date for testing
     let sampleTags = ["test", "backup", "important"]
     let samplePaths = ["/path/to/backup", "/another/path"]
     let sampleSize: UInt64 = 1024 * 1024 // 1MB
     let sampleRepoId = "test-repo-id"
-    
+
     var snapshot: ResticSnapshot {
         ResticSnapshot(
             id: "test-snapshot-id",
@@ -40,8 +27,8 @@ struct ResticSnapshotTests {
 
     @Test
     func testSnapshotInitialization() {
-        let snapshot = self.snapshot
-        
+        let snapshot = snapshot
+
         #expect(snapshot.id == "test-snapshot-id")
         #expect(snapshot.time == sampleDate)
         #expect(snapshot.hostname == "test-host")
@@ -55,7 +42,7 @@ struct ResticSnapshotTests {
 
     @Test
     func testSnapshotEquality() {
-        let snapshot1 = self.snapshot
+        let snapshot1 = snapshot
         let snapshot2 = ResticSnapshot(
             id: "test-snapshot-id",
             time: sampleDate,
@@ -66,9 +53,9 @@ struct ResticSnapshotTests {
             size: sampleSize,
             repositoryId: sampleRepoId
         )
-        
+
         #expect(snapshot1 == snapshot2)
-        
+
         // Test inequality
         let differentSnapshot = ResticSnapshot(
             id: "different-id",
@@ -80,7 +67,7 @@ struct ResticSnapshotTests {
             size: sampleSize,
             repositoryId: sampleRepoId
         )
-        
+
         #expect(snapshot1 != differentSnapshot)
     }
 
@@ -94,11 +81,11 @@ struct ResticSnapshotTests {
             "paths": ["/json/test/path"],
             "parent": "json-parent-id",
             "size": UInt64(2048),
-            "repository_id": "json-repo-id"
+            "repository_id": "json-repo-id",
         ]
-        
+
         let snapshot = try ResticSnapshot(json: json)
-        
+
         #expect(snapshot.id == "json-test-id")
         #expect(snapshot.hostname == "json-test-host")
         #expect(snapshot.tags == ["json", "test"])
@@ -113,9 +100,9 @@ struct ResticSnapshotTests {
         let invalidJSON: [String: Any] = [
             "id": "test-id",
             // Missing required fields
-            "hostname": "test-host"
+            "hostname": "test-host",
         ]
-        
+
         #expect(throws: DecodingError.self) {
             _ = try ResticSnapshot(json: invalidJSON)
         }
@@ -124,19 +111,19 @@ struct ResticSnapshotTests {
     @Test
     func testNSCoding() {
         let originalSnapshot = snapshot
-        
+
         // Archive
         let data = try! NSKeyedArchiver.archivedData(
             withRootObject: originalSnapshot,
             requiringSecureCoding: true
         )
-        
+
         // Unarchive
         let unarchivedSnapshot = try! NSKeyedUnarchiver.unarchivedObject(
             of: ResticSnapshot.self,
             from: data
         )
-        
+
         #expect(unarchivedSnapshot != nil)
         #expect(unarchivedSnapshot?.id == originalSnapshot.id)
         #expect(unarchivedSnapshot?.time == originalSnapshot.time)
@@ -150,9 +137,9 @@ struct ResticSnapshotTests {
 
     @Test
     func testDescription() {
-        let snapshot = self.snapshot
+        let snapshot = snapshot
         let description = snapshot.description
-        
+
         #expect(description.contains("Snapshot test-sna"))
         #expect(description.contains("Host: test-host"))
         #expect(description.contains("1 MB")) // Size formatting

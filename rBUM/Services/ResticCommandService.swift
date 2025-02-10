@@ -1,16 +1,3 @@
-//
-//  ResticCommandService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Core
 import Foundation
 
@@ -76,7 +63,7 @@ public final class ResticCommandService: BaseSandboxedService, ResticServiceProt
             repository: Repository(url: URL(string: "default")!),
             credentials: RepositoryCredentials(username: "default", password: UUID().uuidString)
         )
-        return result.output.snapshots.map { $0.id }
+        return result.output.snapshots.map(\.id)
     }
 
     public func restore(from source: URL, to destination: URL) async throws {
@@ -111,27 +98,27 @@ public enum ResticCommandError: LocalizedError {
     case insufficientPermissions
     case operationNotFound
     case operationFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .resticNotInstalled:
-            return "Restic is not installed"
+            "Restic is not installed"
         case .repositoryNotFound:
-            return "Repository not found"
+            "Repository not found"
         case .repositoryExists:
-            return "Repository already exists"
-        case .invalidRepository(let message):
-            return "Invalid repository: \(message)"
-        case .invalidSettings(let message):
-            return "Invalid settings: \(message)"
-        case .invalidCredentials(let message):
-            return "Invalid credentials: \(message)"
+            "Repository already exists"
+        case let .invalidRepository(message):
+            "Invalid repository: \(message)"
+        case let .invalidSettings(message):
+            "Invalid settings: \(message)"
+        case let .invalidCredentials(message):
+            "Invalid credentials: \(message)"
         case .insufficientPermissions:
-            return "Insufficient permissions"
+            "Insufficient permissions"
         case .operationNotFound:
-            return "Operation not found"
-        case .operationFailed(let message):
-            return "Operation failed: \(message)"
+            "Operation not found"
+        case let .operationFailed(message):
+            "Operation failed: \(message)"
         }
     }
 }
@@ -142,7 +129,7 @@ struct Repository {
     let id = UUID()
     let url: URL?
     let tags: [String] = []
-    let settings: RepositorySettings = RepositorySettings()
+    let settings: RepositorySettings = .init()
 }
 
 // MARK: - RepositorySettings
@@ -174,7 +161,7 @@ struct RepositoryCredentials {
     let password: String
 }
 
-extension ResticCommandService {
+public extension ResticCommandService {
     // MARK: - HealthCheckable Implementation
 
     /// Performs a health check on the Restic command service.
@@ -183,7 +170,7 @@ extension ResticCommandService {
     /// 2. The service can execute basic restic commands
     /// 3. All required resources are accessible
     /// - Returns: A boolean indicating whether the service is healthy
-    public func performHealthCheck() async -> Bool {
+    func performHealthCheck() async -> Bool {
         await measure("Restic Command Service Health Check") {
             do {
                 // Check XPC service

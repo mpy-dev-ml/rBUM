@@ -72,7 +72,7 @@ public final class ProgressTracker: ProgressTrackerProtocol {
 
         let userInfo: [String: Any] = [
             "operationId": operationId,
-            "progress": progress
+            "progress": progress,
         ]
 
         notificationCenter.post(
@@ -91,7 +91,7 @@ public final class ProgressTracker: ProgressTrackerProtocol {
 
         let userInfo: [String: Any] = [
             "operationId": operationId,
-            "error": error
+            "error": error,
         ]
 
         notificationCenter.post(

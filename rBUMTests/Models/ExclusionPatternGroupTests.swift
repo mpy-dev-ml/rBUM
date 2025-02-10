@@ -1,5 +1,5 @@
-@testable import rBUM
 import XCTest
+@testable import rBUM
 
 final class ExclusionPatternGroupTests: XCTestCase {
     func testPatternGroups() throws {
@@ -12,22 +12,22 @@ final class ExclusionPatternGroupTests: XCTestCase {
             patterns: [
                 ExclusionPattern(pattern: "node_modules", isDirectory: true, groupId: groupId),
                 ExclusionPattern(pattern: "*.pyc", groupId: groupId),
-                ExclusionPattern(pattern: ".git", isDirectory: true, groupId: groupId)
+                ExclusionPattern(pattern: ".git", isDirectory: true, groupId: groupId),
             ]
         )
-        
+
         // When creating a configuration with the group
         let config = try BackupConfiguration(
             name: "Test Backup",
             sources: [URL(fileURLWithPath: "/tmp")],
             exclusionPatternGroups: [group]
         )
-        
+
         // Then the group should be accessible
         XCTAssertEqual(config.exclusionPatternGroups.count, 1)
         XCTAssertEqual(config.exclusionPatternGroups.first?.name, "Development Files")
     }
-    
+
     func testPatternGroupValidation() throws {
         // When creating a group with no patterns
         XCTAssertThrowsError(
@@ -39,7 +39,7 @@ final class ExclusionPatternGroupTests: XCTestCase {
             XCTAssertTrue(error is ConfigurationError)
             XCTAssertTrue(error.localizedDescription.contains("must contain at least one pattern"))
         }
-        
+
         // When creating a group with an empty name
         XCTAssertThrowsError(
             try ExclusionPatternGroup(

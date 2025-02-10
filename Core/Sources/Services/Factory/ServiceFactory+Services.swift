@@ -1,12 +1,12 @@
 import Foundation
 
-extension ServiceFactory {
+public extension ServiceFactory {
     // MARK: - Service Creation
-    
+
     /// Create security service with appropriate implementation
     /// - Parameter logger: Logger for the service
     /// - Returns: SecurityServiceProtocol implementation
-    public static func createSecurityService(logger: LoggerProtocol) -> SecurityServiceProtocol {
+    static func createSecurityService(logger: LoggerProtocol) -> SecurityServiceProtocol {
         #if DEBUG
             return configuration.developmentEnabled
                 ? DevelopmentSecurityService(
@@ -22,7 +22,7 @@ extension ServiceFactory {
     /// Create keychain service with appropriate implementation
     /// - Parameter logger: Logger for the service
     /// - Returns: KeychainServiceProtocol implementation
-    public static func createKeychainService(logger: LoggerProtocol) -> KeychainServiceProtocol {
+    static func createKeychainService(logger: LoggerProtocol) -> KeychainServiceProtocol {
         #if DEBUG
             return configuration.developmentEnabled
                 ? DevelopmentKeychainService(
@@ -41,7 +41,7 @@ extension ServiceFactory {
     ///   - securityService: Security service dependency
     ///   - keychainService: Keychain service dependency
     /// - Returns: BookmarkServiceProtocol implementation
-    public static func createBookmarkService(
+    static func createBookmarkService(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         keychainService: KeychainServiceProtocol
@@ -71,7 +71,7 @@ extension ServiceFactory {
     ///   - logger: Logger for the service
     ///   - securityService: Security service dependency
     /// - Returns: ResticXPCProtocol implementation
-    public static func createXPCService(
+    static func createXPCService(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol
     ) -> ResticXPCProtocol {
@@ -97,14 +97,14 @@ extension ServiceFactory {
                 )
         #endif
     }
-    
+
     /// Create backup service with appropriate implementation
     /// - Parameters:
     ///   - logger: Logger for the service
     ///   - securityService: Security service dependency
     ///   - xpcService: XPC service dependency
     /// - Returns: BackupServiceProtocol implementation
-    public static func createBackupService(
+    static func createBackupService(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         xpcService: ResticXPCProtocol
@@ -115,14 +115,14 @@ extension ServiceFactory {
             xpcService: xpcService
         )
     }
-    
+
     /// Create restore service with appropriate implementation
     /// - Parameters:
     ///   - logger: Logger for the service
     ///   - securityService: Security service dependency
     ///   - xpcService: XPC service dependency
     /// - Returns: RestoreServiceProtocol implementation
-    public static func createRestoreService(
+    static func createRestoreService(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         xpcService: ResticXPCProtocol
@@ -133,14 +133,14 @@ extension ServiceFactory {
             xpcService: xpcService
         )
     }
-    
+
     /// Create Restic command service with appropriate implementation
     /// - Parameters:
     ///   - logger: Logger for the service
     ///   - securityService: Security service dependency
     ///   - xpcService: XPC service dependency
     /// - Returns: ResticCommandServiceProtocol implementation
-    public static func createResticCommandService(
+    static func createResticCommandService(
         logger: LoggerProtocol,
         securityService: SecurityServiceProtocol,
         xpcService: ResticXPCProtocol

@@ -1,14 +1,14 @@
 import AppKit
 import Foundation
 
-extension SecurityService {
+public extension SecurityService {
     // MARK: - Access Control
-    
+
     /// Request user permission to access a URL through a system dialog
     /// - Parameter url: URL to request permission for
     /// - Returns: True if permission was granted, false otherwise
     @MainActor
-    public func requestPermission(for url: URL) async throws -> Bool {
+    func requestPermission(for url: URL) async throws -> Bool {
         logger.debug(
             "Requesting permission for: \(url.path)",
             file: #file,
@@ -51,12 +51,12 @@ extension SecurityService {
             return false
         }
     }
-    
+
     /// Start accessing a security-scoped URL
     /// - Parameter url: URL to start accessing
     /// - Returns: True if access was started successfully
     /// - Throws: SecurityError if access cannot be started
-    public func startAccessing(_ url: URL) throws -> Bool {
+    func startAccessing(_ url: URL) throws -> Bool {
         logger.debug(
             "Starting access for: \(url.path)",
             file: #file,
@@ -69,7 +69,7 @@ extension SecurityService {
     /// Stop accessing a security-scoped URL
     /// - Parameter url: URL to stop accessing
     /// - Throws: SecurityError if access cannot be stopped
-    public func stopAccessing(_ url: URL) async throws {
+    func stopAccessing(_ url: URL) async throws {
         logger.debug(
             "Stopping access for: \(url.path)",
             file: #file,
@@ -83,7 +83,7 @@ extension SecurityService {
     /// - Parameter url: URL to validate access for
     /// - Returns: True if access is valid
     /// - Throws: SecurityError if validation fails
-    public func validateAccess(to url: URL) async throws -> Bool {
+    func validateAccess(to url: URL) async throws -> Bool {
         logger.debug(
             "Validating access to: \(url.path)",
             file: #file,

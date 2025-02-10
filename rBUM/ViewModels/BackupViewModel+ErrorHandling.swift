@@ -15,7 +15,7 @@ extension BackupViewModel {
             """,
             metadata: [
                 "error": .string("\(error)"),
-                "operation": .string(currentOperation?.rawValue ?? "unknown")
+                "operation": .string(currentOperation?.rawValue ?? "unknown"),
             ]
         )
 
@@ -47,22 +47,22 @@ enum BackupError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingSource(let message):
-            return "Missing source: \(message)"
-        case .invalidSource(let message):
-            return "Invalid source: \(message)"
-        case .duplicateSource(let message):
-            return "Duplicate source: \(message)"
-        case .missingRepository(let message):
-            return "Missing repository: \(message)"
-        case .invalidRepository(let message):
-            return "Invalid repository: \(message)"
-        case .missingCredentials(let message):
-            return "Missing credentials: \(message)"
-        case .invalidSettings(let message):
-            return "Invalid settings: \(message)"
-        case .backupFailed(let message):
-            return "Backup failed: \(message)"
+        case let .missingSource(message):
+            "Missing source: \(message)"
+        case let .invalidSource(message):
+            "Invalid source: \(message)"
+        case let .duplicateSource(message):
+            "Duplicate source: \(message)"
+        case let .missingRepository(message):
+            "Missing repository: \(message)"
+        case let .invalidRepository(message):
+            "Invalid repository: \(message)"
+        case let .missingCredentials(message):
+            "Missing credentials: \(message)"
+        case let .invalidSettings(message):
+            "Invalid settings: \(message)"
+        case let .backupFailed(message):
+            "Backup failed: \(message)"
         }
     }
 }

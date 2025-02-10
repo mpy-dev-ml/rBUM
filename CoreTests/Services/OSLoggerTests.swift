@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-@testable import Core
 import os.log
 import Testing
+@testable import Core
 
 struct OSLoggerTests {
     let subsystem = "dev.mpy.rBUM.tests"

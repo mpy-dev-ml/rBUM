@@ -3,14 +3,14 @@ import Foundation
 /// Service for managing backup configurations
 public actor BackupConfigurationService {
     // MARK: - Properties
-    
+
     private let logger: LoggerProtocol
     private let fileManager: FileManagerProtocol
     private let storage: BackupConfigurationStorageProtocol
     private var activeConfigurations: [BackupConfiguration] = []
-    
+
     // MARK: - Initialization
-    
+
     /// Initialise the backup configuration service
     /// - Parameters:
     ///   - logger: Logger for service operations
@@ -25,16 +25,16 @@ public actor BackupConfigurationService {
         self.fileManager = fileManager
         self.storage = storage
     }
-    
+
     /// Load saved configurations
     public func loadConfigurations() async throws {
         logger.debug("Loading saved configurations", privacy: .public)
         activeConfigurations = try await storage.loadConfigurations()
         logger.debug("Loaded \(activeConfigurations.count) configurations", privacy: .public)
     }
-    
+
     // MARK: - Configuration Management
-    
+
     /// Create a new backup configuration
     /// - Parameters:
     ///   - name: Name of the backup configuration
@@ -57,7 +57,7 @@ public actor BackupConfigurationService {
         repository: Repository? = nil
     ) async throws -> BackupConfiguration {
         logger.debug("Creating backup configuration: \(name)", privacy: .public)
-        
+
         // Create the configuration
         let configuration = try BackupConfiguration(
             name: name,
@@ -69,17 +69,17 @@ public actor BackupConfigurationService {
             verifyAfterBackup: verifyAfterBackup,
             repository: repository
         )
-        
+
         // Store the configuration
         activeConfigurations.append(configuration)
-        
+
         // Save to persistent storage
         try await storage.saveConfigurations(activeConfigurations)
-        
+
         logger.debug("Created backup configuration with ID: \(configuration.id)", privacy: .public)
         return configuration
     }
-    
+
     /// Start accessing sources for a backup configuration
     /// - Parameter configurationId: ID of the configuration to start accessing
     /// - Throws: Error if configuration not found or access cannot be started
@@ -88,11 +88,11 @@ public actor BackupConfigurationService {
             logger.error("Configuration not found: \(configurationId)", privacy: .public)
             throw BackupConfigurationError.configurationNotFound(configurationId)
         }
-        
+
         logger.debug("Starting access for configuration: \(configurationId)", privacy: .public)
         try activeConfigurations[index].startAccessing()
     }
-    
+
     /// Stop accessing sources for a backup configuration
     /// - Parameter configurationId: ID of the configuration to stop accessing
     public func stopAccessing(configurationId: UUID) async {
@@ -100,17 +100,17 @@ public actor BackupConfigurationService {
             logger.warning("Configuration not found for stopping access: \(configurationId)", privacy: .public)
             return
         }
-        
+
         logger.debug("Stopping access for configuration: \(configurationId)", privacy: .public)
         activeConfigurations[index].stopAccessing()
     }
-    
+
     /// Get all backup configurations
     /// - Returns: Array of backup configurations
     public func getConfigurations() async -> [BackupConfiguration] {
-        return activeConfigurations
+        activeConfigurations
     }
-    
+
     /// Get a specific backup configuration
     /// - Parameter id: ID of the configuration to get
     /// - Returns: The backup configuration if found
@@ -127,11 +127,11 @@ public actor BackupConfigurationService {
 /// Errors that can occur when working with backup configurations
 public enum BackupConfigurationError: LocalizedError {
     case configurationNotFound(UUID)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .configurationNotFound(let id):
-            return "Backup configuration not found with ID: \(id)"
+        case let .configurationNotFound(id):
+            "Backup configuration not found with ID: \(id)"
         }
     }
 }

@@ -1,16 +1,3 @@
-//
-//  RepositoryListView.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import SwiftUI
 
 struct RepositoryListView: View {
@@ -124,7 +111,7 @@ private class PreviewCredentialsManager: KeychainCredentialsManagerProtocol {
 
     func list() async throws -> [(repositoryId: String, credentials: RepositoryCredentials)] {
         [
-            ("mock-id", RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password"))
+            ("mock-id", RepositoryCredentials(repositoryPath: "/mock/path", password: "mock-password")),
         ]
     }
 

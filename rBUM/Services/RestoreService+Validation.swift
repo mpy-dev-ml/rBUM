@@ -4,7 +4,7 @@ import Foundation
 @RestoreActor
 extension RestoreService {
     // MARK: - Validation
-    
+
     /// Validates restore prerequisites.
     ///
     /// - Parameters:
@@ -19,16 +19,16 @@ extension RestoreService {
     ) async throws {
         // Validate snapshot
         try await validateSnapshot(snapshot, in: repository)
-        
+
         // Validate target
         try await validateTarget(URL(fileURLWithPath: target))
-        
+
         // Verify permissions
         guard try await verifyPermissions(for: URL(fileURLWithPath: target)) else {
             throw RestoreError.insufficientPermissions
         }
     }
-    
+
     /// Validates a snapshot.
     ///
     /// - Parameters:
@@ -44,13 +44,13 @@ extension RestoreService {
         guard snapshots.contains(where: { $0.id == snapshot.id }) else {
             throw RestoreError.snapshotNotFound
         }
-        
+
         // Check if snapshot is accessible
         guard try await resticService.check(repository) else {
             throw RestoreError.snapshotInaccessible
         }
     }
-    
+
     /// Validates a restore target.
     ///
     /// - Parameter url: The target URL to validate
@@ -62,7 +62,7 @@ extension RestoreService {
             guard try await fileManager.isWritable(at: url) else {
                 throw RestoreError.targetNotWritable
             }
-            
+
             // Check if target has enough space
             guard try await hasEnoughSpace(at: url, snapshot: snapshot) else {
                 throw RestoreError.insufficientSpace
@@ -73,18 +73,18 @@ extension RestoreService {
             guard try await fileManager.fileExists(at: parent) else {
                 throw RestoreError.targetNotFound
             }
-            
+
             guard try await fileManager.isWritable(at: parent) else {
                 throw RestoreError.targetNotWritable
             }
-            
+
             // Check if parent has enough space
             guard try await hasEnoughSpace(at: parent, snapshot: snapshot) else {
                 throw RestoreError.insufficientSpace
             }
         }
     }
-    
+
     /// Verifies permissions for a URL.
     ///
     /// - Parameter url: The URL to verify permissions for
@@ -96,10 +96,10 @@ extension RestoreService {
             // Request permission if we don't have it
             return try await securityService.requestAccess(to: url)
         }
-        
+
         return true
     }
-    
+
     /// Checks if there is enough space at a URL.
     ///
     /// - Parameter url: The URL to check space at
@@ -109,12 +109,12 @@ extension RestoreService {
     private func hasEnoughSpace(at url: URL, snapshot: ResticSnapshot) async throws -> Bool {
         // Get available space
         let available = try await fileManager.availableSpace(at: url)
-        
+
         // Calculate required space with a safety margin
         let snapshotSize = snapshot.stats.totalSize
-        let safetyMargin: Double = 1.1 // 10% extra space for safety
+        let safetyMargin = 1.1 // 10% extra space for safety
         let required = UInt64(Double(snapshotSize) * safetyMargin)
-        
+
         return available >= required
     }
 }

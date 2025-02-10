@@ -1,14 +1,6 @@
-//
-//  TestHelpers.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Test Helpers
 
@@ -39,8 +31,8 @@ extension XCTestCase {
 extension XCTestCase {
     static func generateTestData(size: Int = 1024) -> Data {
         var data = Data(count: size)
-        for index in 0..<size {
-            data[index] = UInt8.random(in: 0...255)
+        for index in 0 ..< size {
+            data[index] = UInt8.random(in: 0 ... 255)
         }
         return data
     }

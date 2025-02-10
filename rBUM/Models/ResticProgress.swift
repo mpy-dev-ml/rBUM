@@ -28,9 +28,13 @@ public enum ResticBackupStatus: Codable {
 
     public var isActive: Bool {
         switch self {
-        case .preparing, .backing, .finalising:
+        case .preparing,
+             .backing,
+             .finalising:
             true
-        case .completed, .failed, .cancelled:
+        case .completed,
+             .failed,
+             .cancelled:
             false
         }
     }

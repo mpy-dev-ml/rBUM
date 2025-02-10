@@ -73,7 +73,7 @@ public final class BookmarkPersistenceService: BaseSandboxedService, BookmarkPer
                     includingResourceValuesForKeys: [
                         .isDirectoryKey,
                         .volumeURLKey,
-                        .volumeNameKey
+                        .volumeNameKey,
                     ],
                     relativeTo: nil
                 )

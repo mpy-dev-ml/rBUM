@@ -1,11 +1,3 @@
-//
-//  SystemResources.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Foundation
 
 /// A class that encapsulates system resource information.
@@ -27,24 +19,24 @@ import Foundation
 /// ```
 @objc public class SystemResources: NSObject, NSSecureCoding {
     // MARK: - Properties
-    
+
     /// Available system memory in bytes
     @objc public let availableMemory: UInt64
-    
+
     /// Available disk space in bytes
     @objc public let availableDiskSpace: UInt64
-    
+
     /// CPU usage as a percentage (0-100)
     @objc public let cpuUsagePercentage: Double
-    
+
     /// System load averages for 1, 5, and 15 minutes
     @objc public let systemLoad: [Double]
-    
+
     /// Whether this class supports secure coding
     public static var supportsSecureCoding: Bool { true }
-    
+
     // MARK: - Initialization
-    
+
     /// Creates a new SystemResources instance.
     ///
     /// - Parameters:
@@ -64,9 +56,9 @@ import Foundation
         self.systemLoad = systemLoad.map { max($0, 0) }
         super.init()
     }
-    
+
     // MARK: - NSSecureCoding
-    
+
     /// Creates a SystemResources instance from an NSCoder.
     ///
     /// - Parameter coder: The NSCoder to decode from
@@ -77,14 +69,14 @@ import Foundation
         ) as? [Double] else {
             return nil
         }
-        
-        self.availableMemory = UInt64(coder.decodeInt64(forKey: "availableMemory"))
-        self.availableDiskSpace = UInt64(coder.decodeInt64(forKey: "availableDiskSpace"))
-        self.cpuUsagePercentage = coder.decodeDouble(forKey: "cpuUsagePercentage")
+
+        availableMemory = UInt64(coder.decodeInt64(forKey: "availableMemory"))
+        availableDiskSpace = UInt64(coder.decodeInt64(forKey: "availableDiskSpace"))
+        cpuUsagePercentage = coder.decodeDouble(forKey: "cpuUsagePercentage")
         self.systemLoad = systemLoad
         super.init()
     }
-    
+
     /// Encodes the SystemResources instance to an NSCoder.
     ///
     /// - Parameter coder: The NSCoder to encode to
@@ -94,9 +86,9 @@ import Foundation
         coder.encode(cpuUsagePercentage, forKey: "cpuUsagePercentage")
         coder.encode(systemLoad as NSArray, forKey: "systemLoad")
     }
-    
+
     // MARK: - Helpers
-    
+
     /// Returns a string representation of available memory.
     ///
     /// - Returns: A formatted string with memory size and unit
@@ -106,7 +98,7 @@ import Foundation
             countStyle: .memory
         )
     }
-    
+
     /// Returns a string representation of available disk space.
     ///
     /// - Returns: A formatted string with disk space size and unit
@@ -116,14 +108,14 @@ import Foundation
             countStyle: .file
         )
     }
-    
+
     /// Returns a string representation of CPU usage.
     ///
     /// - Returns: A formatted string with CPU usage percentage
     @objc public func formattedCPUUsage() -> String {
         String(format: "%.1f%%", cpuUsagePercentage)
     }
-    
+
     /// Returns a string representation of system load.
     ///
     /// - Returns: A formatted string with load averages

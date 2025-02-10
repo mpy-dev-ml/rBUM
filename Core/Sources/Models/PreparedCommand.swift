@@ -11,16 +11,16 @@ import Foundation
 @objc public class PreparedCommand: NSObject {
     /// The command to execute
     @objc public let command: String
-    
+
     /// Arguments to pass to the command
     @objc public let arguments: [String]
-    
+
     /// Environment variables for the command
     @objc public let environment: [String: String]
-    
+
     /// Working directory for the command
     @objc public let workingDirectory: String
-    
+
     /// Initialize a new prepared command
     /// - Parameters:
     ///   - command: The command to execute

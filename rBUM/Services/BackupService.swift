@@ -1,11 +1,3 @@
-//
-//  BackupService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Core
 import Foundation
 
@@ -38,15 +30,18 @@ import Foundation
 /// let snapshots = try await backupService.listSnapshots(in: repository)
 /// ```
 public final class BackupService: BaseSandboxedService, BackupServiceProtocol, HealthCheckable, Measurable,
-    @unchecked Sendable {
+    @unchecked Sendable
+{
     // MARK: - Properties
-    internal let resticService: ResticServiceProtocol
+
+    let resticService: ResticServiceProtocol
     private let repositoryLock: RepositoryLockProtocol
     private let maintenanceScheduler: MaintenanceSchedulerProtocol
     private let metricsTracker: LockMetricsTracker
     private let logger: LoggerProtocol
-    
+
     // MARK: - Initialisation
+
     /// Initialises a new BackupService instance with required dependencies.
     /// - Parameters:
     ///   - resticService: Service for executing Restic commands
@@ -71,11 +66,12 @@ public final class BackupService: BaseSandboxedService, BackupServiceProtocol, H
 }
 
 // MARK: - Repository Operations
-extension BackupService {
+
+public extension BackupService {
     /// Initialises a new repository at the specified location.
     /// - Parameter repository: The repository to initialise
     /// - Throws: BackupError if initialisation fails or lock cannot be acquired
-    public func initializeRepository(_ repository: Repository) async throws {
+    func initializeRepository(_ repository: Repository) async throws {
         guard try await repositoryLock.acquireLock(
             for: repository,
             operation: .init,
@@ -83,19 +79,19 @@ extension BackupService {
         ) else {
             throw BackupError.lockAcquisitionFailed
         }
-        
+
         defer {
             try? await repositoryLock.releaseLock(for: repository)
         }
-        
+
         try await resticService.initRepository(repository)
     }
-    
+
     /// Checks the integrity and accessibility of a repository.
     /// - Parameter repository: The repository to check
     /// - Returns: Boolean indicating if the repository is valid
     /// - Throws: BackupError if check fails or lock cannot be acquired
-    public func checkRepository(_ repository: Repository) async throws -> Bool {
+    func checkRepository(_ repository: Repository) async throws -> Bool {
         guard try await repositoryLock.acquireLock(
             for: repository,
             operation: .check,
@@ -103,21 +99,22 @@ extension BackupService {
         ) else {
             throw BackupError.lockAcquisitionFailed
         }
-        
+
         defer {
             try? await repositoryLock.releaseLock(for: repository)
         }
-        
+
         return try await resticService.checkRepository(repository)
     }
 }
 
 // MARK: - Backup Operations
-extension BackupService {
+
+public extension BackupService {
     /// Starts a new backup operation with the specified configuration.
     /// - Parameter configuration: Configuration for the backup operation
     /// - Throws: BackupError if backup fails or lock cannot be acquired
-    public func startBackup(configuration: BackupConfiguration) async throws {
+    func startBackup(configuration: BackupConfiguration) async throws {
         guard try await repositoryLock.acquireLock(
             for: configuration.repository,
             operation: .backup,
@@ -125,37 +122,38 @@ extension BackupService {
         ) else {
             throw BackupError.lockAcquisitionFailed
         }
-        
+
         defer {
             try? await repositoryLock.releaseLock(for: configuration.repository)
         }
-        
+
         try await resticService.startBackup(configuration)
     }
-    
+
     /// Cancels the currently running backup operation.
     /// - Throws: BackupError if cancellation fails
-    public func cancelBackup() async throws {
+    func cancelBackup() async throws {
         try await resticService.cancelBackup()
     }
-    
+
     /// Retrieves the current progress of an ongoing backup operation.
     /// - Returns: Current backup progress information
     /// - Throws: BackupError if progress cannot be retrieved
-    public func getBackupProgress() async throws -> BackupProgress {
+    func getBackupProgress() async throws -> BackupProgress {
         try await resticService.getBackupProgress()
     }
 }
 
 // MARK: - Snapshot Management
-extension BackupService {
+
+public extension BackupService {
     /// Lists snapshots in the specified repository, optionally filtered by criteria.
     /// - Parameters:
     ///   - repository: The repository to list snapshots from
     ///   - filter: Optional filter criteria for the snapshots
     /// - Returns: Array of matching snapshots
     /// - Throws: BackupError if listing fails or lock cannot be acquired
-    public func listSnapshots(
+    func listSnapshots(
         in repository: Repository,
         filter: SnapshotFilter? = nil
     ) async throws -> [ResticSnapshot] {
@@ -166,20 +164,20 @@ extension BackupService {
         ) else {
             throw BackupError.lockAcquisitionFailed
         }
-        
+
         defer {
             try? await repositoryLock.releaseLock(for: repository)
         }
-        
+
         return try await resticService.listSnapshots(in: repository, filter: filter)
     }
-    
+
     /// Removes specified snapshots from a repository.
     /// - Parameters:
     ///   - snapshots: Array of snapshots to remove
     ///   - repository: The repository to remove snapshots from
     /// - Throws: BackupError if removal fails or lock cannot be acquired
-    public func removeSnapshots(
+    func removeSnapshots(
         _ snapshots: [ResticSnapshot],
         from repository: Repository
     ) async throws {
@@ -190,30 +188,31 @@ extension BackupService {
         ) else {
             throw BackupError.lockAcquisitionFailed
         }
-        
+
         defer {
             try? await repositoryLock.releaseLock(for: repository)
         }
-        
+
         try await resticService.removeSnapshots(snapshots, from: repository)
     }
 }
 
 // MARK: - Maintenance & Metrics
-extension BackupService {
+
+public extension BackupService {
     /// Triggers maintenance operations on the specified repository.
     /// - Parameter repository: The repository to perform maintenance on
     /// - Returns: Result of the maintenance operation
     /// - Throws: BackupError if maintenance fails
-    public func triggerMaintenance(for repository: Repository) async throws -> MaintenanceResult {
-        return try await maintenanceScheduler.triggerMaintenance(for: repository)
+    func triggerMaintenance(for repository: Repository) async throws -> MaintenanceResult {
+        try await maintenanceScheduler.triggerMaintenance(for: repository)
     }
-    
+
     /// Retrieves lock metrics for the specified repository.
     /// - Parameter repository: The repository to get metrics for
     /// - Returns: Lock metrics for the repository
-    public func getLockMetrics(for repository: Repository) -> LockMetrics {
-        return metricsTracker.getMetrics(for: repository)
+    func getLockMetrics(for repository: Repository) -> LockMetrics {
+        metricsTracker.getMetrics(for: repository)
     }
 }
 

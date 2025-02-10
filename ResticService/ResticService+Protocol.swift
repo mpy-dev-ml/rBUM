@@ -26,19 +26,19 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: repositoryURL)
                 defer { self.stopAccessing(repoAccess) }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 let environment = ["RESTIC_PASSWORD": password]
                 let arguments = ["init", "--repo", repoAccess.url.path]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Repository initialised at \(repoAccess.url.path, privacy: .private)")
                 reply(result)
             } catch {
@@ -51,7 +51,7 @@ extension ResticService {
             }
         }
     }
-    
+
     /// Creates a new backup of the specified source paths to the repository
     ///
     /// This method:
@@ -77,39 +77,39 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: repositoryURL)
                 defer { self.stopAccessing(repoAccess) }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 // Resolve and access all source paths
                 let sourceAccesses = try sourcePaths.map { try self.createSecurityScopedAccess(from: $0) }
                 defer { sourceAccesses.forEach { self.stopAccessing($0) } }
-                
+
                 // Start accessing all sources
                 for access in sourceAccesses {
                     guard self.startAccessing(access) else {
                         throw ResticXPCError.accessDenied
                     }
                 }
-                
+
                 var arguments = ["backup", "--repo", repoAccess.url.path]
-                
+
                 // Add exclude patterns
                 for pattern in excludePatterns {
                     arguments.append(contentsOf: ["--exclude", pattern])
                 }
-                
+
                 // Add source paths
-                arguments.append(contentsOf: sourceAccesses.map { $0.url.path })
-                
+                arguments.append(contentsOf: sourceAccesses.map(\.url.path))
+
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Backup completed to \(repoAccess.url.path, privacy: .private)")
                 reply(result)
             } catch {
@@ -122,7 +122,7 @@ extension ResticService {
             }
         }
     }
-    
+
     /// Lists all snapshots in the repository
     ///
     /// This method:
@@ -144,19 +144,19 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: repositoryURL)
                 defer { self.stopAccessing(repoAccess) }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 let arguments = ["snapshots", "--repo", repoAccess.url.path, "--json"]
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 reply(result)
             } catch {
                 self.logger.error("Failed to list snapshots: \(error.localizedDescription)")
@@ -168,7 +168,7 @@ extension ResticService {
             }
         }
     }
-    
+
     /// Restores a snapshot from the repository to the specified target path
     ///
     /// This method:
@@ -196,39 +196,39 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: repositoryURL)
                 let targetAccess = try self.createSecurityScopedAccess(from: targetPath)
-                
+
                 defer {
                     self.stopAccessing(repoAccess)
                     self.stopAccessing(targetAccess)
                 }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 guard self.startAccessing(targetAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 var arguments = [
                     "restore",
                     "--repo", repoAccess.url.path,
                     "--target", targetAccess.url.path,
-                    snapshotID
+                    snapshotID,
                 ]
-                
+
                 // Add specific paths if provided
                 if !paths.isEmpty {
                     arguments.append(contentsOf: paths)
                 }
-                
+
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 self.logger.info("Restore completed to \(targetAccess.url.path, privacy: .private)")
                 reply(result)
             } catch {
@@ -241,7 +241,7 @@ extension ResticService {
             }
         }
     }
-    
+
     /// Verifies the integrity of the repository
     ///
     /// This method:
@@ -263,19 +263,19 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: repositoryURL)
                 defer { self.stopAccessing(repoAccess) }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 let arguments = ["check", "--repo", repoAccess.url.path]
                 let environment = ["RESTIC_PASSWORD": password]
-                
+
                 let result = try self.executeResticCommand(
                     arguments: arguments,
                     environment: environment
                 )
-                
+
                 reply(result)
             } catch {
                 self.logger.error("Repository verification failed: \(error.localizedDescription)")
@@ -287,7 +287,7 @@ extension ResticService {
             }
         }
     }
-    
+
     /// Cancels the current operation
     ///
     /// This method:
@@ -302,14 +302,14 @@ extension ResticService {
                 reply(false)
                 return
             }
-            
+
             task.terminate()
             self.currentTask = nil
-            
+
             reply(true)
         }
     }
-    
+
     /// Validates a security-scoped bookmark
     ///
     /// This method:
@@ -325,11 +325,11 @@ extension ResticService {
             do {
                 let repoAccess = try self.createSecurityScopedAccess(from: bookmarkData)
                 defer { self.stopAccessing(repoAccess) }
-                
+
                 guard self.startAccessing(repoAccess) else {
                     throw ResticXPCError.accessDenied
                 }
-                
+
                 reply(true, nil)
             } catch {
                 self.logger.error("Bookmark validation failed: \(error.localizedDescription)")

@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Test URL Extensions
 
@@ -100,11 +100,11 @@ extension XCTestCase {
         try await setupTestBookmarks(in: environment)
         return environment
     }
-    
+
     private static func createTestEnvironment() async throws -> TestEnvironment {
         let fileManager = FileManager.default
         let testDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        
+
         return TestEnvironment(
             fileManager: fileManager,
             testDirectory: testDirectory,
@@ -114,31 +114,31 @@ extension XCTestCase {
             mockServices: createMockServices()
         )
     }
-    
+
     private static func setupTestDirectories(in environment: TestEnvironment) async throws {
         // Create main test directory
         try environment.fileManager.createDirectory(
             at: environment.testDirectory,
             withIntermediateDirectories: true
         )
-        
+
         // Create subdirectories
         try environment.fileManager.createDirectory(
             at: environment.sourceDirectory,
             withIntermediateDirectories: true
         )
-        
+
         try environment.fileManager.createDirectory(
             at: environment.destinationDirectory,
             withIntermediateDirectories: true
         )
-        
+
         try environment.fileManager.createDirectory(
             at: environment.bookmarkDirectory,
             withIntermediateDirectories: true
         )
     }
-    
+
     private static func setupTestFiles(in environment: TestEnvironment) async throws {
         // Create test files with different permissions
         try createTestFile(
@@ -147,21 +147,21 @@ extension XCTestCase {
             permissions: [.readable],
             in: environment
         )
-        
+
         try createTestFile(
             named: "writable.txt",
             content: "Writable content",
             permissions: [.writable],
             in: environment
         )
-        
+
         try createTestFile(
             named: "executable.txt",
             content: "Executable content",
             permissions: [.executable],
             in: environment
         )
-        
+
         try createTestFile(
             named: "full-access.txt",
             content: "Full access content",
@@ -169,19 +169,19 @@ extension XCTestCase {
             in: environment
         )
     }
-    
+
     private static func setupTestBookmarks(in environment: TestEnvironment) async throws {
         // Create bookmarks for test files
         let files = try environment.fileManager.contentsOfDirectory(
             at: environment.sourceDirectory,
             includingPropertiesForKeys: nil
         )
-        
+
         for file in files {
             try await createTestBookmark(for: file, in: environment)
         }
     }
-    
+
     private static func createTestFile(
         named name: String,
         content: String,
@@ -190,7 +190,7 @@ extension XCTestCase {
     ) throws {
         let filePath = environment.sourceDirectory.appendingPathComponent(name)
         try content.write(to: filePath, atomically: true, encoding: .utf8)
-        
+
         // Set file permissions
         var attributes: [FileAttributeKey: Any] = [:]
         if permissions.contains(.readable) {
@@ -204,37 +204,37 @@ extension XCTestCase {
         }
         try environment.fileManager.setAttributes(attributes, ofItemAtPath: filePath.path)
     }
-    
+
     private static func createTestBookmark(for url: URL, in environment: TestEnvironment) async throws {
         let bookmark = try url.bookmarkData(
             options: .withSecurityScope,
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
-        
+
         let bookmarkFile = environment.bookmarkDirectory
             .appendingPathComponent(url.lastPathComponent)
             .appendingPathExtension("bookmark")
-        
+
         try bookmark.write(to: bookmarkFile)
     }
-    
+
     private static func createMockServices() -> MockServices {
         let bookmarkService = MockBookmarkService()
         let securityService = MockSecurityService()
         let keychainService = MockKeychainService()
-        
+
         configureMockBookmarkService(bookmarkService)
         configureMockSecurityService(securityService)
         configureMockKeychainService(keychainService)
-        
+
         return MockServices(
             bookmarkService: bookmarkService,
             securityService: securityService,
             keychainService: keychainService
         )
     }
-    
+
     private static func configureMockBookmarkService(_ service: MockBookmarkService) {
         service.createBookmarkHandler = { url in
             try url.bookmarkData(
@@ -243,7 +243,7 @@ extension XCTestCase {
                 relativeTo: nil
             )
         }
-        
+
         service.resolveBookmarkHandler = { data in
             var isStale = false
             return try URL(
@@ -254,56 +254,56 @@ extension XCTestCase {
             )
         }
     }
-    
+
     private static func configureMockSecurityService(_ service: MockSecurityService) {
         service.validateAccessHandler = { url in
             FileManager.default.fileExists(atPath: url.path)
         }
-        
+
         service.validateWriteAccessHandler = { url in
             FileManager.default.isWritableFile(atPath: url.path)
         }
-        
+
         service.validateReadAccessHandler = { url in
             FileManager.default.isReadableFile(atPath: url.path)
         }
     }
-    
+
     private static func configureMockKeychainService(_ service: MockKeychainService) {
         service.saveHandler = { _, _, _ in true }
         service.loadHandler = { _, _ in Data("test-data".utf8) }
         service.deleteHandler = { _, _ in true }
     }
-    
+
     // MARK: - Test Environment Cleanup
-    
+
     static func cleanupTestEnvironment(_ environment: TestEnvironment) throws {
         try cleanupTestFiles(in: environment)
         try cleanupTestDirectories(in: environment)
         try cleanupTestBookmarks(in: environment)
     }
-    
+
     private static func cleanupTestFiles(in environment: TestEnvironment) throws {
         let files = try environment.fileManager.contentsOfDirectory(
             at: environment.sourceDirectory,
             includingPropertiesForKeys: nil
         )
-        
+
         for file in files {
             try environment.fileManager.removeItem(at: file)
         }
     }
-    
+
     private static func cleanupTestDirectories(in environment: TestEnvironment) throws {
         try environment.fileManager.removeItem(at: environment.testDirectory)
     }
-    
+
     private static func cleanupTestBookmarks(in environment: TestEnvironment) throws {
         let bookmarks = try environment.fileManager.contentsOfDirectory(
             at: environment.bookmarkDirectory,
             includingPropertiesForKeys: nil
         )
-        
+
         for bookmark in bookmarks {
             try environment.fileManager.removeItem(at: bookmark)
         }

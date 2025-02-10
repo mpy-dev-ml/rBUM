@@ -1,16 +1,3 @@
-//
-//  ContentView.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 29/01/2025.
-//
-
 import Core
 import SwiftUI
 
@@ -200,7 +187,7 @@ class ContentViewModel: ObservableObject {
 
     private let logger = Logger(subsystem: "dev.mpy.rBUM", category: "repository")
     private let fileManager = FileManager.default
-    
+
     let repositoryStorage: any RepositoryStorageProtocol
     let repositoryCreationService: any RepositoryCreationServiceProtocol
     let resticService: any ResticCommandServiceProtocol
@@ -208,14 +195,14 @@ class ContentViewModel: ObservableObject {
 
     init(credentialsManager: KeychainCredentialsManagerProtocol) {
         self.credentialsManager = credentialsManager
-        
+
         let storage = RepositoryStorage()
-        self.repositoryStorage = storage
-        
+        repositoryStorage = storage
+
         let securityService = DefaultSecurityService()
         let xpcService = ResticXPCService()
         let keychainService = KeychainService()
-        
+
         let commandService = ResticCommandService(
             logger: logger,
             securityService: securityService,
@@ -223,9 +210,9 @@ class ContentViewModel: ObservableObject {
             keychainService: keychainService,
             fileManager: fileManager
         )
-        self.resticService = commandService
-        
-        self.repositoryCreationService = RepositoryCreationService(
+        resticService = commandService
+
+        repositoryCreationService = RepositoryCreationService(
             resticService: commandService,
             repositoryStorage: storage
         )

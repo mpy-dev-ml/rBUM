@@ -3,7 +3,7 @@ import Foundation
 @available(macOS 13.0, *)
 extension ResticXPCService {
     // MARK: - Error Handling
-    
+
     /// Handles errors that occur during XPC operations
     /// - Parameters:
     ///   - error: The error that occurred
@@ -18,28 +18,28 @@ extension ResticXPCService {
             function: #function,
             line: #line
         )
-        
+
         // Update operation status if provided
         if let operation {
             updateOperation(operation, status: .failed, error: error)
         }
-        
+
         // Handle specific error types
         switch error {
         case let xpcError as ResticXPCError:
             return handleXPCError(xpcError, retryCount: retryCount)
-            
+
         case let securityError as SecurityError:
             return handleSecurityError(securityError, retryCount: retryCount)
-            
+
         case let resticError as ResticError:
             return handleResticError(resticError, retryCount: retryCount)
-            
+
         default:
             return handleGenericError(error, retryCount: retryCount)
         }
     }
-    
+
     /// Handles XPC-specific errors
     /// - Parameters:
     ///   - error: The XPC error
@@ -47,7 +47,8 @@ extension ResticXPCService {
     /// - Returns: True if the error was handled and operation should be retried
     private func handleXPCError(_ error: ResticXPCError, retryCount: Int) -> Bool {
         switch error {
-        case .connectionNotEstablished, .connectionInterrupted:
+        case .connectionNotEstablished,
+             .connectionInterrupted:
             // Attempt to reconnect if we haven't exceeded retry limit
             if retryCount < maxRetries {
                 do {
@@ -62,20 +63,21 @@ extension ResticXPCService {
                     )
                 }
             }
-            
-        case .invalidBookmark, .staleBookmark:
+
+        case .invalidBookmark,
+             .staleBookmark:
             // Request bookmark refresh from security service
             Task {
                 await refreshBookmarks()
             }
-            
+
         default:
             break
         }
-        
+
         return false
     }
-    
+
     /// Handles security-related errors
     /// - Parameters:
     ///   - error: The security error
@@ -88,18 +90,18 @@ extension ResticXPCService {
             Task {
                 await refreshPermissions()
             }
-            
+
         case .invalidCredentials:
             // Clear cached credentials
             clearCredentials()
-            
+
         default:
             break
         }
-        
+
         return false
     }
-    
+
     /// Handles Restic-specific errors
     /// - Parameters:
     ///   - error: The Restic error
@@ -115,20 +117,20 @@ extension ResticXPCService {
                     return true
                 }
             }
-            
+
         case .repositoryCorrupted:
             // Attempt repository repair
             Task {
                 try await repairRepository()
             }
-            
+
         default:
             break
         }
-        
+
         return false
     }
-    
+
     /// Handles generic errors
     /// - Parameters:
     ///   - error: The generic error
@@ -141,7 +143,7 @@ extension ResticXPCService {
         }
         return false
     }
-    
+
     /// Determines if an error is likely transient
     /// - Parameter error: The error to check
     /// - Returns: True if the error is likely transient
@@ -152,23 +154,23 @@ extension ResticXPCService {
             return [
                 NSURLErrorTimedOut,
                 NSURLErrorNetworkConnectionLost,
-                NSURLErrorNotConnectedToInternet
+                NSURLErrorNotConnectedToInternet,
             ].contains(nsError.code)
-            
+
         case POSIXError.errorDomain:
             return [
                 EAGAIN,
                 EBUSY,
-                ETIMEDOUT
+                ETIMEDOUT,
             ].contains(POSIXErrorCode(rawValue: nsError.code)?.rawValue ?? 0)
-            
+
         default:
             return false
         }
     }
-    
+
     // MARK: - Error Recovery
-    
+
     /// Refresh security-scoped bookmarks
     private func refreshBookmarks() async {
         do {
@@ -183,7 +185,7 @@ extension ResticXPCService {
             )
         }
     }
-    
+
     /// Refresh security permissions
     private func refreshPermissions() async {
         do {
@@ -197,17 +199,17 @@ extension ResticXPCService {
             )
         }
     }
-    
+
     /// Clear cached credentials
     private func clearCredentials() {
         // Implementation depends on credential storage mechanism
     }
-    
+
     /// Unlock a locked repository
     private func unlockRepository() async throws {
         // Implementation depends on Restic command execution
     }
-    
+
     /// Repair a corrupted repository
     private func repairRepository() async throws {
         // Implementation depends on Restic command execution

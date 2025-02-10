@@ -1,13 +1,3 @@
-//
-//  main.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 9 February 2025
-//
-//  Created by Matthew Yeager on 05/02/2025.
-//
-
 import Foundation
 import os.log
 
@@ -42,17 +32,17 @@ listener.delegate = service
 // Set up signal handling for graceful shutdown
 signal(SIGTERM) { _ in
     logger.info("Received SIGTERM, initiating graceful shutdown...")
-    
+
     // Perform any cleanup here if needed
-    
+
     exit(0)
 }
 
 signal(SIGINT) { _ in
     logger.info("Received SIGINT, initiating graceful shutdown...")
-    
+
     // Perform any cleanup here if needed
-    
+
     exit(0)
 }
 

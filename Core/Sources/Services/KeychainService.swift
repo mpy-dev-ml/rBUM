@@ -40,18 +40,18 @@ public enum KeychainError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .saveFailed(let status):
-            return "Failed to save to keychain: \(status)"
-        case .updateFailed(let status):
-            return "Failed to update keychain item: \(status)"
-        case .retrievalFailed(let status):
-            return "Failed to retrieve from keychain: \(status)"
-        case .deleteFailed(let status):
-            return "Failed to delete from keychain: \(status)"
+        case let .saveFailed(status):
+            "Failed to save to keychain: \(status)"
+        case let .updateFailed(status):
+            "Failed to update keychain item: \(status)"
+        case let .retrievalFailed(status):
+            "Failed to retrieve from keychain: \(status)"
+        case let .deleteFailed(status):
+            "Failed to delete from keychain: \(status)"
         case .invalidData:
-            return "Invalid data format"
+            "Invalid data format"
         case .accessDenied:
-            return "Access denied to keychain"
+            "Access denied to keychain"
         }
     }
 }

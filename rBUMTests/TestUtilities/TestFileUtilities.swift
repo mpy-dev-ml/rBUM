@@ -1,14 +1,6 @@
-//
-//  TestFileUtilities.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - File Utilities
 
@@ -21,7 +13,7 @@ extension XCTestCase {
         try content.write(to: tempURL, atomically: true, encoding: .utf8)
         return tempURL
     }
-    
+
     func createTemporaryDirectory(name: String = UUID().uuidString) throws -> URL {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try FileManager.default.createDirectory(
@@ -30,7 +22,7 @@ extension XCTestCase {
         )
         return tempURL
     }
-    
+
     func removeTemporaryItem(at url: URL) throws {
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)

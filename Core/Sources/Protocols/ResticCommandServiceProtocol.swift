@@ -81,16 +81,16 @@ import Foundation
 
 public extension ResticCommandServiceProtocol {
     /// Pauses all active Restic operations.
-    /// 
+    ///
     /// This method provides a default implementation that does nothing.
     /// Override this method to implement custom pause functionality.
     /// - Throws: Any errors that occur during the pause operation
     func pauseAllOperations() async throws {
         // Default implementation does nothing
     }
-    
+
     /// Resumes all paused Restic operations.
-    /// 
+    ///
     /// This method provides a default implementation that does nothing.
     /// Override this method to implement custom resume functionality.
     /// - Throws: Any errors that occur during the resume operation

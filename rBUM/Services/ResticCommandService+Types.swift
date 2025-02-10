@@ -1,10 +1,3 @@
-//
-//  ResticCommandService+Types.swift
-//  rBUM
-//
-//  Created on 7 February 2025.
-//
-
 import Foundation
 
 // MARK: - ResticCommand
@@ -30,27 +23,27 @@ public enum ResticCommandError: LocalizedError {
     case insufficientPermissions
     case operationNotFound
     case operationFailed(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .resticNotInstalled:
-            return "Restic is not installed"
+            "Restic is not installed"
         case .repositoryNotFound:
-            return "Repository not found"
+            "Repository not found"
         case .repositoryExists:
-            return "Repository already exists"
-        case .invalidRepository(let message):
-            return "Invalid repository: \(message)"
-        case .invalidSettings(let message):
-            return "Invalid settings: \(message)"
-        case .invalidCredentials(let message):
-            return "Invalid credentials: \(message)"
+            "Repository already exists"
+        case let .invalidRepository(message):
+            "Invalid repository: \(message)"
+        case let .invalidSettings(message):
+            "Invalid settings: \(message)"
+        case let .invalidCredentials(message):
+            "Invalid credentials: \(message)"
         case .insufficientPermissions:
-            return "Insufficient permissions"
+            "Insufficient permissions"
         case .operationNotFound:
-            return "Operation not found"
-        case .operationFailed(let message):
-            return "Operation failed: \(message)"
+            "Operation not found"
+        case let .operationFailed(message):
+            "Operation failed: \(message)"
         }
     }
 }

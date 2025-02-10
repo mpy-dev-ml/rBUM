@@ -1,11 +1,3 @@
-//
-//  LoggerFactory.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 import os.log
 
@@ -33,7 +25,7 @@ import os.log
 public enum LoggerFactory {
     /// The subsystem identifier for all loggers
     private static let subsystem = "dev.mpy.rBUM"
-    
+
     // MARK: - Public Methods
 
     /// Create a new logger for the given category

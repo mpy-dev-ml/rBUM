@@ -1,13 +1,3 @@
-//
-//  ResticServiceProtocol.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// Protocol for Restic backup operations
@@ -49,16 +39,16 @@ import Foundation
 public struct ResticFile {
     /// Full path to the file in the backup
     public let path: String
-    
+
     /// Size of the file in bytes
     public let size: UInt64
-    
+
     /// Last modification time of the file
     public let modTime: Date
-    
+
     /// Hash of the file content
     public let hash: String
-    
+
     /// Initialise a new ResticFile instance
     /// - Parameters:
     ///   - path: Full path to the file in the backup
@@ -86,7 +76,7 @@ extension ResticServiceProtocol {
         in snapshot: ResticSnapshot,
         repository: Repository
     ) async throws -> [ResticFile]
-    
+
     /// Find a specific file in a snapshot
     /// - Parameters:
     ///   - path: Full path of the file

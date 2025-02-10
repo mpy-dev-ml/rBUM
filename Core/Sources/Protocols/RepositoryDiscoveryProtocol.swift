@@ -24,10 +24,10 @@ import Foundation
 /// ## Example Usage
 /// ```swift
 /// let service = RepositoryDiscoveryService()
-/// 
+///
 /// // Start scanning
 /// let repositories = try await service.scanLocation(url, recursive: true)
-/// 
+///
 /// // Verify and index each repository
 /// for repository in repositories {
 ///     guard try await service.verifyRepository(repository) else { continue }
@@ -53,18 +53,18 @@ public protocol RepositoryDiscoveryProtocol {
     /// - Returns: An array of discovered repositories
     /// - Throws: `RepositoryDiscoveryError` if scanning fails
     func scanLocation(_ url: URL, recursive: Bool) async throws -> [DiscoveredRepository]
-    
+
     /// Verifies if a discovered repository is valid
     /// - Parameter repository: The repository to verify
     /// - Returns: A boolean indicating if the repository is valid
     /// - Throws: `RepositoryDiscoveryError` if verification fails
     func verifyRepository(_ repository: DiscoveredRepository) async throws -> Bool
-    
+
     /// Indexes a verified repository for searching
     /// - Parameter repository: The repository to index
     /// - Throws: `RepositoryDiscoveryError` if indexing fails
     func indexRepository(_ repository: DiscoveredRepository) async throws
-    
+
     /// Cancels any ongoing discovery operations
     func cancelDiscovery()
 }

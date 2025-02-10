@@ -1,36 +1,28 @@
-//
-//  XPCCommandConfig.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Foundation
 
 /// Configuration for XPC command execution
 @objc public class XPCCommandConfig: NSObject, NSSecureCoding {
     /// Command to execute
     @objc public let command: String
-    
+
     /// Command arguments
     @objc public let arguments: [String]
-    
+
     /// Environment variables
     @objc public let environment: [String: String]
-    
+
     /// Working directory
     @objc public let workingDirectory: String
-    
+
     /// Security-scoped bookmarks
     @objc public let bookmarks: [String: NSData]
-    
+
     /// Command timeout
     @objc public let timeout: TimeInterval
-    
+
     /// Audit session identifier
     @objc public let auditSessionId: au_asid_t
-    
+
     /// Initialize a new XPC command configuration
     /// - Parameters:
     ///   - command: Command to execute
@@ -58,11 +50,11 @@ import Foundation
         self.auditSessionId = auditSessionId
         super.init()
     }
-    
+
     // MARK: - NSSecureCoding
-    
+
     public static var supportsSecureCoding: Bool { true }
-    
+
     @objc public func encode(with coder: NSCoder) {
         coder.encode(command, forKey: "command")
         coder.encode(arguments, forKey: "arguments")
@@ -72,8 +64,8 @@ import Foundation
         coder.encode(timeout, forKey: "timeout")
         coder.encode(auditSessionId, forKey: "auditSessionId")
     }
-    
-    @objc required public init?(coder: NSCoder) {
+
+    @objc public required init?(coder: NSCoder) {
         guard let command = coder.decodeObject(of: NSString.self, forKey: "command") as String?,
               let arguments = coder.decodeObject(of: NSArray.self, forKey: "arguments") as? [String],
               let environment = coder.decodeObject(of: NSDictionary.self, forKey: "environment") as? [String: String],
@@ -82,14 +74,14 @@ import Foundation
         else {
             return nil
         }
-        
+
         self.command = command
         self.arguments = arguments
         self.environment = environment
         self.workingDirectory = workingDirectory
         self.bookmarks = bookmarks
-        self.timeout = coder.decodeDouble(forKey: "timeout")
-        self.auditSessionId = au_asid_t(coder.decodeInt64(forKey: "auditSessionId"))
+        timeout = coder.decodeDouble(forKey: "timeout")
+        auditSessionId = au_asid_t(coder.decodeInt64(forKey: "auditSessionId"))
         super.init()
     }
 }

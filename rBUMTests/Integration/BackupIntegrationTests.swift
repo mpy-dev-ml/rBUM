@@ -1,19 +1,6 @@
-//
-//  BackupIntegrationTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 final class BackupIntegrationTests: XCTestCase {
     // MARK: - Properties

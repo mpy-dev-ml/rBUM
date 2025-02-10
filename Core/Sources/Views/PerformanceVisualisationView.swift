@@ -5,33 +5,33 @@ import SwiftUI
 public struct PerformanceVisualisationView: View {
     private let report: PerformanceReport
     private let alerts: [PerformanceAlert]
-    
+
     public init(report: PerformanceReport, alerts: [PerformanceAlert] = []) {
         self.report = report
         self.alerts = alerts
     }
-    
+
     public var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 summarySection
-                
+
                 if !alerts.isEmpty {
                     alertsSection
                 }
-                
+
                 resourceUsageCharts
                 operationMetricsCharts
             }
             .padding()
         }
     }
-    
+
     private var summarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Performance Summary")
                 .font(.headline)
-            
+
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
                 GridRow {
                     Text("Success Rate:")
@@ -52,18 +52,18 @@ public struct PerformanceVisualisationView: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
     }
-    
+
     private var alertsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Active Alerts")
                 .font(.headline)
-            
+
             ForEach(alerts) { alert in
                 HStack {
                     Circle()
                         .fill(alert.severity == .critical ? Color.red : Color.orange)
                         .frame(width: 8, height: 8)
-                    
+
                     VStack(alignment: .leading) {
                         Text(alert.type.localizedDescription)
                             .font(.subheadline)
@@ -80,17 +80,17 @@ public struct PerformanceVisualisationView: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
     }
-    
+
     private var resourceUsageCharts: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Resource Usage")
                 .font(.headline)
-            
+
             Chart {
                 ForEach(
-                    report.metrics.filter { 
-                        $0.unit == .percentage && 
-                        $0.name == "cpu_usage" 
+                    report.metrics.filter {
+                        $0.unit == .percentage &&
+                            $0.name == "cpu_usage"
                     },
                     id: \.timestamp
                 ) { metric in
@@ -105,12 +105,12 @@ public struct PerformanceVisualisationView: View {
             .chartYAxis {
                 AxisMarks(position: .leading)
             }
-            
+
             Chart {
                 ForEach(
-                    report.metrics.filter { 
-                        $0.unit == .bytes && 
-                        $0.name == "memory_usage" 
+                    report.metrics.filter {
+                        $0.unit == .bytes &&
+                            $0.name == "memory_usage"
                     },
                     id: \.timestamp
                 ) { metric in
@@ -130,17 +130,17 @@ public struct PerformanceVisualisationView: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
     }
-    
+
     private var operationMetricsCharts: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Operation Metrics")
                 .font(.headline)
-            
+
             Chart {
                 ForEach(
-                    report.metrics.filter { 
-                        $0.unit == .bytesPerSecond && 
-                        $0.name == "backup_speed" 
+                    report.metrics.filter {
+                        $0.unit == .bytesPerSecond &&
+                            $0.name == "backup_speed"
                     },
                     id: \.timestamp
                 ) { metric in
@@ -160,12 +160,12 @@ public struct PerformanceVisualisationView: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
     }
-    
+
     private var successRateColor: Color {
         switch report.statistics.operationSuccessRate {
-        case 95...: return .green
-        case 80...: return .yellow
-        default: return .red
+        case 95...: .green
+        case 80...: .yellow
+        default: .red
         }
     }
 }

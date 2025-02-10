@@ -26,23 +26,23 @@ extension ResticCommandService {
         guard !repository.path.isEmpty else {
             throw ValidationError.emptyRepositoryPath
         }
-        
+
         let url = URL(fileURLWithPath: repository.path)
-        
+
         // Check if repository exists
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError.repositoryNotFound(path: repository.path)
         }
-        
+
         // Check if repository is accessible
         guard FileManager.default.isReadableFile(atPath: url.path) else {
             throw ValidationError.repositoryNotAccessible(path: repository.path)
         }
-        
+
         // Validate repository credentials
         try validateCredentials(repository.credentials)
     }
-    
+
     /// Validates repository credentials
     ///
     /// This method ensures that:
@@ -59,13 +59,13 @@ extension ResticCommandService {
         guard !credentials.password.isEmpty else {
             throw ValidationError.emptyPassword
         }
-        
+
         // Validate key file if provided
         if let keyFile = credentials.keyFile {
             try validateKeyFile(keyFile)
         }
     }
-    
+
     /// Validates a repository key file
     ///
     /// This method performs comprehensive validation of a key file:
@@ -86,27 +86,27 @@ extension ResticCommandService {
         guard !path.isEmpty else {
             throw ValidationError.emptyKeyFilePath
         }
-        
+
         let url = URL(fileURLWithPath: path)
-        
+
         // Check if key file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError.keyFileNotFound(path: path)
         }
-        
+
         // Check if key file is accessible
         guard FileManager.default.isReadableFile(atPath: url.path) else {
             throw ValidationError.keyFileNotAccessible(path: path)
         }
-        
+
         // Check key file size
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let fileSize = attributes[.size] as? Int64 ?? 0
-        
+
         guard fileSize > 0 else {
             throw ValidationError.emptyKeyFile
         }
-        
+
         guard fileSize <= 1024 * 1024 else { // 1MB max
             throw ValidationError.keyFileTooLarge
         }
@@ -130,7 +130,7 @@ enum ValidationError: LocalizedError {
     case emptyRepositoryPath
     case repositoryNotFound(path: String)
     case repositoryNotAccessible(path: String)
-    
+
     // Credential errors
     case emptyPassword
     case emptyKeyFilePath
@@ -138,72 +138,72 @@ enum ValidationError: LocalizedError {
     case keyFileNotAccessible(path: String)
     case emptyKeyFile
     case keyFileTooLarge
-    
+
     // Snapshot errors
     case invalidSnapshotId
     case snapshotNotFound(id: String)
-    
+
     // Path errors
     case emptyPath
     case pathNotFound(path: String)
     case pathNotAccessible(path: String)
     case invalidPathFormat(path: String)
     case pathTooLong(path: String)
-    
+
     // Tag errors
     case emptyTag
     case invalidTagFormat(tag: String)
-    
+
     // Exclude pattern errors
     case emptyExcludePattern
     case invalidExcludePattern(pattern: String)
     case excludePatternTooLong(pattern: String)
-    
+
     /// A localized message describing the error
     var errorDescription: String? {
         switch self {
         case .emptyRepositoryPath:
-            return "Repository path cannot be empty"
-        case .repositoryNotFound(let path):
-            return "Repository not found at path: \(path)"
-        case .repositoryNotAccessible(let path):
-            return "Repository is not accessible at path: \(path)"
+            "Repository path cannot be empty"
+        case let .repositoryNotFound(path):
+            "Repository not found at path: \(path)"
+        case let .repositoryNotAccessible(path):
+            "Repository is not accessible at path: \(path)"
         case .emptyPassword:
-            return "Repository password cannot be empty"
+            "Repository password cannot be empty"
         case .emptyKeyFilePath:
-            return "Key file path cannot be empty"
-        case .keyFileNotFound(let path):
-            return "Key file not found at path: \(path)"
-        case .keyFileNotAccessible(let path):
-            return "Key file is not accessible at path: \(path)"
+            "Key file path cannot be empty"
+        case let .keyFileNotFound(path):
+            "Key file not found at path: \(path)"
+        case let .keyFileNotAccessible(path):
+            "Key file is not accessible at path: \(path)"
         case .emptyKeyFile:
-            return "Key file is empty"
+            "Key file is empty"
         case .keyFileTooLarge:
-            return "Key file is too large (max 1MB)"
+            "Key file is too large (max 1MB)"
         case .invalidSnapshotId:
-            return "Invalid snapshot ID"
-        case .snapshotNotFound(let id):
-            return "Snapshot not found with ID: \(id)"
+            "Invalid snapshot ID"
+        case let .snapshotNotFound(id):
+            "Snapshot not found with ID: \(id)"
         case .emptyPath:
-            return "Path cannot be empty"
-        case .pathNotFound(let path):
-            return "Path not found: \(path)"
-        case .pathNotAccessible(let path):
-            return "Path is not accessible: \(path)"
-        case .invalidPathFormat(let path):
-            return "Path contains invalid characters: \(path)"
-        case .pathTooLong(let path):
-            return "Path is too long: \(path)"
+            "Path cannot be empty"
+        case let .pathNotFound(path):
+            "Path not found: \(path)"
+        case let .pathNotAccessible(path):
+            "Path is not accessible: \(path)"
+        case let .invalidPathFormat(path):
+            "Path contains invalid characters: \(path)"
+        case let .pathTooLong(path):
+            "Path is too long: \(path)"
         case .emptyTag:
-            return "Tag cannot be empty"
-        case .invalidTagFormat(let tag):
-            return "Tag contains invalid characters: \(tag)"
+            "Tag cannot be empty"
+        case let .invalidTagFormat(tag):
+            "Tag contains invalid characters: \(tag)"
         case .emptyExcludePattern:
-            return "Exclude pattern cannot be empty"
-        case .invalidExcludePattern(let pattern):
-            return "Exclude pattern contains invalid characters: \(pattern)"
-        case .excludePatternTooLong(let pattern):
-            return "Exclude pattern is too long: \(pattern)"
+            "Exclude pattern cannot be empty"
+        case let .invalidExcludePattern(pattern):
+            "Exclude pattern contains invalid characters: \(pattern)"
+        case let .excludePatternTooLong(pattern):
+            "Exclude pattern is too long: \(pattern)"
         }
     }
 }

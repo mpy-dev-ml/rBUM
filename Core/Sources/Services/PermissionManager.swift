@@ -1,11 +1,3 @@
-//
-//  PermissionManager.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 /// A service that manages permission persistence and recovery for sandbox-compliant file access.
@@ -64,7 +56,7 @@ public class PermissionManager {
         self.logger = logger
         self.securityService = securityService
         self.keychain = keychain
-        self.fileManager = FileManager.default
+        fileManager = FileManager.default
 
         do {
             try keychain.configureXPCSharing(accessGroup: permissionAccessGroup)

@@ -1,14 +1,6 @@
-//
-//  TestRepositoryUtilities.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension XCTestCase {
     /// Sets up a test repository
@@ -19,7 +11,7 @@ extension XCTestCase {
         try createTestMetadataFiles(in: repository)
         return repository
     }
-    
+
     /// Creates test metadata files in the repository
     /// - Parameter repository: The repository to create files in
     /// - Throws: Error if file creation fails
@@ -29,12 +21,12 @@ extension XCTestCase {
             files: [
                 "small.dat": TestFileMetadata(size: 1024, chunks: 1),
                 "medium.dat": TestFileMetadata(size: 1024 * 1024, chunks: 10),
-                "large.dat": TestFileMetadata(size: 1024 * 1024 * 10, chunks: 100)
+                "large.dat": TestFileMetadata(size: 1024 * 1024 * 10, chunks: 100),
             ]
         )
-        
+
         try repository.writeIndex(index)
-        
+
         // Create test files
         try repository.createTestFiles()
     }
@@ -48,7 +40,7 @@ extension XCTestCase {
     func cleanupTestRepository(_ repository: TestRepository) throws {
         try repository.cleanup()
     }
-    
+
     /// Cleans up all test repositories
     func cleanupAllTestRepositories() throws {
         let testDir = try XCTUnwrap(FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first)

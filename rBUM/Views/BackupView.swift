@@ -1,23 +1,16 @@
-//
-//  BackupView.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Core
 import OSLog
 import SwiftUI
 
 // MARK: - Backup Configuration View
+
 /// View for configuring backup settings
 private struct BackupConfigurationView: View {
     @ObservedObject var viewModel: BackupViewModel
     @State private var showingValidationAlert: Bool = false
     @State private var validationError: String = ""
     @State private var showingResetAlert: Bool = false
-    
+
     var body: some View {
         Section("Configuration") {
             Toggle("Include Hidden Files", isOn: $viewModel.includeHidden)
@@ -27,7 +20,7 @@ private struct BackupConfigurationView: View {
                         await validateAndSave()
                     }
                 }
-            
+
             Toggle("Verify After Backup", isOn: $viewModel.verifyAfterBackup)
                 .help("Performs integrity verification after backup completion")
                 .onChange(of: viewModel.verifyAfterBackup) { _ in
@@ -35,11 +28,11 @@ private struct BackupConfigurationView: View {
                         await validateAndSave()
                     }
                 }
-            
+
             if let validationIssue = viewModel.configurationIssue {
                 ValidationIssueView(message: validationIssue)
             }
-            
+
             Button("Reset to Defaults") {
                 showingResetAlert = true
             }
@@ -62,7 +55,7 @@ private struct BackupConfigurationView: View {
             Text("Are you sure you want to reset all settings to their default values? This cannot be undone.")
         }
     }
-    
+
     private func validateAndSave() async {
         do {
             try await viewModel.validateConfiguration()
@@ -77,7 +70,7 @@ private struct BackupConfigurationView: View {
 /// View for displaying validation issues
 private struct ValidationIssueView: View {
     let message: String
-    
+
     var body: some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -90,10 +83,11 @@ private struct ValidationIssueView: View {
 }
 
 // MARK: - Backup Progress View
+
 /// View for displaying backup progress
 private struct BackupProgressView: View {
     let progress: BackupProgress
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ProgressView(
@@ -108,14 +102,14 @@ private struct BackupProgressView: View {
         }
         .padding()
     }
-    
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.hour, .minute, .second]
         formatter.unitsStyle = .abbreviated
         return formatter.string(from: duration) ?? "Unknown"
     }
-    
+
     private func formatSpeed(_ bytesPerSecond: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .binary
@@ -124,10 +118,11 @@ private struct BackupProgressView: View {
 }
 
 // MARK: - Backup Actions View
+
 /// View for backup action buttons
 private struct BackupActionsView: View {
     @ObservedObject var viewModel: BackupViewModel
-    
+
     var body: some View {
         Section {
             if viewModel.backupState.isInProgress {
@@ -157,17 +152,18 @@ private struct BackupActionsView: View {
 }
 
 // MARK: - Backup Progress Section
+
 /// View for displaying backup progress
 private struct BackupProgressSection: View {
     @ObservedObject var viewModel: BackupViewModel
-    
+
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 // Operation Description
                 Text(viewModel.currentOperation)
                     .font(.headline)
-                
+
                 // Progress Bar
                 if viewModel.indeterminateProgress {
                     ProgressView()
@@ -176,14 +172,14 @@ private struct BackupProgressSection: View {
                     ProgressView(value: viewModel.currentProgress)
                         .progressViewStyle(.linear)
                 }
-                
+
                 // File Count
                 if let total = viewModel.totalFiles {
                     Text("\(viewModel.processedFiles) of \(total) files processed")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 // Status-specific UI
                 switch viewModel.backupStatus {
                 case .completed:
@@ -192,15 +188,15 @@ private struct BackupProgressSection: View {
                             .foregroundColor(.green)
                         Text("Backup completed successfully")
                     }
-                    
-                case .failed(let error):
+
+                case let .failed(error):
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.red)
                         Text("Backup failed: \(error.localizedDescription)")
                             .foregroundColor(.red)
                     }
-                    
+
                 case .cancelled:
                     HStack {
                         Image(systemName: "xmark.circle.fill")
@@ -208,13 +204,13 @@ private struct BackupProgressSection: View {
                         Text("Backup cancelled")
                             .foregroundColor(.orange)
                     }
-                    
+
                 default:
                     EmptyView()
                 }
             }
             .padding(.vertical, 4)
-            
+
             // Cancel Button
             if case .backing = viewModel.backupStatus {
                 Button(role: .destructive) {
@@ -232,31 +228,32 @@ private struct BackupProgressSection: View {
 }
 
 // MARK: - Main Backup View
+
 /// Main view for backup configuration and control
 struct BackupView: View {
     @StateObject private var viewModel: BackupViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingPermissionAlert = false
     @State private var permissionError: String = ""
-    
+
     init(repository: Repository) {
         _viewModel = StateObject(wrappedValue: BackupViewModel(repository: repository))
     }
-    
+
     var body: some View {
         Form {
             BackupConfigurationView(viewModel: viewModel)
-            
+
             if viewModel.backupStatus != nil {
                 BackupProgressSection(viewModel: viewModel)
             }
-            
+
             TagsSection(
                 tags: viewModel.selectedTags,
                 onRemove: viewModel.removeTag,
                 onAdd: viewModel.addTag
             )
-            
+
             BackupActionsView(viewModel: viewModel)
         }
         .padding()
@@ -281,24 +278,25 @@ struct BackupView: View {
             }
         )
     }
-    
+
     private func handleSandboxError(_ error: SandboxError) {
         switch error {
-        case .accessDenied(let message):
+        case let .accessDenied(message):
             permissionError = "Access Required: \(message)\n\nPlease grant access when prompted."
             showingPermissionAlert = true
-            
-        case .bookmarkInvalid, .bookmarkStale:
+
+        case .bookmarkInvalid,
+             .bookmarkStale:
             permissionError = "Access to backup locations has expired. Please select the locations again."
             showingPermissionAlert = true
-            
+
         case .resourceUnavailable:
             permissionError = """
-                The selected backup location is no longer available.
-                Please check if it exists and is accessible.
-                """
+            The selected backup location is no longer available.
+            Please check if it exists and is accessible.
+            """
             showingPermissionAlert = true
-            
+
         case .permissionExpired:
             permissionError = "Permission to access backup locations has expired. Please grant access again."
             showingPermissionAlert = true
@@ -307,6 +305,7 @@ struct BackupView: View {
 }
 
 // MARK: - Preview Provider
+
 struct BackupView_Previews: PreviewProvider {
     static var previews: some View {
         BackupView(
@@ -319,12 +318,13 @@ struct BackupView_Previews: PreviewProvider {
 }
 
 // MARK: - Backup View Components
+
 /// Component for displaying and managing backup tags
 private struct TagsSection: View {
     let tags: [String]
     let onRemove: (String) -> Void
     let onAdd: () -> Void
-    
+
     var body: some View {
         Section("Tags") {
             ForEach(tags, id: \.self) { tag in
@@ -348,7 +348,7 @@ private struct TagsSection: View {
 /// Component for displaying backup progress
 private struct ProgressSection: View {
     let progress: BackupProgress
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ProgressView(
@@ -363,14 +363,14 @@ private struct ProgressSection: View {
         }
         .padding()
     }
-    
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.hour, .minute, .second]
         formatter.unitsStyle = .abbreviated
         return formatter.string(from: duration) ?? "Unknown"
     }
-    
+
     private func formatSpeed(_ bytesPerSecond: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .binary

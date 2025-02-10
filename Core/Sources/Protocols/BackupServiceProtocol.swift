@@ -1,16 +1,3 @@
-//
-//  BackupServiceProtocol.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
 import Foundation
 @_exported import Models
 
@@ -18,136 +5,136 @@ import Foundation
 public protocol BackupServiceProtocol {
     /// The delegate to receive backup operation updates
     var delegate: BackupServiceDelegate? { get set }
-    
+
     // Core backup operations
-    
+
     /// Starts a backup operation with the specified configuration
     /// - Parameter configuration: The configuration for the backup operation
     /// - Returns: A boolean indicating whether the backup was started successfully
     /// - Throws: BackupError if the operation cannot be started
     func startBackup(configuration: BackupConfiguration) throws -> Bool
-    
+
     /// Cancels the currently running backup operation
     /// - Returns: A boolean indicating whether the backup was cancelled successfully
     /// - Throws: BackupError if the operation cannot be cancelled
     func cancelBackup() throws -> Bool
-    
+
     /// Retrieves the current backup progress
     /// - Returns: The current backup progress information
     /// - Throws: BackupError if the progress cannot be retrieved
     func getBackupProgress() throws -> ResticProgress
-    
+
     /// Checks if a backup operation is currently in progress
     /// - Returns: A boolean indicating whether a backup is running
     /// - Throws: BackupError if the status cannot be determined
     func isBackupInProgress() throws -> Bool
-    
+
     // Configuration management
-    
+
     /// Validates the backup configuration before starting
     /// - Parameter configuration: The configuration to validate
     /// - Throws: BackupError if the configuration is invalid
     func validateBackupConfiguration(_ configuration: BackupConfiguration) throws
-    
+
     /// Retrieves the current backup configuration
     /// - Returns: The current backup configuration
     /// - Throws: BackupError if the configuration cannot be retrieved
     func getCurrentConfiguration() throws -> BackupConfiguration
-    
+
     /// Updates the current backup configuration
     /// - Parameter configuration: The new configuration to set
     /// - Throws: BackupError if the configuration cannot be updated
     func updateConfiguration(_ configuration: BackupConfiguration) throws
-    
+
     // Source management
-    
+
     /// Retrieves the list of backup sources
     /// - Returns: An array of backup sources
     /// - Throws: BackupError if the sources cannot be retrieved
     func getBackupSources() throws -> [BackupSource]
-    
+
     /// Adds a new backup source
     /// - Parameter source: The source to add
     /// - Throws: BackupError if the source cannot be added
     func addBackupSource(_ source: BackupSource) throws
-    
+
     /// Removes a backup source
     /// - Parameter source: The source to remove
     /// - Throws: BackupError if the source cannot be removed
     func removeBackupSource(_ source: BackupSource) throws
-    
+
     // Schedule management
-    
+
     /// Retrieves the backup schedule for a given source
     /// - Parameter source: The source to get the schedule for
     /// - Returns: The backup schedule for the specified source
     /// - Throws: BackupError if the schedule cannot be retrieved
     func getBackupSchedule(for source: BackupSource) throws -> BackupSchedule
-    
+
     /// Updates the backup schedule for a given source
     /// - Parameters:
     ///   - schedule: The new schedule to set
     ///   - source: The source to update the schedule for
     /// - Throws: BackupError if the schedule cannot be updated
     func updateBackupSchedule(_ schedule: BackupSchedule, for source: BackupSource) throws
-    
+
     // Settings management
-    
+
     /// Retrieves the backup settings for a given source
     /// - Parameter source: The source to get settings for
     /// - Returns: The backup settings for the specified source
     /// - Throws: BackupError if the settings cannot be retrieved
     func getBackupSettings(for source: BackupSource) throws -> BackupSettings
-    
+
     /// Updates the backup settings for a given source
     /// - Parameters:
     ///   - settings: The new settings to set
     ///   - source: The source to update settings for
     /// - Throws: BackupError if the settings cannot be updated
     func updateBackupSettings(_ settings: BackupSettings, for source: BackupSource) throws
-    
+
     // History and metrics
-    
+
     /// Retrieves the list of completed backups
     /// - Returns: An array of completed backup configurations
     /// - Throws: BackupError if the list cannot be retrieved
     func getCompletedBackups() throws -> [BackupConfiguration]
-    
+
     /// Retrieves the list of failed backups
     /// - Returns: An array of failed backup configurations
     /// - Throws: BackupError if the list cannot be retrieved
     func getFailedBackups() throws -> [BackupConfiguration]
-    
+
     /// Clears the backup history
     /// - Returns: A boolean indicating whether the history was cleared successfully
     /// - Throws: BackupError if the history cannot be cleared
     func clearBackupHistory() throws -> Bool
-    
+
     /// Retrieves the backup metrics for a given time period
     /// - Parameter period: The time period to get metrics for
     /// - Returns: The backup metrics for the specified period
     /// - Throws: BackupError if the metrics cannot be retrieved
     func getBackupMetrics(for period: TimePeriod) throws -> BackupMetrics
-    
+
     /// Retrieves the backup history for a given time period
     /// - Parameter period: The time period to get history for
     /// - Returns: The backup history for the specified period
     /// - Throws: BackupError if the history cannot be retrieved
     func getBackupHistory(for period: TimePeriod) throws -> [BackupOperation]
-    
+
     /// Retrieves the backup status for a given source
     /// - Parameter source: The source to get status for
     /// - Returns: The backup status for the specified source
     /// - Throws: BackupError if the status cannot be retrieved
     func getBackupStatus(for source: BackupSource) throws -> BackupStatus
-    
+
     // Health check
-    
+
     /// Performs a health check on the backup service
     /// - Returns: The health check result
     /// - Throws: BackupError if the health check fails
     func performHealthCheck() throws -> HealthCheckResult
-    
+
     /// Performs a backup operation for the specified source
     /// - Parameters:
     ///   - source: The backup source to process
@@ -159,7 +146,7 @@ public protocol BackupServiceProtocol {
         for source: BackupSource,
         options: BackupOptions?
     ) async throws -> BackupResult
-    
+
     /// Restores files from a backup snapshot
     /// - Parameters:
     ///   - snapshot: The snapshot to restore from
@@ -172,7 +159,7 @@ public protocol BackupServiceProtocol {
         to destination: String,
         options: RestoreOptions?
     ) async throws
-    
+
     /// Checks repository health and consistency
     /// - Parameter repository: The repository to check
     /// - Returns: Health check result
@@ -186,17 +173,17 @@ public protocol BackupServiceDelegate: AnyObject {
     /// Called when a backup operation starts
     /// - Parameter backup: The backup configuration that started
     func backupDidStart(_ backup: BackupConfiguration)
-    
+
     /// Called when a backup operation completes successfully
     /// - Parameter backup: The backup configuration that completed
     func backupDidComplete(_ backup: BackupConfiguration)
-    
+
     /// Called when a backup operation fails
     /// - Parameters:
     ///   - backup: The backup configuration that failed
     ///   - error: The error that caused the failure
     func backupDidFail(_ backup: BackupConfiguration, with error: Error)
-    
+
     /// Called when backup progress is updated
     /// - Parameter progress: The updated backup progress
     func backupProgressDidUpdate(_ progress: ResticProgress)
@@ -208,7 +195,7 @@ public struct RepositoryOptions {
     public let encryption: EncryptionAlgorithm
     /// Additional repository configuration
     public let config: [String: Any]
-    
+
     /// Initializes a new repository options instance
     /// - Parameters:
     ///   - encryption: The encryption algorithm to use (default: .aes256)
@@ -229,7 +216,7 @@ public struct BackupOptions {
     public let excludePaths: [String]
     /// Whether to verify data after backup
     public let verify: Bool
-    
+
     /// Initializes a new backup options instance
     /// - Parameters:
     ///   - incremental: Whether to create an incremental backup (default: true)
@@ -257,7 +244,7 @@ public struct RestoreOptions {
     public let overwrite: Bool
     /// Maximum download speed in bytes per second
     public let downloadLimit: UInt64?
-    
+
     /// Initializes a new restore options instance
     /// - Parameters:
     ///   - verify: Whether to verify data during restore (default: true)
@@ -280,7 +267,7 @@ public struct CheckOptions {
     public let readData: Bool
     /// Whether to check unused blobs
     public let checkUnused: Bool
-    
+
     /// Initializes a new check options instance
     /// - Parameters:
     ///   - readData: Whether to read all data blobs (default: false)
@@ -307,7 +294,7 @@ public struct RetentionPolicy {
     public let keepYearly: Int?
     /// Keep snapshots with these tags
     public let keepTags: [String]?
-    
+
     /// Initializes a new retention policy instance
     /// - Parameters:
     ///   - keepLast: Keep last n snapshots (default: nil)
@@ -346,7 +333,7 @@ public struct RepositoryCheckResult {
     public let bytesChecked: UInt64
     /// Any errors encountered during check
     public let errors: [Error]
-    
+
     /// Initializes a new repository check result instance
     /// - Parameters:
     ///   - success: Whether the check was successful
@@ -374,7 +361,7 @@ public struct PruningResult {
     public let blobsRemoved: Int
     /// Size of reclaimed space in bytes
     public let bytesReclaimed: UInt64
-    
+
     /// Initializes a new pruning result instance
     /// - Parameters:
     ///   - snapshotsRemoved: Number of snapshots removed
@@ -403,7 +390,7 @@ public enum BackupStatus: Equatable {
     case completed
     /// Operation failed with error
     case failed(Error)
-    
+
     /// Compares two backup status instances for equality
     /// - Parameters:
     ///   - lhs: The first backup status instance
@@ -412,17 +399,17 @@ public enum BackupStatus: Equatable {
     public static func == (lhs: BackupStatus, rhs: BackupStatus) -> Bool {
         switch (lhs, rhs) {
         case (.preparing, .preparing):
-            return true
+            true
         case (.running, .running):
-            return true
+            true
         case (.paused, .paused):
-            return true
+            true
         case (.completed, .completed):
-            return true
+            true
         case (.failed, .failed):
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 }

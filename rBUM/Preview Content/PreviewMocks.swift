@@ -42,7 +42,7 @@ private class MockFileSearchService: FileSearchServiceProtocol {
     func searchFile(pattern: String, in repository: Repository) async throws -> [FileMatch] {
         []
     }
-    
+
     func getFileVersions(path: String, in repository: Repository) async throws -> [FileVersion] {
         []
     }
@@ -55,7 +55,7 @@ private class MockRestoreService: RestoreServiceProtocol {
         paths: [String],
         to target: String
     ) async throws {}
-    
+
     func listSnapshots(in repository: Repository) async throws -> [ResticSnapshot] {
         []
     }

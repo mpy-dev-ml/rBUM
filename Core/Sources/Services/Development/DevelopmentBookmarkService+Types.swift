@@ -1,11 +1,3 @@
-//
-//  DevelopmentBookmarkService+Types.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 import Foundation
 
 /// Extension containing type definitions for DevelopmentBookmarkService
@@ -27,7 +19,7 @@ extension DevelopmentBookmarkService {
             let resourceValues = try url.resourceValues(forKeys: [
                 .fileSizeKey,
                 .fileResourceTypeKey,
-                .posixPermissionsKey
+                .posixPermissionsKey,
             ])
 
             return BookmarkEntry(

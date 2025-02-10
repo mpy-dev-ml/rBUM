@@ -1,39 +1,26 @@
-//
-//  ResticServiceProtocol.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 05/02/2025.
-//
-
 import Foundation
 
 /// Represents the result of a Restic command execution
 @objc public class ResticCommandResult: NSObject, NSSecureCoding {
     public static var supportsSecureCoding: Bool { true }
-    
+
     public let output: String
     public let error: String
     public let exitCode: Int32
-    
+
     public init(output: String, error: String, exitCode: Int32) {
         self.output = output
         self.error = error
         self.exitCode = exitCode
         super.init()
     }
-    
+
     public func encode(with coder: NSCoder) {
         coder.encode(output, forKey: "output")
         coder.encode(error, forKey: "error")
         coder.encode(exitCode, forKey: "exitCode")
     }
-    
+
     public required init?(coder: NSCoder) {
         output = coder.decodeObject(of: NSString.self, forKey: "output") as? String ?? ""
         error = coder.decodeObject(of: NSString.self, forKey: "error") as? String ?? ""
@@ -54,7 +41,7 @@ import Foundation
         password: String,
         with reply: @escaping (ResticCommandResult) -> Void
     )
-    
+
     /// Creates a new backup snapshot
     /// - Parameters:
     ///   - repositoryURL: Security-scoped bookmark data for the repository
@@ -69,7 +56,7 @@ import Foundation
         excludePatterns: [String],
         with reply: @escaping (ResticCommandResult) -> Void
     )
-    
+
     /// Lists snapshots in the repository
     /// - Parameters:
     ///   - repositoryURL: Security-scoped bookmark data for the repository
@@ -80,7 +67,7 @@ import Foundation
         password: String,
         with reply: @escaping (ResticCommandResult) -> Void
     )
-    
+
     /// Restores files from a snapshot
     /// - Parameters:
     ///   - repositoryURL: Security-scoped bookmark data for the repository
@@ -97,7 +84,7 @@ import Foundation
         paths: [String]?,
         with reply: @escaping (ResticCommandResult) -> Void
     )
-    
+
     /// Verifies repository integrity
     /// - Parameters:
     ///   - repositoryURL: Security-scoped bookmark data for the repository
@@ -108,11 +95,11 @@ import Foundation
         password: String,
         with reply: @escaping (ResticCommandResult) -> Void
     )
-    
+
     /// Cancels any running Restic operation
     /// - Parameter reply: Completion handler indicating if cancel was successful
     func cancelOperation(with reply: @escaping (Bool) -> Void)
-    
+
     /// Validates that a security-scoped bookmark is still valid
     /// - Parameters:
     ///   - bookmarkData: The bookmark data to validate
@@ -130,7 +117,7 @@ import Foundation
      if let proxy = connection.remoteObjectProxy as? ResticServiceProtocol {
          // Create security-scoped bookmarks for file access
          let repoBookmark = try fileManager.bookmarkData(for: repoURL)
-         
+
          proxy.initialiseRepository(at: repoBookmark, password: "secure-password") { result in
              if result.exitCode == 0 {
                  print("Repository initialised successfully")

@@ -1,10 +1,11 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
+
+@_exported import struct Core.LogMetadataValue
 
 // Re-export Core types
 @_exported import enum Core.LogPrivacy
-@_exported import struct Core.LogMetadataValue
 
 // Re-export mock implementations
 @_exported import MockKeychainService
@@ -120,11 +121,11 @@ class MockXPCService: ResticXPCServiceProtocol {
 
     func executeCommand(_ command: String, arguments: [String]) async throws -> ProcessResult {
         operations.append((Date(), "\(command) \(arguments.joined(separator: " "))"))
-        
+
         if let error = errorToThrow {
             throw error
         }
-        
+
         return commandResults[command] ?? ProcessResult(
             status: 0,
             standardOutput: "Mock output for \(command)",

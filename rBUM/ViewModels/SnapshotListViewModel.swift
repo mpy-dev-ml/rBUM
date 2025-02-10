@@ -1,11 +1,3 @@
-//
-//  SnapshotListViewModel.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Core
 import Foundation
 import os.log

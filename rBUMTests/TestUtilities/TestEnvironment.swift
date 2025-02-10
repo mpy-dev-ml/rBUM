@@ -1,14 +1,6 @@
-//
-//  TestEnvironment.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Test Environment
 
@@ -27,29 +19,29 @@ extension XCTestCase {
         try await setupTestFiles(in: environment)
         return environment
     }
-    
+
     private static func createTestEnvironment() async throws -> TestEnvironment {
         let baseDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("rBUMTests", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        
+
         try FileManager.default.createDirectory(
             at: baseDirectory,
             withIntermediateDirectories: true
         )
-        
+
         return TestEnvironment(
             baseDirectory: baseDirectory,
             mockServices: createMockServices(),
             testFiles: []
         )
     }
-    
+
     private static func createMockServices() -> MockServices {
         let bookmarkService = MockBookmarkService()
         let securityService = MockSecurityService()
         let keychainService = MockKeychainService()
-        
+
         return MockServices(
             bookmarkService: bookmarkService,
             securityService: securityService,

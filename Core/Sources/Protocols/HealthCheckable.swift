@@ -1,13 +1,3 @@
-//
-//  HealthCheckable.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// A protocol that defines health monitoring capabilities for services.
@@ -157,8 +147,10 @@ import Foundation
     /// Whether the state indicates the service is operational
     public var isOperational: Bool {
         switch self {
-        case .healthy, .degraded: true
-        case .unknown, .unhealthy: false
+        case .healthy,
+             .degraded: true
+        case .unknown,
+             .unhealthy: false
         }
     }
 }
@@ -169,17 +161,17 @@ import Foundation
     case connectionFailed = 2
     case invalidState = 3
     case dependencyUnavailable = 4
-    
+
     public var errorDescription: String? {
         switch self {
         case .timeout:
-            return "Service health check timed out"
+            "Service health check timed out"
         case .connectionFailed:
-            return "Failed to connect to service"
+            "Failed to connect to service"
         case .invalidState:
-            return "Service is in an invalid state"
+            "Service is in an invalid state"
         case .dependencyUnavailable:
-            return "Required dependency is unavailable"
+            "Required dependency is unavailable"
         }
     }
 }
@@ -265,7 +257,7 @@ public extension HealthCheckable {
     /// - Throws: HealthError if the check fails
     func checkHealth() async throws -> HealthCheckResult {
         // Default implementation for checkHealth
-        return HealthCheckResult(
+        HealthCheckResult(
             status: .healthy,
             timestamp: Date(),
             duration: 0,
@@ -279,7 +271,7 @@ public extension HealthCheckable {
     /// - Throws: HealthError if validation fails
     func validateConfiguration() async throws -> Bool {
         // Default implementation for validateConfiguration
-        return true
+        true
     }
 
     /// Performs cleanup operations for the service.

@@ -24,14 +24,14 @@ import os.log
         super.init()
     }
 
-    public override func isEqual(_ object: Any?) -> Bool {
+    override public func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? SecurityOperation else { return false }
         return url == other.url &&
             type == other.type &&
             timestamp == other.timestamp
     }
 
-    public override var hash: Int {
+    override public var hash: Int {
         var hasher = Hasher()
         hasher.combine(url)
         hasher.combine(type)

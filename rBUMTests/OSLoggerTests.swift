@@ -8,10 +8,10 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
-@testable import Core
 import os.log
-@testable import rBUM
 import XCTest
+@testable import Core
+@testable import rBUM
 
 final class OSLoggerTests: XCTestCase {
     // MARK: - Properties

@@ -1,18 +1,5 @@
-//
-//  LoggerTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
-@testable import Core
 import XCTest
+@testable import Core
 
 final class LoggerTests: XCTestCase {
     // MARK: - Properties
@@ -79,7 +66,7 @@ final class LoggerTests: XCTestCase {
         let metadata: [String: LogMetadataValue] = [
             "key1": .string("value1"),
             "key2": .int(42),
-            "key3": .bool(true)
+            "key3": .bool(true),
         ]
 
         logger.debug(
@@ -137,7 +124,7 @@ private struct LogParameters {
     let file: String
     let function: String
     let line: Int
-    
+
     init(
         level: LogLevel,
         message: String,
@@ -161,7 +148,7 @@ private struct LogParameters {
 
 private final class TestLogOutput {
     var lastContext: LogContext?
-    
+
     var lastLevel: LogLevel? { lastContext?.level }
     var lastMessage: String? { lastContext?.message }
     var lastMetadata: [String: LogMetadataValue]? { lastContext?.metadata }
@@ -170,7 +157,7 @@ private final class TestLogOutput {
     var lastFile: String? { lastContext?.file }
     var lastFunction: String? { lastContext?.function }
     var lastLine: Int? { lastContext?.line }
-    
+
     func log(_ context: LogContext) {
         lastContext = context
     }
@@ -196,7 +183,7 @@ private final class TestLogger: LoggerProtocol {
         )
         output.log(context)
     }
-    
+
     // Convenience method that maintains the original interface
     func log(
         level: LogLevel,

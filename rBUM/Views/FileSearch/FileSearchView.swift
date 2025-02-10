@@ -7,7 +7,7 @@ struct FileSearchView: View {
     @State private var previewURL: URL?
     @State private var showingRestoreSheet = false
     @State private var selectedVersion: FileVersion?
-    
+
     init(
         fileSearchService: FileSearchServiceProtocol,
         restoreService: RestoreServiceProtocol,
@@ -21,7 +21,7 @@ struct FileSearchView: View {
             )
         )
     }
-    
+
     var body: some View {
         NavigationSplitView {
             // Search sidebar
@@ -30,7 +30,7 @@ struct FileSearchView: View {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    
+
                     TextField("Search files...", text: $viewModel.searchPattern)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
@@ -38,7 +38,7 @@ struct FileSearchView: View {
                                 await viewModel.performSearch()
                             }
                         }
-                    
+
                     if !viewModel.searchPattern.isEmpty {
                         Button {
                             viewModel.clearSearch()
@@ -50,7 +50,7 @@ struct FileSearchView: View {
                     }
                 }
                 .padding([.horizontal, .top])
-                
+
                 // Results list
                 List(viewModel.searchResults, selection: $viewModel.selectedFile) { file in
                     FileMatchRow(file: file)
@@ -96,12 +96,12 @@ struct FileSearchView: View {
 /// Row view for a file match in the search results
 struct FileMatchRow: View {
     let file: FileMatch
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(file.path)
                 .font(.body)
-            
+
             HStack {
                 Text(file.modTime, style: .date)
                 Text("•")
@@ -120,7 +120,7 @@ struct FileVersionsView: View {
     @Binding var selectedVersion: FileVersion?
     @Binding var showingRestoreSheet: Bool
     @Binding var previewURL: URL?
-    
+
     var body: some View {
         List(versions) { version in
             FileVersionRow(version: version)
@@ -131,7 +131,7 @@ struct FileVersionsView: View {
                     } label: {
                         Label("Restore...", systemImage: "arrow.counterclockwise")
                     }
-                    
+
                     Button {
                         Task {
                             // Create a temporary file for preview
@@ -139,7 +139,7 @@ struct FileVersionsView: View {
                             let tempFile = tempDir.appendingPathComponent(
                                 version.path.components(separatedBy: "/").last ?? "file"
                             )
-                            
+
                             do {
                                 // Restore file to temporary location
                                 try await viewModel.restoreVersion(version, to: tempDir)
@@ -170,12 +170,12 @@ struct FileVersionsView: View {
 /// Row view for a file version
 struct FileVersionRow: View {
     let version: FileVersion
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(version.modTime, style: .date)
                 .font(.headline)
-            
+
             HStack {
                 Text(ByteCountFormatter.string(fromByteCount: Int64(version.size), countStyle: .file))
                 Text("•")
@@ -194,29 +194,29 @@ struct RestoreSheet: View {
     let viewModel: FileSearchViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var destinationURL: URL?
-    
+
     var body: some View {
         NavigationStack {
             VStack {
                 Text("Choose where to restore:")
                     .font(.headline)
-                
+
                 Text(version.path)
                     .font(.body)
                     .foregroundColor(.secondary)
-                
+
                 Spacer()
-                
+
                 Button {
                     let panel = NSOpenPanel()
                     panel.canChooseFiles = false
                     panel.canChooseDirectories = true
                     panel.canCreateDirectories = true
                     panel.prompt = "Choose"
-                    
+
                     if panel.runModal() == .OK {
                         destinationURL = panel.url
-                        
+
                         Task {
                             if let url = destinationURL {
                                 await viewModel.restoreVersion(version, to: url)

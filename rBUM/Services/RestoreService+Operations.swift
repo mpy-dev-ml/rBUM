@@ -4,7 +4,7 @@ import Foundation
 @RestoreActor
 extension RestoreService {
     // MARK: - Operation Management
-    
+
     /// Starts a restore operation.
     ///
     /// - Parameters:
@@ -21,7 +21,7 @@ extension RestoreService {
     ) async throws {
         // Add to active operations
         activeRestores.insert(id)
-        
+
         // Log operation start
         logger.info(
             "Starting restore operation",
@@ -29,14 +29,14 @@ extension RestoreService {
                 "operation": .string(id.uuidString),
                 "snapshot": .string(snapshot.id),
                 "repository": .string(repository.id.uuidString),
-                "target": .string(target)
+                "target": .string(target),
             ],
             file: #file,
             function: #function,
             line: #line
         )
     }
-    
+
     /// Completes a restore operation.
     ///
     /// - Parameters:
@@ -50,21 +50,21 @@ extension RestoreService {
     ) async {
         // Remove from active operations
         activeRestores.remove(id)
-        
+
         // Log completion
         logger.info(
             "Completed restore operation",
             metadata: [
                 "operation": .string(id.uuidString),
                 "success": .string(success ? "true" : "false"),
-                "error": error.map { .string($0.localizedDescription) } ?? .string("none")
+                "error": error.map { .string($0.localizedDescription) } ?? .string("none"),
             ],
             file: #file,
             function: #function,
             line: #line
         )
     }
-    
+
     /// Cancels a restore operation.
     ///
     /// - Parameter id: The unique identifier for the operation
@@ -74,10 +74,10 @@ extension RestoreService {
         guard activeRestores.contains(id) else {
             throw RestoreError.operationNotFound
         }
-        
+
         // Remove from active operations
         activeRestores.remove(id)
-        
+
         // Log cancellation
         logger.info(
             "Cancelled restore operation",
@@ -87,21 +87,21 @@ extension RestoreService {
             line: #line
         )
     }
-    
+
     /// Gets all active restore operations.
     ///
     /// - Returns: Set of active operation IDs
     func getActiveOperations() async -> Set<UUID> {
         activeRestores
     }
-    
+
     /// Cancels all active restore operations.
     ///
     /// - Throws: RestoreError if operations cannot be cancelled
     func cancelAllOperations() async throws {
         // Get active operations
         let operations = activeRestores
-        
+
         // Cancel each operation
         for id in operations {
             try await cancelRestoreOperation(id)

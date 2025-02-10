@@ -1,14 +1,6 @@
-//
-//  DefaultSecurityServiceTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 /// Test suite for DefaultSecurityService
 ///
@@ -26,7 +18,7 @@ import XCTest
 /// - Test helpers (DefaultSecurityServiceTests+Helpers.swift)
 final class DefaultSecurityServiceTests: XCTestCase {
     // MARK: - Types
-    
+
     enum FilePermission: String {
         case readable = "r"
         case writable = "w"
@@ -132,7 +124,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully validated access"
+                "Successfully validated access",
             ]
         )
     }
@@ -152,7 +144,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to validate access"
+                "Failed to validate access",
             ]
         )
     }
@@ -177,7 +169,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully saved credentials",
-                "Successfully validated credentials"
+                "Successfully validated credentials",
             ]
         )
     }
@@ -196,7 +188,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to validate credentials"
+                "Failed to validate credentials",
             ]
         )
     }
@@ -213,7 +205,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully validated credentials"
+                "Successfully validated credentials",
             ]
         )
     }
@@ -240,7 +232,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully validated access",
-                "Successfully validated credentials"
+                "Successfully validated credentials",
             ]
         )
     }
@@ -284,7 +276,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully cleaned up resources"
+                "Successfully cleaned up resources",
             ]
         )
     }
@@ -304,7 +296,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check completed successfully"
+                "Health check completed successfully",
             ]
         )
     }
@@ -322,7 +314,7 @@ final class DefaultSecurityServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check failed"
+                "Health check failed",
             ]
         )
     }

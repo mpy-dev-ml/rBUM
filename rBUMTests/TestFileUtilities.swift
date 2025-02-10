@@ -1,14 +1,6 @@
-//
-//  TestFileUtilities.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension XCTestCase {
     /// Creates a temporary file with a given name and content
@@ -23,7 +15,7 @@ extension XCTestCase {
         try content.write(to: fileURL, atomically: true, encoding: .utf8)
         return fileURL
     }
-    
+
     /// Creates a temporary directory
     /// - Parameter name: The name of the directory
     /// - Returns: URL of the created directory
@@ -34,7 +26,7 @@ extension XCTestCase {
         try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
         return dirURL
     }
-    
+
     /// Cleans up a temporary file or directory
     /// - Parameter url: The URL to clean up
     func cleanupTemporary(at url: URL) {

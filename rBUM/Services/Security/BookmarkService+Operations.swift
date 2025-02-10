@@ -3,7 +3,7 @@ import Foundation
 
 extension BookmarkService {
     // MARK: - Operation Management
-    
+
     /// Creates a new security-scoped bookmark for a URL.
     ///
     /// - Parameter url: The URL to create a bookmark for
@@ -29,7 +29,7 @@ extension BookmarkService {
             }
         }
     }
-    
+
     /// Starts accessing a security-scoped resource.
     ///
     /// - Parameter url: The URL to access
@@ -79,14 +79,14 @@ extension BookmarkService {
     private func resolveBookmark(for url: URL) async throws -> ResolvedBookmark {
         let bookmark = try await getOrCreateBookmark(for: url)
         var isStale = false
-        
+
         let resolvedURL = try URL(
             resolvingBookmarkData: bookmark,
             options: .withSecurityScope,
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         )
-        
+
         return ResolvedBookmark(
             url: resolvedURL,
             data: bookmark,
@@ -138,7 +138,7 @@ extension BookmarkService {
 
         return true
     }
-    
+
     /// Stops accessing a security-scoped resource.
     ///
     /// - Parameter url: The URL to stop accessing

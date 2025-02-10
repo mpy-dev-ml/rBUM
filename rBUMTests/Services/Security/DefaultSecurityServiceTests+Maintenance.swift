@@ -1,6 +1,6 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension DefaultSecurityServiceTests {
     // MARK: - Cleanup Tests
@@ -21,7 +21,7 @@ extension DefaultSecurityServiceTests {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to clean up resources"
+                "Failed to clean up resources",
             ]
         )
     }
@@ -42,7 +42,7 @@ extension DefaultSecurityServiceTests {
             mockLogger,
             contains: [
                 "Health check failed",
-                "Keychain service health check failed"
+                "Keychain service health check failed",
             ]
         )
     }

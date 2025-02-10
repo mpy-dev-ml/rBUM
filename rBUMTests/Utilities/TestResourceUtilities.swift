@@ -1,11 +1,3 @@
-//
-//  TestResourceUtilities.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 
@@ -17,16 +9,16 @@ enum TestResourceUtilities {
     static func createTemporaryDirectory(name: String) throws -> URL {
         let baseURL = try URL.temporaryTestDirectory(name: "test-resources")
         let directoryURL = baseURL.appendingPathComponent(name)
-        
+
         try FileManager.default.createDirectory(
             at: directoryURL,
             withIntermediateDirectories: true,
             attributes: nil
         )
-        
+
         return directoryURL
     }
-    
+
     /// Creates a test file with the given content
     /// - Parameters:
     ///   - name: The name of the file
@@ -46,7 +38,7 @@ enum TestResourceUtilities {
         )
         return fileURL
     }
-    
+
     /// Creates a test file with random content
     /// - Parameters:
     ///   - name: The name of the file
@@ -59,15 +51,15 @@ enum TestResourceUtilities {
         in directory: URL
     ) throws -> URL {
         let fileURL = directory.appendingPathComponent(name)
-        let data = Data((0..<size).map { _ in UInt8.random(in: 0...255) })
+        let data = Data((0 ..< size).map { _ in UInt8.random(in: 0 ... 255) })
         try data.write(to: fileURL)
         return fileURL
     }
-    
+
     /// Cleans up test resources at the given URLs
     /// - Parameter urls: The URLs to clean up
     static func cleanupTestResources(_ urls: URL...) {
-        urls.forEach { url in
+        for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
     }

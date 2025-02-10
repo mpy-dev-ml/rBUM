@@ -4,17 +4,17 @@ import Foundation
 import Security
 
 /// Extension providing validation capabilities for DefaultSecurityService
-extension DefaultSecurityService {
+public extension DefaultSecurityService {
     // MARK: - Validation
-    
+
     /// Validates access to a directory.
     ///
     /// - Parameter url: The URL of the directory to validate
     /// - Returns: Boolean indicating whether access is valid
-    public func validateDirectoryAccess(at url: URL) async throws -> Bool {
+    func validateDirectoryAccess(at url: URL) async throws -> Bool {
         let id = UUID()
         let type: SecurityOperationType = .validateAccess
-        
+
         return try await withOperation(id: id, type: type) {
             // Check directory permissions
             let contents = try fileManager.contentsOfDirectory(
@@ -22,15 +22,15 @@ extension DefaultSecurityService {
                 includingPropertiesForKeys: [.isReadableKey, .isWritableKey],
                 options: [.skipsHiddenFiles]
             )
-            
+
             // Check each item in directory
             for itemURL in contents {
                 var isReadable: AnyObject?
                 try itemURL.getResourceValue(&isReadable, forKey: .isReadableKey)
-                
+
                 var isWritable: AnyObject?
                 try itemURL.getResourceValue(&isWritable, forKey: .isWritableKey)
-                
+
                 guard
                     isReadable as? Bool == true,
                     isWritable as? Bool == true
@@ -38,18 +38,18 @@ extension DefaultSecurityService {
                     return false
                 }
             }
-            
+
             return true
         }
     }
-    
+
     /// Validates sandbox container access.
     ///
     /// - Returns: Boolean indicating whether sandbox container access is valid
-    public func validateSandboxContainer() async throws -> Bool {
+    func validateSandboxContainer() async throws -> Bool {
         let id = UUID()
         let type: SecurityOperationType = .validateContainer
-        
+
         return try await withOperation(id: id, type: type) {
             // Get sandbox container
             guard let container = try? FileManager.default.url(
@@ -60,12 +60,12 @@ extension DefaultSecurityService {
             ) else {
                 return false
             }
-            
+
             // Validate container access
             return try validateDirectoryAccess(at: container)
         }
     }
-    
+
     /// Validates security-scoped access to a URL.
     ///
     /// - Parameter url: The URL to validate
@@ -75,7 +75,7 @@ extension DefaultSecurityService {
         guard let bookmark = try? await bookmarkService.findBookmark(for: url) else {
             return false
         }
-        
+
         // Resolve bookmark to validate it
         _ = try await resolveBookmark(bookmark)
         return true

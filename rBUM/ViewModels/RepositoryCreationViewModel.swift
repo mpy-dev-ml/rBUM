@@ -1,16 +1,3 @@
-//
-//  RepositoryCreationViewModel.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import AppKit
 import Core
 import Foundation
@@ -202,12 +189,12 @@ final class RepositoryCreationViewModel: ObservableObject, RepositoryCreationVie
         }
 
         // Check complexity
-        let hasUppercase = password.contains(where: { $0.isUppercase })
-        let hasLowercase = password.contains(where: { $0.isLowercase })
-        let hasNumbers = password.contains(where: { $0.isNumber })
+        let hasUppercase = password.contains(where: \.isUppercase)
+        let hasLowercase = password.contains(where: \.isLowercase)
+        let hasNumbers = password.contains(where: \.isNumber)
         let hasSpecialCharacters = password.contains(where: { "!@#$%^&*()_+-=[]{}|;:,.<>?".contains($0) })
 
-        guard hasUppercase && hasLowercase && hasNumbers && hasSpecialCharacters else {
+        guard hasUppercase, hasLowercase, hasNumbers, hasSpecialCharacters else {
             throw RepositoryError.weakPassword(
                 "Password must contain uppercase, lowercase, numbers, and special characters"
             )
@@ -263,7 +250,7 @@ final class RepositoryCreationViewModel: ObservableObject, RepositoryCreationVie
             // Log completion
             logger.info("Repository created successfully", metadata: [
                 "name": .string(name),
-                "location": .string(directoryURL?.path ?? "unknown")
+                "location": .string(directoryURL?.path ?? "unknown"),
             ])
 
             // Clear sensitive data

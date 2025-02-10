@@ -1,16 +1,3 @@
-//
-//  BaseSandboxedService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// Base class for services requiring sandbox compliance

@@ -1,14 +1,6 @@
-//
-//  MockSecurityServices.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Mock Keychain Service
 

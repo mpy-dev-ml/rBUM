@@ -1,14 +1,6 @@
-//
-//  DefaultSecurityServiceValidationTests.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 /// Test suite for DefaultSecurityService validation functionality
 final class DefaultSecurityServiceValidationTests: XCTestCase {

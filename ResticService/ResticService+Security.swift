@@ -25,7 +25,7 @@ extension ResticService {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
-            
+
             if isStale {
                 securityRecorder.recordOperation(
                     url: url,
@@ -35,15 +35,15 @@ extension ResticService {
                 )
                 throw ResticXPCError.bookmarkValidationFailed
             }
-            
+
             let access = try SecurityScopedAccess(url: url)
-            
+
             securityRecorder.recordOperation(
                 url: url,
                 type: .bookmark,
                 status: .success
             )
-            
+
             return access
         } catch {
             securityRecorder.recordOperation(
@@ -55,7 +55,7 @@ extension ResticService {
             throw error
         }
     }
-    
+
     /// Starts accessing a security-scoped resource
     ///
     /// This method:
@@ -68,13 +68,13 @@ extension ResticService {
     func startAccessing(_ access: SecurityScopedAccess) -> Bool {
         do {
             try access.startAccessing()
-            
+
             securityRecorder.recordOperation(
                 url: access.url,
                 type: .access,
                 status: .success
             )
-            
+
             return true
         } catch {
             securityRecorder.recordOperation(
@@ -86,7 +86,7 @@ extension ResticService {
             return false
         }
     }
-    
+
     /// Stops accessing a security-scoped resource
     ///
     /// This method:
@@ -98,7 +98,7 @@ extension ResticService {
     func stopAccessing(_ access: SecurityScopedAccess) {
         do {
             try access.stopAccessing()
-            
+
             securityRecorder.recordOperation(
                 url: access.url,
                 type: .access,

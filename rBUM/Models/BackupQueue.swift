@@ -1,13 +1,3 @@
-//
-//  BackupQueue.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 01/02/2025.
-//
-
 import Core
 import Foundation
 
@@ -169,7 +159,7 @@ public final class BackupQueue {
             object: nil,
             userInfo: [
                 "jobId": jobId,
-                "progress": progress
+                "progress": progress,
             ]
         )
     }
@@ -187,7 +177,7 @@ public final class BackupQueue {
             object: nil,
             userInfo: [
                 "jobId": jobId,
-                "error": error
+                "error": error,
             ]
         )
     }

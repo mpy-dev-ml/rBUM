@@ -1,11 +1,3 @@
-//
-//  BookmarkError.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 import Foundation
 
 /// An enumeration of errors that can occur during security-scoped bookmark operations.

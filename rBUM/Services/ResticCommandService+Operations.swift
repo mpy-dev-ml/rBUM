@@ -3,7 +3,7 @@ import Foundation
 
 extension ResticCommandService {
     // MARK: - Operation Management
-    
+
     /// Starts a Restic operation.
     ///
     /// - Parameters:
@@ -20,21 +20,21 @@ extension ResticCommandService {
         accessQueue.async(flags: .barrier) {
             self.activeOperations.insert(id)
         }
-        
+
         // Log operation start
         logger.info(
             "Starting Restic operation",
             metadata: [
                 "operation": .string(id.uuidString),
                 "command": .string(command.rawValue),
-                "repository": .string(repository.id.uuidString)
+                "repository": .string(repository.id.uuidString),
             ],
             file: #file,
             function: #function,
             line: #line
         )
     }
-    
+
     /// Completes a Restic operation.
     ///
     /// - Parameters:
@@ -50,21 +50,21 @@ extension ResticCommandService {
         accessQueue.async(flags: .barrier) {
             self.activeOperations.remove(id)
         }
-        
+
         // Log completion
         logger.info(
             "Completed Restic operation",
             metadata: [
                 "operation": .string(id.uuidString),
                 "success": .string(success ? "true" : "false"),
-                "error": error.map { .string($0.localizedDescription) } ?? .string("none")
+                "error": error.map { .string($0.localizedDescription) } ?? .string("none"),
             ],
             file: #file,
             function: #function,
             line: #line
         )
     }
-    
+
     /// Cancels a Restic operation.
     ///
     /// - Parameter id: The unique identifier for the operation
@@ -74,12 +74,12 @@ extension ResticCommandService {
         guard accessQueue.sync(execute: { activeOperations.contains(id) }) else {
             throw ResticCommandError.operationNotFound
         }
-        
+
         // Remove from active operations
         accessQueue.async(flags: .barrier) {
             self.activeOperations.remove(id)
         }
-        
+
         // Log cancellation
         logger.info(
             "Cancelled Restic operation",
@@ -89,27 +89,27 @@ extension ResticCommandService {
             line: #line
         )
     }
-    
+
     /// Gets all active Restic operations.
     ///
     /// - Returns: Set of active operation IDs
     func getActiveOperations() -> Set<UUID> {
         accessQueue.sync { activeOperations }
     }
-    
+
     /// Cancels all active Restic operations.
     ///
     /// - Throws: ResticCommandError if operations cannot be cancelled
     func cancelAllOperations() async throws {
         // Get active operations
         let operations = getActiveOperations()
-        
+
         // Cancel each operation
         for id in operations {
             try await cancelResticOperation(id)
         }
     }
-    
+
     /// Pauses all active Restic operations.
     ///
     /// - Throws: ResticCommandError if operations cannot be paused
@@ -120,13 +120,13 @@ extension ResticCommandService {
             function: #function,
             line: #line
         )
-        
+
         // Signal all active operations to pause
         for operation in activeOperations {
             try await operation.pause()
         }
     }
-    
+
     /// Resumes all paused Restic operations.
     ///
     /// - Throws: ResticCommandError if operations cannot be resumed
@@ -137,7 +137,7 @@ extension ResticCommandService {
             function: #function,
             line: #line
         )
-        
+
         // Resume all paused operations
         for operation in activeOperations where operation.isPaused {
             try await operation.resume()

@@ -14,7 +14,7 @@ extension SnapshotListViewModel {
             """,
             metadata: [
                 "error": .string("\(error)"),
-                "operation": .string(currentOperation?.rawValue ?? "unknown")
+                "operation": .string(currentOperation?.rawValue ?? "unknown"),
             ]
         )
 
@@ -41,12 +41,12 @@ enum SnapshotError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidRepository(let message):
-            return "Invalid repository: \(message)"
-        case .accessDenied(let message):
-            return "Access denied: \(message)"
-        case .restorationFailed(let message):
-            return "Restoration failed: \(message)"
+        case let .invalidRepository(message):
+            "Invalid repository: \(message)"
+        case let .accessDenied(message):
+            "Access denied: \(message)"
+        case let .restorationFailed(message):
+            "Restoration failed: \(message)"
         }
     }
 }

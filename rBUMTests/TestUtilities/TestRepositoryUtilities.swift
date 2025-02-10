@@ -1,14 +1,6 @@
-//
-//  TestRepositoryUtilities.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Test Repository
 
@@ -27,30 +19,30 @@ extension XCTestCase {
         try await setupRepositoryData(for: repository)
         return repository
     }
-    
+
     private static func createTestRepository() async throws -> TestRepository {
         let baseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("TestRepository")
             .appendingPathComponent(UUID().uuidString)
-        
+
         try FileManager.default.createDirectory(
             at: baseURL,
             withIntermediateDirectories: true
         )
-        
+
         let credentials = RepositoryCredentials(
             url: baseURL,
             password: "test-password",
             type: .local
         )
-        
+
         return TestRepository(
             url: baseURL,
             credentials: credentials,
             files: []
         )
     }
-    
+
     static func cleanupTestRepository(_ repository: TestRepository) throws {
         try FileManager.default.removeItem(at: repository.url)
     }

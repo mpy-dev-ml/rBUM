@@ -1,6 +1,6 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - File Test Utilities
 

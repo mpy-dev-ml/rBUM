@@ -1,43 +1,36 @@
-//
-//  MockBackupService.swift
-//  rBUMTests
-//
-//  Created by Matthew Yeager on 09/02/2025.
-//
-
-@testable import Core
 import Foundation
+@testable import Core
 
 final class MockBackupService: BackupServiceProtocol {
     weak var delegate: BackupServiceDelegate?
     private(set) var currentStatus: BackupStatus = .preparing
-    
+
     // MARK: - Mock Control
-    
+
     var shouldFail = false
     var simulatedDelay: TimeInterval = 0
     var simulatedProgress: BackupProgress?
-    
+
     private func simulateOperation() async throws {
         if shouldFail {
             throw BackupError.operationFailed("Simulated failure")
         }
-        
+
         if let progress = simulatedProgress {
             delegate?.backupService(self, didUpdateProgress: progress)
         }
-        
+
         if simulatedDelay > 0 {
             try await Task.sleep(nanoseconds: UInt64(simulatedDelay * 1_000_000_000))
         }
     }
-    
+
     // MARK: - BackupServiceProtocol
-    
+
     func initializeRepository(_ repository: Repository, options: RepositoryOptions?) async throws {
         try await simulateOperation()
     }
-    
+
     func createBackup(
         to repository: Repository,
         paths: [String],
@@ -45,7 +38,7 @@ final class MockBackupService: BackupServiceProtocol {
         options: BackupOptions?
     ) async throws -> ResticSnapshot {
         try await simulateOperation()
-        
+
         return ResticSnapshot(
             id: "mock-snapshot-id",
             time: Date(),
@@ -57,13 +50,13 @@ final class MockBackupService: BackupServiceProtocol {
             repositoryId: repository.id
         )
     }
-    
+
     func listSnapshots(
         in repository: Repository,
         filter: SnapshotFilter?
     ) async throws -> [ResticSnapshot] {
         try await simulateOperation()
-        
+
         return [
             ResticSnapshot(
                 id: "mock-snapshot-1",
@@ -74,10 +67,10 @@ final class MockBackupService: BackupServiceProtocol {
                 parent: nil,
                 size: 1024,
                 repositoryId: repository.id
-            )
+            ),
         ]
     }
-    
+
     func restore(
         snapshot: ResticSnapshot,
         from repository: Repository,
@@ -87,13 +80,13 @@ final class MockBackupService: BackupServiceProtocol {
     ) async throws {
         try await simulateOperation()
     }
-    
+
     func checkRepository(
         _ repository: Repository,
         options: CheckOptions?
     ) async throws -> RepositoryCheckResult {
         try await simulateOperation()
-        
+
         return RepositoryCheckResult(
             success: true,
             blobsChecked: 100,
@@ -101,34 +94,34 @@ final class MockBackupService: BackupServiceProtocol {
             errors: []
         )
     }
-    
+
     func pruneSnapshots(
         in repository: Repository,
         policy: RetentionPolicy
     ) async throws -> PruningResult {
         try await simulateOperation()
-        
+
         return PruningResult(
             snapshotsRemoved: 5,
             blobsRemoved: 50,
             bytesReclaimed: 1024 * 1024
         )
     }
-    
+
     func cancelCurrentOperation() async {
         currentStatus = .completed
         delegate?.backupService(self, didChangeStatus: currentStatus)
     }
-    
+
     func pauseCurrentOperation() async {
-        if case .running(let progress) = currentStatus {
+        if case let .running(progress) = currentStatus {
             currentStatus = .paused(progress)
             delegate?.backupService(self, didChangeStatus: currentStatus)
         }
     }
-    
+
     func resumeCurrentOperation() async {
-        if case .paused(let progress) = currentStatus {
+        if case let .paused(progress) = currentStatus {
             currentStatus = .running(progress)
             delegate?.backupService(self, didChangeStatus: currentStatus)
         }

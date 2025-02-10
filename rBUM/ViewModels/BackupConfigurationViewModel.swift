@@ -5,16 +5,16 @@ import SwiftUI
 @MainActor
 final class BackupConfigurationViewModel: ObservableObject {
     // MARK: - Properties
-    
+
     @Published private(set) var configurations: [BackupConfiguration] = []
     @Published private(set) var isLoading = false
     @Published private(set) var error: Error?
-    
+
     private let configurationService: BackupConfigurationService
     private let logger: LoggerProtocol
-    
+
     // MARK: - Initialization
-    
+
     init(
         configurationService: BackupConfigurationService,
         logger: LoggerProtocol
@@ -22,19 +22,19 @@ final class BackupConfigurationViewModel: ObservableObject {
         self.configurationService = configurationService
         self.logger = logger
     }
-    
+
     // MARK: - Configuration Management
-    
+
     /// Load saved configurations
     func loadConfigurations() {
         Task {
             do {
                 isLoading = true
                 error = nil
-                
+
                 try await configurationService.loadConfigurations()
                 configurations = await configurationService.getConfigurations()
-                
+
                 logger.debug("Loaded \(configurations.count) configurations", privacy: .public)
             } catch {
                 logger.error("Failed to load configurations: \(error.localizedDescription)", privacy: .public)
@@ -43,7 +43,7 @@ final class BackupConfigurationViewModel: ObservableObject {
             isLoading = false
         }
     }
-    
+
     /// Create a new backup configuration
     /// - Parameters:
     ///   - name: Name of the backup configuration
@@ -67,7 +67,7 @@ final class BackupConfigurationViewModel: ObservableObject {
         Task {
             do {
                 error = nil
-                
+
                 _ = try await configurationService.createConfiguration(
                     name: name,
                     description: description,
@@ -78,10 +78,10 @@ final class BackupConfigurationViewModel: ObservableObject {
                     verifyAfterBackup: verifyAfterBackup,
                     repository: repository
                 )
-                
+
                 // Refresh configurations list
                 configurations = await configurationService.getConfigurations()
-                
+
                 logger.debug("Created new configuration: \(name)", privacy: .public)
             } catch {
                 logger.error("Failed to create configuration: \(error.localizedDescription)", privacy: .public)
@@ -89,17 +89,17 @@ final class BackupConfigurationViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Start accessing sources for a backup configuration
     /// - Parameter configurationId: ID of the configuration to start accessing
     func startAccessing(configurationId: UUID) {
         Task {
             do {
                 error = nil
-                
+
                 try await configurationService.startAccessing(configurationId: configurationId)
                 configurations = await configurationService.getConfigurations()
-                
+
                 logger.debug("Started accessing configuration: \(configurationId)", privacy: .public)
             } catch {
                 logger.error("Failed to start accessing configuration: \(error.localizedDescription)", privacy: .public)
@@ -107,16 +107,16 @@ final class BackupConfigurationViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Stop accessing sources for a backup configuration
     /// - Parameter configurationId: ID of the configuration to stop accessing
     func stopAccessing(configurationId: UUID) {
         Task {
             error = nil
-            
+
             await configurationService.stopAccessing(configurationId: configurationId)
             configurations = await configurationService.getConfigurations()
-            
+
             logger.debug("Stopped accessing configuration: \(configurationId)", privacy: .public)
         }
     }

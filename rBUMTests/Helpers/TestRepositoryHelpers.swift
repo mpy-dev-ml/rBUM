@@ -1,14 +1,6 @@
-//
-//  TestRepositoryHelpers.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 // MARK: - Test Repository Setup
 
@@ -120,7 +112,7 @@ extension XCTestCase {
             files: [
                 "small.dat": TestFileMetadata(size: 1024, chunks: 1),
                 "medium.dat": TestFileMetadata(size: 1024 * 1024, chunks: 10),
-                "large.dat": TestFileMetadata(size: 1024 * 1024 * 10, chunks: 100)
+                "large.dat": TestFileMetadata(size: 1024 * 1024 * 10, chunks: 100),
             ]
         )
 
@@ -137,7 +129,7 @@ extension XCTestCase {
             files: [
                 "small.dat",
                 "medium.dat",
-                "large.dat"
+                "large.dat",
             ]
         )
 

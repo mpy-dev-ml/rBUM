@@ -22,14 +22,16 @@ import os.log
         }
 
         let errorMessage = "\(operation) failed (simulated)"
-        logger.error("""
-                     Simulating \(operation) failure for URL: \
-                     \(url.path)
-                     """,
-                     file: #file,
-                     function: #function,
-                     line: #line)
-        
+        logger.error(
+            """
+            Simulating \(operation) failure for URL: \
+            \(url.path)
+            """,
+            file: #file,
+            function: #function,
+            line: #line
+        )
+
         return NSError(
             domain: "dev.mpy.rbum.security",
             code: 1,

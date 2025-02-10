@@ -1,12 +1,12 @@
 import Foundation
 
-extension SecurityService {
+public extension SecurityService {
     // MARK: - XPC Validation
-    
+
     /// Validate XPC service by performing a ping test
     /// - Returns: True if service is valid
     /// - Throws: SecurityError if validation fails
-    public func validateXPCService() async throws -> Bool {
+    func validateXPCService() async throws -> Bool {
         logger.debug(
             "Validating XPC service",
             file: #file,
@@ -31,7 +31,7 @@ extension SecurityService {
     /// - Parameter connection: Connection to validate
     /// - Returns: True if connection is valid
     /// - Throws: SecurityError if validation fails
-    public func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
+    func validateXPCConnection(_ connection: NSXPCConnection) async throws -> Bool {
         logger.debug(
             "Validating XPC connection",
             file: #file,

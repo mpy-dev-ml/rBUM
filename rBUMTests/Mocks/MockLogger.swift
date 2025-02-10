@@ -1,13 +1,6 @@
-//
-//  MockLogger.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 @_exported import struct Core.LogMetadataValue
 @_exported import enum Core.LogPrivacy

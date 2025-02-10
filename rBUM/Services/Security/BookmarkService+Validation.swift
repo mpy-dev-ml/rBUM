@@ -3,7 +3,7 @@ import Foundation
 
 extension BookmarkService {
     // MARK: - Validation
-    
+
     /// Validates a bookmark for a URL.
     ///
     /// - Parameter url: The URL to validate the bookmark for
@@ -35,7 +35,7 @@ extension BookmarkService {
             }
         }
     }
-    
+
     /// Gets or creates a bookmark for a URL.
     ///
     /// - Parameter url: The URL to get or create a bookmark for

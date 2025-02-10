@@ -8,13 +8,13 @@ public protocol PerformanceMonitorProtocol {
     ///   - metadata: Additional context about the operation
     /// - Returns: A unique identifier for the operation
     func startOperation(_ operation: String, metadata: [String: String]?) async -> UUID
-    
+
     /// End monitoring for an operation
     /// - Parameters:
     ///   - operationId: The operation's unique identifier
     ///   - status: Final status of the operation
     func endOperation(_ operationId: UUID, status: OperationStatus) async
-    
+
     /// Record a specific metric
     /// - Parameters:
     ///   - name: Name of the metric
@@ -22,7 +22,7 @@ public protocol PerformanceMonitorProtocol {
     ///   - unit: Unit of measurement
     ///   - metadata: Additional context about the metric
     func recordMetric(_ name: String, value: Double, unit: MetricUnit, metadata: [String: String]?) async
-    
+
     /// Get performance report for a time period
     /// - Parameters:
     ///   - startDate: Start of the period
@@ -43,15 +43,15 @@ public enum MetricUnit {
     case count
     /// Data transfer rate in bytes per second
     case bytesPerSecond
-    
+
     /// String representation of the unit
     var description: String {
         switch self {
-        case .bytes: return "bytes"
-        case .milliseconds: return "ms"
-        case .percentage: return "%"
-        case .count: return "count"
-        case .bytesPerSecond: return "B/s"
+        case .bytes: "bytes"
+        case .milliseconds: "ms"
+        case .percentage: "%"
+        case .count: "count"
+        case .bytesPerSecond: "B/s"
         }
     }
 }

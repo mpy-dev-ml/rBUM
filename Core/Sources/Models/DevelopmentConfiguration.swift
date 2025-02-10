@@ -1,11 +1,3 @@
-//
-//  DevelopmentConfiguration.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 7 February 2025
-//
-
 import Foundation
 
 /// Configuration options for development services
@@ -21,7 +13,7 @@ import Foundation
 /// - Security boundary validation
 public struct DevelopmentConfiguration: Equatable, Hashable {
     // MARK: - Properties
-    
+
     /// Whether to simulate bookmark-related failures
     public let shouldSimulateBookmarkFailures: Bool
 

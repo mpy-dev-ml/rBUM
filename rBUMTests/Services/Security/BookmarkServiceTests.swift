@@ -1,19 +1,6 @@
-//
-//  BookmarkServiceTests.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 03/02/2025.
-//
-
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 final class BookmarkServiceTests: XCTestCase {
     // MARK: - Properties
@@ -60,7 +47,7 @@ final class BookmarkServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully created bookmark",
-                "Successfully validated bookmark"
+                "Successfully validated bookmark",
             ]
         )
     }
@@ -83,7 +70,7 @@ final class BookmarkServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully started accessing URL",
-                "Successfully stopped accessing URL"
+                "Successfully stopped accessing URL",
             ]
         )
     }
@@ -103,7 +90,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Bookmark validation failed"
+                "Bookmark validation failed",
             ]
         )
     }
@@ -122,7 +109,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to start accessing URL"
+                "Failed to start accessing URL",
             ]
         )
     }
@@ -166,7 +153,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check completed successfully"
+                "Health check completed successfully",
             ]
         )
     }
@@ -183,7 +170,7 @@ final class BookmarkServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Health check failed"
+                "Health check failed",
             ]
         )
     }

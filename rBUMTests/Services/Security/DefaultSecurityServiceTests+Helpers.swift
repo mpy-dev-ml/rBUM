@@ -1,6 +1,6 @@
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 extension DefaultSecurityServiceTests {
     // MARK: - Test Setup Helpers
@@ -102,12 +102,12 @@ extension DefaultSecurityServiceTests {
     private func configureKeychainMock() {
         mockKeychainService.saveHandler = { _, _, _ in
             // Simulate successful keychain save
-            return true
+            true
         }
 
         mockKeychainService.loadHandler = { _, _ in
             // Return test data
-            return Data("test-data".utf8)
+            Data("test-data".utf8)
         }
     }
 

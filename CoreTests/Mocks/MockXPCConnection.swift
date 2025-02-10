@@ -1,5 +1,5 @@
-@testable import Core
 import Foundation
+@testable import Core
 
 final class MockXPCConnection: NSXPCConnection {
     var pingResult: Bool = true
@@ -12,11 +12,11 @@ final class MockXPCConnection: NSXPCConnection {
     )
     var shouldThrowError: Bool = false
     var error: Error = ResticXPCError.connectionNotEstablished
-    
+
     override init() {
         super.init(machServiceName: "")
     }
-    
+
     override var remoteObjectProxyWithErrorHandler: Any {
         MockResticXPCProtocol(
             pingResult: pingResult,
@@ -32,7 +32,7 @@ final class MockResticXPCProtocol: NSObject, ResticXPCProtocol {
     private let resourcesResult: SystemResources
     private let shouldThrowError: Bool
     private let error: Error
-    
+
     init(
         pingResult: Bool,
         resourcesResult: SystemResources,
@@ -45,28 +45,28 @@ final class MockResticXPCProtocol: NSObject, ResticXPCProtocol {
         self.error = error
         super.init()
     }
-    
+
     func ping() async throws -> Bool {
         if shouldThrowError {
             throw error
         }
         return pingResult
     }
-    
+
     func validate() async throws -> Bool {
         if shouldThrowError {
             throw error
         }
         return true
     }
-    
+
     func checkResources() async throws -> SystemResources {
         if shouldThrowError {
             throw error
         }
         return resourcesResult
     }
-    
+
     func execute(config: XPCCommandConfig, progress: ProgressTracker) async throws -> ProcessResult {
         if shouldThrowError {
             throw error

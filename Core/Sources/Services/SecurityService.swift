@@ -1,16 +1,3 @@
-//
-//  SecurityService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import AppKit
 import Foundation
 
@@ -47,21 +34,21 @@ import Foundation
 /// 4. Detailed logging
 public final class SecurityService: SecurityServiceProtocol {
     // MARK: - Properties
-    
+
     /// Logger for tracking operations
     let logger: LoggerProtocol
-    
+
     /// XPC service for secure operations
     let xpcService: ResticXPCServiceProtocol
-    
+
     /// Active bookmarks mapped by URL
     var activeBookmarks: [URL: Data] = [:]
-    
+
     /// Queue for thread-safe bookmark operations
     let bookmarkQueue = DispatchQueue(label: "dev.mpy.rBUM.security.bookmarks", attributes: .concurrent)
 
     // MARK: - Initialization
-    
+
     /// Initialize the security service
     /// - Parameters:
     ///   - logger: Logger for tracking operations
@@ -73,7 +60,7 @@ public final class SecurityService: SecurityServiceProtocol {
     }
 
     // MARK: - Notifications
-    
+
     private func setupNotifications() {
         logger.debug(
             "Setting up security notifications",

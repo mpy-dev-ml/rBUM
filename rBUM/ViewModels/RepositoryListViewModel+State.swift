@@ -1,11 +1,3 @@
-//
-//  RepositoryListViewModel+State.swift
-//  rBUM
-//
-//  First created: 8 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import Foundation
 
@@ -17,7 +9,7 @@ extension RepositoryListViewModel {
         case error(Error)
         case empty
     }
-    
+
     /// Updates the state of the repository list
     /// - Parameter repositories: The repositories to display
     func updateState(with repositories: [Repository]) {
@@ -27,13 +19,13 @@ extension RepositoryListViewModel {
             state = .loaded(repositories)
         }
     }
-    
+
     /// Updates the state with an error
     /// - Parameter error: The error to display
     func updateState(with error: Error) {
         state = .error(error)
     }
-    
+
     /// Sets the state to loading
     func setLoading() {
         state = .loading

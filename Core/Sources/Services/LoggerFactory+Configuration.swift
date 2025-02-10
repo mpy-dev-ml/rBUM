@@ -1,25 +1,25 @@
 import Foundation
 
-extension LoggerFactory {
+public extension LoggerFactory {
     // MARK: - Configuration
-    
+
     /// Configuration options for loggers
-    public struct Configuration {
+    struct Configuration {
         /// The subsystem identifier for all loggers
         public static let subsystem = "dev.mpy.rBUM"
-        
+
         /// Default configuration options
         public static let `default` = Configuration()
-        
+
         /// Whether to include source file information in log messages
         public let includeSourceInfo: Bool
-        
+
         /// Whether to include timestamps in log messages
         public let includeTimestamps: Bool
-        
+
         /// Whether to include the subsystem in log messages
         public let includeSubsystem: Bool
-        
+
         /// Creates a new configuration with the specified options
         ///
         /// - Parameters:
@@ -36,7 +36,7 @@ extension LoggerFactory {
             self.includeSubsystem = includeSubsystem
         }
     }
-    
+
     /// Current configuration for all loggers
-    public static var configuration: Configuration = .default
+    static var configuration: Configuration = .default
 }

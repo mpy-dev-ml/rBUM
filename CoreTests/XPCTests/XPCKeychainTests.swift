@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 final class XPCKeychainTests: XCTestCase {
     private var keychainService: KeychainService!
@@ -41,25 +41,25 @@ final class XPCKeychainTests: XCTestCase {
         let account = "test-account"
         let service = "test-service"
         let data = Data("test-data".utf8)
-        
+
         try await keychainService.storeItem(
             data,
             account: account,
             service: service
         )
-        
+
         let retrievedData = try await keychainService.retrieveItem(
             account: account,
             service: service
         )
-        
+
         XCTAssertEqual(data, retrievedData)
-        
+
         verifyLogMessages(
             mockLogger,
             contains: [
                 "Successfully stored keychain item",
-                "Successfully retrieved keychain item"
+                "Successfully retrieved keychain item",
             ]
         )
     }

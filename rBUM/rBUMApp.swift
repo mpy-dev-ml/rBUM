@@ -1,16 +1,3 @@
-//
-//  rBUMApp.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 29/01/2025.
-//
-
 import Core
 import Foundation
 import SwiftUI
@@ -31,38 +18,38 @@ struct RBUMApp: App {
     init() {
         let dependencies = AppSetup.setupCoreDependencies()
         let securityServices = AppSetup.setupSecurityServices(dependencies)
-        
+
         credentialsManager = AppSetup.setupCredentialsManager(
             dependencies: dependencies,
             keychainService: securityServices.keychainService
         )
-        
+
         repositoryStorage = AppSetup.setupRepositoryStorage(dependencies.fileManager)
-        
+
         resticService = AppSetup.setupResticService(
             dependencies: dependencies,
             securityServices: securityServices
         )
-        
+
         repositoryCreationService = AppSetup.setupRepositoryCreationService(
             dependencies: dependencies,
             securityServices: securityServices
         )
-        
+
         fileSearchService = AppSetup.setupFileSearchService(
             dependencies: dependencies,
             securityServices: securityServices,
             resticService: resticService,
             logger: logger
         )
-        
+
         restoreService = AppSetup.setupRestoreService(
             dependencies: dependencies,
             securityServices: securityServices,
             resticService: resticService,
             logger: logger
         )
-        
+
         logger.debug("App initialised", privacy: .public)
     }
 
@@ -104,7 +91,7 @@ struct RBUMApp: App {
             }
         #endif
     }
-    
+
     // MARK: - Private Methods
 
     private func setupAppDelegate() {
@@ -162,24 +149,24 @@ struct RBUMApp: App {
         guard let url = URL(string: "https://api.github.com/repos/mpy/rBUM/releases/latest") else {
             return
         }
-        
+
         URLSession.shared.dataTask(with: url) { [weak self] _, _, _ in
             // Implementation moved to GitHubRelease.swift
         }.resume()
     }
-    
+
     private func showUpdateAlert(release: GitHubRelease) {
         let alert = NSAlert()
         alert.messageText = "Update Available"
         alert.informativeText = "A new version of rBUM (\(release.tagName)) is available."
         alert.addButton(withTitle: "View Release")
         alert.addButton(withTitle: "Later")
-        
+
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(URL(string: release.htmlUrl)!)
         }
     }
-    
+
     private func handleSleepState() {
         logger.info(
             "System entering sleep state",
@@ -187,13 +174,13 @@ struct RBUMApp: App {
             function: #function,
             line: #line
         )
-        
+
         // Pause any active backup operations
         Task {
             await resticService.pauseAllOperations()
         }
     }
-    
+
     private func handleWakeState() {
         logger.info(
             "System waking from sleep",
@@ -201,7 +188,7 @@ struct RBUMApp: App {
             function: #function,
             line: #line
         )
-        
+
         // Resume paused backup operations
         Task {
             await resticService.resumeAllOperations()

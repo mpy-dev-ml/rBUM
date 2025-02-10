@@ -1,16 +1,9 @@
-// 
-//  DefaultSecurityService+Protocol.swift
-//  rBUM
-//
-//  Created on 6 February 2025.
-//
-
 import AppKit
 import Core
 import Foundation
 
 /// Extension to DefaultSecurityService implementing SecurityServiceProtocol methods
-extension DefaultSecurityService {
+public extension DefaultSecurityService {
     // MARK: - SecurityServiceProtocol Implementation
 
     /// Requests permission for the specified URL.
@@ -19,7 +12,7 @@ extension DefaultSecurityService {
     ///
     /// - Parameter url: The URL for which permission is being requested
     /// - Returns: `true` if permission is granted, `false` otherwise
-    public func requestPermission(for url: URL) async throws -> Bool {
+    func requestPermission(for url: URL) async throws -> Bool {
         try await measure("Request Permission") {
             // First check if we already have access
             if try await validateAccess(to: url) {
@@ -44,7 +37,7 @@ extension DefaultSecurityService {
     ///
     /// - Parameter url: The URL for which a bookmark is being created
     /// - Returns: The created bookmark data
-    public func createBookmark(for url: URL) throws -> Data {
+    func createBookmark(for url: URL) throws -> Data {
         try bookmarkService.createBookmark(for: url)
     }
 
@@ -52,7 +45,7 @@ extension DefaultSecurityService {
     ///
     /// - Parameter bookmark: The bookmark data to resolve
     /// - Returns: The resolved URL
-    public func resolveBookmark(_ bookmark: Data) throws -> URL {
+    func resolveBookmark(_ bookmark: Data) throws -> URL {
         try bookmarkService.resolveBookmark(bookmark)
     }
 
@@ -62,7 +55,7 @@ extension DefaultSecurityService {
     ///
     /// - Parameter url: The URL for which access is being validated
     /// - Returns: `true` if access is valid, `false` otherwise
-    public func validateAccess(to url: URL) async throws -> Bool {
+    func validateAccess(to url: URL) async throws -> Bool {
         try await measure("Validate Access") {
             do {
                 let bookmark = try bookmarkService.createBookmark(for: url)
@@ -85,7 +78,7 @@ extension DefaultSecurityService {
     ///
     /// - Parameter url: The URL for which access is being started
     /// - Returns: `true` if access is started successfully, `false` otherwise
-    override public func startAccessing(_ url: URL) -> Bool {
+    override func startAccessing(_ url: URL) -> Bool {
         do {
             return try bookmarkService.startAccessing(url)
         } catch {

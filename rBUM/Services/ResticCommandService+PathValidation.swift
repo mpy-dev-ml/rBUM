@@ -26,31 +26,31 @@ extension ResticCommandService {
         guard !path.isEmpty else {
             throw ValidationError.emptyPath
         }
-        
+
         let url = URL(fileURLWithPath: path)
-        
+
         // Check if path exists
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ValidationError.pathNotFound(path: path)
         }
-        
+
         // Check if path is accessible
         guard FileManager.default.isReadableFile(atPath: url.path) else {
             throw ValidationError.pathNotAccessible(path: path)
         }
-        
+
         // Check for invalid characters in path
         let invalidCharacters = CharacterSet(charactersIn: "<>:\"|?*")
         guard url.path.rangeOfCharacter(from: invalidCharacters) == nil else {
             throw ValidationError.invalidPathFormat(path: path)
         }
-        
+
         // Check path length
         guard url.path.count <= 4096 else {
             throw ValidationError.pathTooLong(path: path)
         }
     }
-    
+
     /// Validates exclude patterns for backup operations
     ///
     /// This method validates an array of exclude patterns, ensuring each pattern:
@@ -73,13 +73,13 @@ extension ResticCommandService {
             guard !pattern.isEmpty else {
                 throw ValidationError.emptyExcludePattern
             }
-            
+
             // Check for invalid characters in pattern
             let invalidCharacters = CharacterSet(charactersIn: "<>:\"|")
             guard pattern.rangeOfCharacter(from: invalidCharacters) == nil else {
                 throw ValidationError.invalidExcludePattern(pattern: pattern)
             }
-            
+
             // Check pattern length
             guard pattern.count <= 1024 else {
                 throw ValidationError.excludePatternTooLong(pattern: pattern)

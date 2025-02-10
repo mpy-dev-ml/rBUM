@@ -1,16 +1,3 @@
-//
-//  ProcessExecutor.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Core
 import Foundation
 
@@ -81,7 +68,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         allowedPaths: Set<String> = [
             "/usr/bin",
             "/usr/local/bin",
-            "/opt/homebrew/bin"
+            "/opt/homebrew/bin",
         ]
     ) {
         self.fileManager = fileManager
@@ -238,7 +225,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         try await withCheckedThrowingContinuation { continuation in
             do {
                 process.terminationHandler = { [weak self] process in
-                    guard let self = self else { return }
+                    guard let self else { return }
                     Task {
                         do {
                             let result = try await self.handleProcessTermination(
@@ -254,9 +241,9 @@ final class ProcessExecutor: ProcessExecutorProtocol {
                 }
 
                 try process.run()
-                
+
                 // Set up output handling if needed
-                if let onOutput = onOutput {
+                if let onOutput {
                     Task {
                         try await handleProcessOutput(outputPipe, callback: onOutput)
                     }
@@ -266,7 +253,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             }
         }
     }
-    
+
     /// Handles process termination and collects output
     private func handleProcessTermination(
         _ process: Process,
@@ -277,21 +264,21 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             outputPipe: outputPipe,
             errorPipe: errorPipe
         )
-        
+
         let outputString = String(data: outputData, encoding: .utf8) ?? ""
         let errorString = String(data: errorData, encoding: .utf8) ?? ""
-        
+
         if process.terminationStatus != 0 {
             logProcessError(status: process.terminationStatus, error: errorString)
         }
-        
+
         return ProcessResult(
             output: outputString,
             error: errorString,
             exitCode: Int(process.terminationStatus)
         )
     }
-    
+
     /// Collects output from process pipes
     private func collectProcessOutput(
         outputPipe: Pipe,
@@ -301,7 +288,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
         async let error = errorPipe.fileHandleForReading.readToEnd() ?? Data()
         return try await (output, error)
     }
-    
+
     /// Handles real-time process output
     private func handleProcessOutput(
         _ pipe: Pipe,
@@ -312,7 +299,7 @@ final class ProcessExecutor: ProcessExecutorProtocol {
             callback(line)
         }
     }
-    
+
     /// Logs process error information
     private func logProcessError(status: Int32, error: String) {
         logger.error(

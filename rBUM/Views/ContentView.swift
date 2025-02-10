@@ -3,18 +3,18 @@ import SwiftUI
 
 struct ContentView: View {
     // MARK: - Properties
-    
+
     private let credentialsManager: KeychainCredentialsManagerProtocol
     private let repositoryStorage: RepositoryStorageProtocol
     private let resticService: ResticCommandServiceProtocol
     private let repositoryCreationService: RepositoryCreationServiceProtocol
     private let fileSearchService: FileSearchServiceProtocol
     private let restoreService: RestoreServiceProtocol
-    
+
     @State private var selectedTab: Tab = .backups
-    
+
     // MARK: - Initialisation
-    
+
     init(
         credentialsManager: KeychainCredentialsManagerProtocol,
         repositoryStorage: RepositoryStorageProtocol,
@@ -30,9 +30,9 @@ struct ContentView: View {
         self.fileSearchService = fileSearchService
         self.restoreService = restoreService
     }
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         NavigationSplitView {
             List(Tab.allCases, selection: $selectedTab) { tab in
@@ -46,9 +46,9 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
     }
-    
+
     // MARK: - Private Views
-    
+
     @ViewBuilder
     private var selectedDetailView: some View {
         switch selectedTab {
@@ -78,9 +78,9 @@ extension ContentView {
         case backups
         case search
         case settings
-        
+
         var id: String { rawValue }
-        
+
         var title: String {
             switch self {
             case .backups:
@@ -91,7 +91,7 @@ extension ContentView {
                 "Settings"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .backups:

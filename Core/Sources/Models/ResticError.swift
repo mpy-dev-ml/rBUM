@@ -11,14 +11,14 @@ import Foundation
 @objc public enum ResticBackupErrorCode: Int {
     case repositoryNotFound = 1
     case invalidCredentials = """
-        The provided credentials are invalid. \
-        Please check your repository password \
-        and try again.
-        """
+    The provided credentials are invalid. \
+    Please check your repository password \
+    and try again.
+    """
     case backupFailed = """
-        The backup operation failed. \
-        Please check the logs for more details.
-        """
+    The backup operation failed. \
+    Please check the logs for more details.
+    """
     case restoreFailed = 4
     case snapshotFailed = 5
     case initializationFailed = 6
@@ -32,7 +32,7 @@ import Foundation
 @objc public class ResticBackupError: NSError {
     /// Domain identifier for Restic backup errors
     public static let domain = "dev.mpy.rBUM.ResticBackup"
-    
+
     /// Creates a new ResticBackupError with the specified code and message
     /// - Parameters:
     ///   - code: The error code indicating the type of error
@@ -45,22 +45,22 @@ import Foundation
         details: String? = nil
     ) -> ResticBackupError {
         var userInfo: [String: Any] = [
-            NSLocalizedDescriptionKey: message
+            NSLocalizedDescriptionKey: message,
         ]
-        
-        if let details = details {
+
+        if let details {
             userInfo["details"] = details
         }
-        
+
         return ResticBackupError(
             domain: domain,
             code: code.rawValue,
             userInfo: userInfo
         )
     }
-    
+
     public var errorDetails: String? {
-        return userInfo["details"] as? String
+        userInfo["details"] as? String
     }
 }
 
@@ -87,56 +87,56 @@ import Foundation
     case resticNotInstalled
     case snapshotNotFound(String)
     case unexpectedError(String)
-    
+
     public var errorDescription: String? {
         switch self {
-        case .compressionError(let message):
-            return "Compression error: \(message)"
-        case .insufficientDiskSpace(let required, let available):
-            return "Insufficient disk space - Required: \(required) bytes, Available: \(available) bytes"
+        case let .compressionError(message):
+            "Compression error: \(message)"
+        case let .insufficientDiskSpace(required, available):
+            "Insufficient disk space - Required: \(required) bytes, Available: \(available) bytes"
         case .invalidCommand:
-            return "Invalid command"
+            "Invalid command"
         case .invalidWorkingDirectory:
-            return "Invalid working directory"
+            "Invalid working directory"
         case .invalidBookmark:
-            return "Invalid security-scoped bookmark"
+            "Invalid security-scoped bookmark"
         case .accessDenied:
-            return "Access denied"
+            "Access denied"
         case .resourceError:
-            return "Resource error"
+            "Resource error"
         case .unknownError:
-            return "Unknown error"
-        case .invalidConfiguration(let message):
-            return "Invalid configuration: \(message)"
-        case .invalidCredentials(let message):
-            return "Invalid credentials: \(message)"
-        case .invalidPath(let message):
-            return "Invalid path: \(message)"
-        case .invalidSettings(let message):
-            return "Invalid settings: \(message)"
-        case .invalidSnapshotId(let message):
-            return "Invalid snapshot ID: \(message)"
-        case .invalidTag(let message):
-            return "Invalid tag: \(message)"
-        case .lockError(let message):
-            return "Lock error: \(message)"
-        case .networkError(let message):
-            return "Network error: \(message)"
+            "Unknown error"
+        case let .invalidConfiguration(message):
+            "Invalid configuration: \(message)"
+        case let .invalidCredentials(message):
+            "Invalid credentials: \(message)"
+        case let .invalidPath(message):
+            "Invalid path: \(message)"
+        case let .invalidSettings(message):
+            "Invalid settings: \(message)"
+        case let .invalidSnapshotId(message):
+            "Invalid snapshot ID: \(message)"
+        case let .invalidTag(message):
+            "Invalid tag: \(message)"
+        case let .lockError(message):
+            "Lock error: \(message)"
+        case let .networkError(message):
+            "Network error: \(message)"
         case .repositoryExists:
-            return "Repository already exists"
+            "Repository already exists"
         case .repositoryNotFound:
-            return "Repository not found"
+            "Repository not found"
         case .resticNotInstalled:
-            return "Restic is not installed"
-        case .snapshotNotFound(let message):
-            return "Snapshot not found: \(message)"
-        case .unexpectedError(let message):
-            return "Unexpected error: \(message)"
+            "Restic is not installed"
+        case let .snapshotNotFound(message):
+            "Snapshot not found: \(message)"
+        case let .unexpectedError(message):
+            "Unexpected error: \(message)"
         }
     }
-    
+
     public static func error(_ code: ResticError, _ message: String) -> NSError {
-        return NSError(
+        NSError(
             domain: "dev.mpy.rBUM.Restic",
             code: code.rawValue,
             userInfo: [NSLocalizedDescriptionKey: message]

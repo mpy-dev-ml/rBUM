@@ -8,9 +8,9 @@
 //  First created: 6 February 2025
 //  Last updated: 6 February 2025
 //
+import XCTest
 @testable import Core
 @testable import rBUM
-import XCTest
 
 final class BookmarkPersistenceServiceTests: XCTestCase {
     // MARK: - Properties
@@ -60,7 +60,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
             mockLogger,
             contains: [
                 "Successfully saved bookmark",
-                "Successfully loaded bookmark"
+                "Successfully loaded bookmark",
             ]
         )
     }
@@ -84,7 +84,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Successfully deleted bookmark"
+                "Successfully deleted bookmark",
             ]
         )
     }
@@ -100,7 +100,7 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         verifyLogMessages(
             mockLogger,
             contains: [
-                "Failed to load bookmark: Bookmark not found"
+                "Failed to load bookmark: Bookmark not found",
             ]
         )
     }
@@ -114,8 +114,10 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
         await XCTAssertThrowsError(try service.saveBookmark(invalidBookmark, for: testURL)) { error in
             XCTAssertTrue(error is BookmarkError)
         }
-        verifyLogMessages(mockLogger,
-                          contains: "Failed to save bookmark")
+        verifyLogMessages(
+            mockLogger,
+            contains: "Failed to save bookmark"
+        )
     }
 
     // MARK: - Health Check Tests
@@ -129,8 +131,10 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
 
         // Then
         XCTAssertTrue(isHealthy)
-        verifyLogMessages(mockLogger,
-                          contains: "Health check completed")
+        verifyLogMessages(
+            mockLogger,
+            contains: "Health check completed"
+        )
     }
 
     func testHealthCheckFailure() async {
@@ -142,7 +146,9 @@ final class BookmarkPersistenceServiceTests: XCTestCase {
 
         // Then
         XCTAssertFalse(isHealthy)
-        verifyLogMessages(mockLogger,
-                          contains: "Health check failed")
+        verifyLogMessages(
+            mockLogger,
+            contains: "Health check failed"
+        )
     }
 }

@@ -13,10 +13,10 @@ import os.log
 private extension ResticXPCService {
     /// Minimum required memory in bytes (512MB)
     static let minimumMemoryRequired: UInt64 = 512 * 1024 * 1024
-    
+
     /// Minimum required disk space in bytes (1GB)
     static let minimumDiskSpaceRequired: Int64 = 1024 * 1024 * 1024
-    
+
     /// Cache directory name
     static let cacheDirName = "ResticCache"
 }
@@ -35,7 +35,7 @@ extension ResticXPCService {
                 create: true
             )
             let resticCacheDir = cacheDir.appendingPathComponent(Self.cacheDirName)
-            
+
             if !fileManager.fileExists(atPath: resticCacheDir.path) {
                 try fileManager.createDirectory(
                     at: resticCacheDir,
@@ -43,7 +43,7 @@ extension ResticXPCService {
                     attributes: nil
                 )
             }
-            
+
             return resticCacheDir
         }
     }
@@ -162,7 +162,7 @@ private extension ResticXPCService {
         let preparedCommand = try await prepareCommand(command)
         return try await executeCommand(preparedCommand)
     }
-    
+
     private func validateCommandPrerequisites(_ command: XPCCommandConfig) async throws {
         // Check connection state
         guard connectionState == .connected else {
@@ -177,7 +177,7 @@ private extension ResticXPCService {
             throw ResticXPCError.resourceUnavailable("Required resources are not available")
         }
     }
-    
+
     private func validateCommandParameters(_ command: XPCCommandConfig) throws {
         // Validate required parameters
         guard !command.command.isEmpty else {
@@ -193,7 +193,7 @@ private extension ResticXPCService {
         // Validate environment variables
         try validateEnvironmentVariables(command.environment)
     }
-    
+
     private func validateEnvironmentVariables(_ environment: [String: String]) throws {
         let requiredVariables = ["RESTIC_PASSWORD", "RESTIC_REPOSITORY"]
         for variable in requiredVariables {
@@ -202,7 +202,7 @@ private extension ResticXPCService {
             }
         }
     }
-    
+
     private func checkResourceAvailability(for command: XPCCommandConfig) async throws -> Bool {
         // Check system resources
         let resources = try await systemMonitor.checkResources()
@@ -219,7 +219,7 @@ private extension ResticXPCService {
 
         return true
     }
-    
+
     private func checkDiskSpace(for command: XPCCommandConfig) async throws -> Bool {
         // Get repository path
         guard let repoPath = command.environment["RESTIC_REPOSITORY"] else {
@@ -231,7 +231,7 @@ private extension ResticXPCService {
         let availableSpace = try await fileManager.availableSpace(at: url)
         return availableSpace > Self.minimumDiskSpaceRequired
     }
-    
+
     private func prepareCommand(_ command: XPCCommandConfig) async throws -> PreparedCommand {
         // Build command arguments
         var arguments = command.arguments
@@ -249,13 +249,13 @@ private extension ResticXPCService {
             workingDirectory: command.workingDirectory
         )
     }
-    
+
     private func executeCommand(_ command: PreparedCommand) async throws -> ProcessResult {
         let operationId = UUID()
 
         // Start progress tracking
         progressTracker.startOperation(operationId)
-        
+
         do {
             // Execute command
             let process = try await processExecutor.execute(
@@ -264,10 +264,10 @@ private extension ResticXPCService {
                 environment: command.environment,
                 workingDirectory: command.workingDirectory
             )
-            
+
             // Update progress
             progressTracker.updateProgress(operationId, progress: 1.0)
-            
+
             return process
         } catch {
             // Handle execution error

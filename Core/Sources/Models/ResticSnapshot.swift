@@ -1,13 +1,3 @@
-//
-//  ResticSnapshot.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 31/01/2025.
-//
-
 import Foundation
 
 /// Represents a snapshot in a Restic repository
@@ -89,7 +79,8 @@ import Foundation
               let hostname = json["hostname"] as? String,
               let paths = json["paths"] as? [String],
               let size = json["size"] as? UInt64,
-              let repositoryId = json["repository_id"] as? String else {
+              let repositoryId = json["repository_id"] as? String
+        else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
@@ -100,7 +91,7 @@ import Foundation
 
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
+
         guard let time = dateFormatter.date(from: timeString) else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -162,12 +153,12 @@ import Foundation
         self.id = id
         self.time = time
         self.hostname = hostname
-        self.tags = coder.decodeObject(
+        tags = coder.decodeObject(
             of: [NSArray.self, NSString.self],
             forKey: "tags"
         ) as? [String]
         self.paths = paths
-        self.parent = coder.decodeObject(
+        parent = coder.decodeObject(
             of: NSString.self,
             forKey: "parent"
         ) as String?
@@ -177,20 +168,20 @@ import Foundation
     }
 
     // MARK: - Equatable
-    
+
     override public func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? ResticSnapshot else { return false }
         return id == other.id &&
-               time == other.time &&
-               hostname == other.hostname &&
-               tags == other.tags &&
-               paths == other.paths &&
-               parent == other.parent &&
-               size == other.size &&
-               repositoryId == other.repositoryId
+            time == other.time &&
+            hostname == other.hostname &&
+            tags == other.tags &&
+            paths == other.paths &&
+            parent == other.parent &&
+            size == other.size &&
+            repositoryId == other.repositoryId
     }
-    
-    public override var hash: Int {
+
+    override public var hash: Int {
         var hasher = Hasher()
         hasher.combine(id)
         hasher.combine(time)
@@ -209,7 +200,7 @@ import Foundation
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .medium
-        
+
         return """
         Snapshot \(shortId)
         Created: \(dateFormatter.string(from: time))

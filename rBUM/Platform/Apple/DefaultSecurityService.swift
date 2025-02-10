@@ -1,16 +1,3 @@
-//
-//  DefaultSecurityService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import AppKit
 import Core
 import Foundation
@@ -164,14 +151,14 @@ public class DefaultSecurityService: BaseSandboxedService, Measurable {
             url: url,
             startTime: Date()
         )
-        
+
         operationRecorder.recordOperation(operation)
-        
+
         // Log operation start
         logger.info("Starting security operation", metadata: [
             "operation": .string(id.uuidString),
             "type": .string(type.rawValue),
-            "url": .string(url.path)
+            "url": .string(url.path),
         ])
     }
 }

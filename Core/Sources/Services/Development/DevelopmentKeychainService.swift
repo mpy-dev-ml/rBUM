@@ -1,11 +1,3 @@
-//
-//  DevelopmentKeychainService.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 import Foundation
 import Security
 
@@ -27,10 +19,10 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
     // MARK: - XPC Configuration
 
     /// Configures XPC sharing for the development keychain.
-    /// 
+    ///
     /// This method simulates XPC configuration in a development environment.
     /// It can simulate failures for testing purposes.
-    /// 
+    ///
     /// - Parameters:
     ///   - accessGroup: The access group to configure
     /// - Throws: KeychainError if the operation fails
@@ -44,18 +36,18 @@ public final class DevelopmentKeychainService: KeychainServiceProtocol {
 
 // MARK: - KeychainServiceProtocol Implementation
 
-extension DevelopmentKeychainService {
+public extension DevelopmentKeychainService {
     /// Saves data to the development keychain.
-    /// 
+    ///
     /// This method simulates keychain storage in a development environment.
     /// It validates access groups and can simulate failures for testing purposes.
-    /// 
+    ///
     /// - Parameters:
     ///   - data: The data to save
     ///   - key: The key to associate with the data
     ///   - accessGroup: Optional access group for shared keychain access
     /// - Throws: KeychainError if the operation fails or access is denied
-    public func save(_ data: Data, for key: String, accessGroup: String?) throws {
+    func save(_ data: Data, for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "save",
             error: KeychainError.saveFailed(status: errSecIO)
@@ -71,7 +63,7 @@ extension DevelopmentKeychainService {
                     "creation_date": Date(),
                     "last_modified": Date(),
                     "accessible": true,
-                    "access_control": accessGroup != nil
+                    "access_control": accessGroup != nil,
                 ]
             )
             store[key] = item
@@ -90,16 +82,16 @@ extension DevelopmentKeychainService {
     }
 
     /// Retrieves data from the development keychain.
-    /// 
+    ///
     /// This method simulates keychain retrieval in a development environment.
     /// It validates access groups and can simulate failures for testing purposes.
-    /// 
+    ///
     /// - Parameters:
     ///   - key: The key to retrieve data for
     ///   - accessGroup: Optional access group for shared keychain access
     /// - Returns: The retrieved data, or nil if not found
     /// - Throws: KeychainError if the operation fails or access is denied
-    public func retrieve(for key: String, accessGroup: String?) throws -> Data? {
+    func retrieve(for key: String, accessGroup: String?) throws -> Data? {
         try simulateFailureIfNeeded(
             operation: "retrieve",
             error: KeychainError.retrievalFailed(status: errSecItemNotFound)
@@ -123,7 +115,8 @@ extension DevelopmentKeychainService {
 
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup {
+               item.accessGroup != requiredGroup
+            {
                 logger.error(
                     """
                     Access group mismatch:
@@ -159,15 +152,15 @@ extension DevelopmentKeychainService {
     }
 
     /// Deletes data from the development keychain.
-    /// 
+    ///
     /// This method simulates keychain deletion in a development environment.
     /// It validates access groups and can simulate failures for testing purposes.
-    /// 
+    ///
     /// - Parameters:
     ///   - key: The key to delete data for
     ///   - accessGroup: Optional access group for shared keychain access
     /// - Throws: KeychainError if the operation fails or access is denied
-    public func delete(for key: String, accessGroup: String?) throws {
+    func delete(for key: String, accessGroup: String?) throws {
         try simulateFailureIfNeeded(
             operation: "delete",
             error: KeychainError.deleteFailed(status: errSecInvalidItemRef)
@@ -191,7 +184,8 @@ extension DevelopmentKeychainService {
 
             // Validate access group matches
             if let requiredGroup = accessGroup,
-               item.accessGroup != requiredGroup {
+               item.accessGroup != requiredGroup
+            {
                 logger.error(
                     """
                     Access group mismatch for deletion:
@@ -260,27 +254,27 @@ extension DevelopmentKeychainService {
 
 // MARK: - Legacy Methods (Deprecated)
 
-extension DevelopmentKeychainService {
+public extension DevelopmentKeychainService {
     /// Saves data to the development keychain without an access group.
-    /// 
+    ///
     /// - Parameters:
     ///   - data: The data to save
     ///   - key: The key to associate with the data
     /// - Throws: KeychainError if the operation fails
     /// - Warning: Deprecated. Use save(_:for:accessGroup:) instead
     @available(*, deprecated, message: "Use save(_:for:accessGroup:) instead")
-    public func save(_ data: Data, for key: String) throws {
+    func save(_ data: Data, for key: String) throws {
         try save(data, for: key, accessGroup: nil)
     }
 
     /// Retrieves data from the development keychain without an access group.
-    /// 
+    ///
     /// - Parameter key: The key to retrieve data for
     /// - Returns: The retrieved data
     /// - Throws: KeychainError if the operation fails or item is not found
     /// - Warning: Deprecated. Use retrieve(for:accessGroup:) instead
     @available(*, deprecated, message: "Use retrieve(for:accessGroup:) instead")
-    public func load(for key: String) throws -> Data {
+    func load(for key: String) throws -> Data {
         guard let data = try retrieve(for: key, accessGroup: nil) else {
             throw KeychainError.retrievalFailed(status: errSecItemNotFound)
         }
@@ -288,12 +282,12 @@ extension DevelopmentKeychainService {
     }
 
     /// Deletes data from the development keychain without an access group.
-    /// 
+    ///
     /// - Parameter key: The key to delete data for
     /// - Throws: KeychainError if the operation fails
     /// - Warning: Deprecated. Use delete(for:accessGroup:) instead
     @available(*, deprecated, message: "Use delete(for:accessGroup:) instead")
-    public func delete(for key: String) throws {
+    func delete(for key: String) throws {
         try delete(for: key, accessGroup: nil)
     }
 }

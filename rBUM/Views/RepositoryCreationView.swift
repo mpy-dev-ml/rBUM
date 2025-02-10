@@ -1,16 +1,3 @@
-//
-//  RepositoryCreationView.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import SwiftUI
 
 struct RepositoryCreationView: View {
@@ -64,10 +51,12 @@ private extension RepositoryCreationView {
             } header: {
                 Text("Repository Details")
             } footer: {
-                Text(viewModel.mode == .create
-                    ? "Choose where to create the new repository"
-                    : "Select an existing repository to import")
-                    .font(.caption)
+                Text(
+                    viewModel.mode == .create
+                        ? "Choose where to create the new repository"
+                        : "Select an existing repository to import"
+                )
+                .font(.caption)
             }
 
             Section {
@@ -92,8 +81,10 @@ private extension RepositoryCreationView {
                     .disabled(true)
 
                 Button(action: viewModel.selectPath) {
-                    Label(viewModel.path.isEmpty ? "Select Location" : "Change Location",
-                          systemImage: "folder")
+                    Label(
+                        viewModel.path.isEmpty ? "Select Location" : "Change Location",
+                        systemImage: "folder"
+                    )
                 }
             }
         }

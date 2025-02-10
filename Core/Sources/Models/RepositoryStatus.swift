@@ -1,14 +1,3 @@
-//
-//  RepositoryStatus.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-
 /// Repository statistics
 struct RepositoryStats: Codable, Equatable {
     /// Total size of the repository in bytes
@@ -31,18 +20,18 @@ struct RepositoryStats: Codable, Equatable {
 public enum RepositoryStatusType {
     /// Repository is ready for operations
     case ready
-    
+
     /// Repository has encountered an error
     /// - Parameter error: The error that occurred
     case error(Error)
-    
+
     /// Repository is currently performing an operation
     /// - Parameter operation: Description of the current operation
     case inProgress(operation: String)
-    
+
     /// Repository is locked, preventing concurrent operations
     case locked
-    
+
     /// Repository is currently unavailable
     case unavailable
 }

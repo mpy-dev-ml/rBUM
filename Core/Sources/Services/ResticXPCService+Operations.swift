@@ -3,7 +3,7 @@ import Foundation
 @available(macOS 13.0, *)
 extension ResticXPCService {
     // MARK: - Operation Types
-    
+
     /// Represents a pending Restic XPC operation
     struct ResticXPCOperation: Identifiable {
         let id: UUID
@@ -12,16 +12,16 @@ extension ResticXPCService {
         var status: OperationStatus
         var progress: Double
         var error: Error?
-        
+
         init(type: OperationType) {
-            self.id = UUID()
+            id = UUID()
             self.type = type
-            self.startTime = Date()
-            self.status = .pending
-            self.progress = 0.0
+            startTime = Date()
+            status = .pending
+            progress = 0.0
         }
     }
-    
+
     /// Types of operations that can be performed
     enum OperationType {
         case backup(source: URL, destination: URL)
@@ -30,25 +30,25 @@ extension ResticXPCService {
         case list
         case check
         case prune
-        
+
         var description: String {
             switch self {
-            case .backup(let source, let destination):
-                return "Backup from \(source.path) to \(destination.path)"
-            case .restore(let source, let destination):
-                return "Restore from \(source.path) to \(destination.path)"
-            case .initialize(let url):
-                return "Initialize repository at \(url.path)"
+            case let .backup(source, destination):
+                "Backup from \(source.path) to \(destination.path)"
+            case let .restore(source, destination):
+                "Restore from \(source.path) to \(destination.path)"
+            case let .initialize(url):
+                "Initialize repository at \(url.path)"
             case .list:
-                return "List snapshots"
+                "List snapshots"
             case .check:
-                return "Check repository"
+                "Check repository"
             case .prune:
-                return "Prune repository"
+                "Prune repository"
             }
         }
     }
-    
+
     /// Status of an operation
     enum OperationStatus {
         case pending
@@ -57,9 +57,9 @@ extension ResticXPCService {
         case failed
         case cancelled
     }
-    
+
     // MARK: - Operation Management
-    
+
     /// Start tracking a new operation
     /// - Parameter type: Type of operation to track
     /// - Returns: ID of the new operation
@@ -76,7 +76,7 @@ extension ResticXPCService {
         )
         return operation.id
     }
-    
+
     /// Update the status of an operation
     /// - Parameters:
     ///   - id: Operation ID
@@ -87,21 +87,21 @@ extension ResticXPCService {
             if let index = pendingOperations.firstIndex(where: { $op in op.id == id }) {
                 pendingOperations[index].status = status
                 pendingOperations[index].error = error
-                
+
                 logger.info(
                     "Updated operation \(id): \(status)",
                     file: #file,
                     function: #function,
                     line: #line
                 )
-                
+
                 if status == .completed || status == .failed || status == .cancelled {
                     cleanupOperation(id)
                 }
             }
         }
     }
-    
+
     /// Update the progress of an operation
     /// - Parameters:
     ///   - id: Operation ID
@@ -113,7 +113,7 @@ extension ResticXPCService {
             }
         }
     }
-    
+
     /// Cancel an operation
     /// - Parameter id: Operation ID
     func cancelOperation(_ id: UUID) {
@@ -124,7 +124,7 @@ extension ResticXPCService {
             }
         }
     }
-    
+
     /// Get the status of an operation
     /// - Parameter id: Operation ID
     /// - Returns: Current operation status and progress
@@ -136,7 +136,7 @@ extension ResticXPCService {
             return nil
         }
     }
-    
+
     /// Clean up resources for an operation
     /// - Parameter id: Operation ID
     private func cleanupOperation(_ id: UUID) {

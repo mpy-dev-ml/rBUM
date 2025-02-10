@@ -1,11 +1,3 @@
-//
-//  BackupListView.swift
-//  rBUM
-//
-//  First created: 7 February 2025
-//  Last updated: 8 February 2025
-//
-
 import Core
 import SwiftUI
 
@@ -13,15 +5,15 @@ import SwiftUI
 struct BackupListView: View {
     /// View model managing the backup operations
     @StateObject private var viewModel: BackupListViewModel
-    
+
     /// Initialize the backup list view
     init() {
         let logger = Logger(subsystem: "dev.mpy.rBUM", category: "backup-list")
-        
+
         // Initialize services
         let backupService = BackupService(logger: logger)
         let repositoryService = RepositoryService(logger: logger)
-        
+
         // Initialize view model
         _viewModel = StateObject(
             wrappedValue: BackupListViewModel(
@@ -31,7 +23,7 @@ struct BackupListView: View {
             )
         )
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
@@ -44,24 +36,24 @@ struct BackupListView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 400)
-                
+
                 Spacer()
-                
+
                 Button("New Backup") {
                     viewModel.showNewBackupSheet = true
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
             .padding()
-            
+
             // Search field
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                
+
                 TextField("Search backups...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
-                
+
                 if !viewModel.searchText.isEmpty {
                     Button {
                         viewModel.searchText = ""
@@ -75,7 +67,7 @@ struct BackupListView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
             .background(Color(.textBackgroundColor))
-            
+
             // Backup list
             List(viewModel.backupOperations) { operation in
                 BackupOperationRow(operation: operation)
@@ -103,24 +95,24 @@ struct BackupListView: View {
 /// Row view for displaying a backup operation
 private struct BackupOperationRow: View {
     let operation: BackupListViewModel.BackupOperation
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Title and status
             HStack {
                 Text(operation.repository.name)
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 StatusBadge(state: operation.state)
             }
-            
+
             // Sources
             Text(operation.sources.map(\.lastPathComponent).joined(separator: ", "))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             // Tags
             if !operation.tags.isEmpty {
                 HStack {
@@ -134,26 +126,26 @@ private struct BackupOperationRow: View {
                     }
                 }
             }
-            
+
             // Progress or completion time
             switch operation.state {
-            case .inProgress(let progress):
+            case let .inProgress(progress):
                 ProgressView(value: progress) {
                     Text("\(Int(progress * 100))%")
                         .font(.caption)
                 }
                 .progressViewStyle(.linear)
-                
-            case .completed(let date):
+
+            case let .completed(date):
                 Text("Completed \(date.formatted(.relative))")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
-            case .failed(let error):
+
+            case let .failed(error):
                 Text("Failed: \(error.localizedDescription)")
                     .font(.caption)
                     .foregroundColor(.red)
-                
+
             case .idle:
                 Text("Waiting to start...")
                     .font(.caption)
@@ -167,13 +159,13 @@ private struct BackupOperationRow: View {
 /// Badge showing the backup operation status
 private struct StatusBadge: View {
     let state: BackupListViewModel.BackupState
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Circle()
                 .fill(color)
                 .frame(width: 8, height: 8)
-            
+
             Text(text)
                 .font(.caption)
                 .foregroundColor(color)
@@ -183,30 +175,30 @@ private struct StatusBadge: View {
         .background(color.opacity(0.1))
         .cornerRadius(12)
     }
-    
+
     private var color: Color {
         switch state {
         case .idle:
-            return .secondary
+            .secondary
         case .inProgress:
-            return .blue
+            .blue
         case .completed:
-            return .green
+            .green
         case .failed:
-            return .red
+            .red
         }
     }
-    
+
     private var text: String {
         switch state {
         case .idle:
-            return "Waiting"
+            "Waiting"
         case .inProgress:
-            return "In Progress"
+            "In Progress"
         case .completed:
-            return "Completed"
+            "Completed"
         case .failed:
-            return "Failed"
+            "Failed"
         }
     }
 }
@@ -215,12 +207,12 @@ private struct StatusBadge: View {
 private struct NewBackupSheet: View {
     @ObservedObject var viewModel: BackupListViewModel
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var selectedRepository: Repository?
     @State private var selectedSources: [URL] = []
     @State private var tags: String = ""
     @State private var showSourcePicker = false
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -228,23 +220,23 @@ private struct NewBackupSheet: View {
                 Section("Repository") {
                     Picker("Select Repository", selection: $selectedRepository) {
                         Text("Select a Repository")
-                            .tag(Optional<Repository>.none)
-                        
+                            .tag(Repository?.none)
+
                         ForEach(viewModel.repositories) { repository in
                             Text(repository.name)
                                 .tag(Optional(repository))
                         }
                     }
                 }
-                
+
                 // Source selection
                 Section("Sources") {
                     ForEach(selectedSources, id: \.self) { source in
                         HStack {
                             Text(source.lastPathComponent)
-                            
+
                             Spacer()
-                            
+
                             Button {
                                 selectedSources.removeAll { $0 == source }
                             } label: {
@@ -254,12 +246,12 @@ private struct NewBackupSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    
+
                     Button("Add Source") {
                         showSourcePicker = true
                     }
                 }
-                
+
                 // Tags
                 Section("Tags") {
                     TextField("Enter tags separated by commas", text: $tags)
@@ -274,7 +266,7 @@ private struct NewBackupSheet: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start Backup") {
                         startBackup()
@@ -289,21 +281,21 @@ private struct NewBackupSheet: View {
             allowsMultipleSelection: true
         ) { result in
             switch result {
-            case .success(let urls):
+            case let .success(urls):
                 selectedSources.append(contentsOf: urls)
-            case .failure(let error):
+            case let .failure(error):
                 print("Error selecting sources: \(error.localizedDescription)")
             }
         }
     }
-    
+
     private var isValid: Bool {
         selectedRepository != nil && !selectedSources.isEmpty
     }
-    
+
     private func startBackup() {
         guard let repository = selectedRepository else { return }
-        
+
         Task {
             await viewModel.startBackup(
                 to: repository,
@@ -313,7 +305,7 @@ private struct NewBackupSheet: View {
                     .filter { !$0.isEmpty }
             )
         }
-        
+
         dismiss()
     }
 }

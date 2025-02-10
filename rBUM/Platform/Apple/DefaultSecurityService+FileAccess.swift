@@ -1,17 +1,9 @@
-//
-//  DefaultSecurityService+FileAccess.swift
-//  rBUM
-//
-//  Created on 6 February 2025.
-//
-
 import Foundation
 
 /// Extension to DefaultSecurityService handling file access and bookmark management
 extension DefaultSecurityService {
-    
     // MARK: - File Access Management
-    
+
     private func hasSecurityScopedBookmark(
         for url: URL,
         permission: SecurityPermission
@@ -20,7 +12,7 @@ extension DefaultSecurityService {
         guard let bookmark = try? await bookmarkStore.getBookmark(for: url) else {
             return false
         }
-        
+
         // Resolve bookmark
         var isStale = false
         guard let bookmarkURL = try? URL(
@@ -31,21 +23,21 @@ extension DefaultSecurityService {
         ) else {
             return false
         }
-        
+
         // Check if bookmark is stale
         if isStale {
             try await updateBookmark(for: url)
         }
-        
+
         // Check if bookmark URL matches
         guard bookmarkURL == url else {
             return false
         }
-        
+
         // Check permission
         return try await checkBookmarkPermission(permission, for: url)
     }
-    
+
     private func updateBookmark(for url: URL) async throws {
         // Create new bookmark
         let bookmark = try url.bookmarkData(
@@ -53,11 +45,11 @@ extension DefaultSecurityService {
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
-        
+
         // Store new bookmark
         try await bookmarkStore.storeBookmark(bookmark, for: url)
     }
-    
+
     private func checkBookmarkPermission(
         _ permission: SecurityPermission,
         for url: URL
@@ -66,11 +58,11 @@ extension DefaultSecurityService {
         guard url.startAccessingSecurityScopedResource() else {
             return false
         }
-        
+
         defer {
             url.stopAccessingSecurityScopedResource()
         }
-        
+
         // Check permission
         switch permission {
         case .read:
@@ -81,13 +73,13 @@ extension DefaultSecurityService {
             return try url.resourceValues(forKeys: [.isExecutableKey]).isExecutable ?? false
         }
     }
-    
+
     private func checkSecurityScopedAccess(to url: URL) async throws -> Bool {
         // Check if we have a security scoped bookmark
         guard let bookmark = try? await bookmarkService.findBookmark(for: url) else {
             return false
         }
-        
+
         // Resolve bookmark
         var isStale = false
         guard let bookmarkURL = try? URL(
@@ -98,15 +90,15 @@ extension DefaultSecurityService {
         ) else {
             return false
         }
-        
+
         // Check if bookmark is stale
         if isStale {
             try await updateBookmark(for: url)
         }
-        
+
         return bookmarkURL == url
     }
-    
+
     private func validateDirectoryAccess(at url: URL) throws -> Bool {
         // Check directory permissions
         let contents = try fileManager.contentsOfDirectory(
@@ -114,7 +106,7 @@ extension DefaultSecurityService {
             includingPropertiesForKeys: [.isReadableKey, .isWritableKey],
             options: [.skipsHiddenFiles]
         )
-        
+
         // Check if all files are accessible
         for fileURL in contents {
             let resourceValues = try fileURL.resourceValues(forKeys: [.isReadableKey, .isWritableKey])
@@ -122,7 +114,7 @@ extension DefaultSecurityService {
                 return false
             }
         }
-        
+
         return true
     }
 }

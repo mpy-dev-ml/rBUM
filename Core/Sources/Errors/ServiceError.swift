@@ -1,13 +1,3 @@
-//
-//  ServiceError.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 04/02/2025.
-//
-
 import Foundation
 
 /// An enumeration of errors that can occur during service lifecycle and operations.
@@ -312,51 +302,51 @@ import Foundation
         switch self {
         // Lifecycle Errors
         case .notInitialized:
-            return "Service is not initialised"
+            "Service is not initialised"
         case .alreadyInitialized:
-            return "Service is already initialised"
+            "Service is already initialised"
         case .initializationFailed:
-            return "Failed to initialize service"
+            "Failed to initialize service"
         // State Errors
         case .invalidState:
-            return "Service is in an invalid state"
+            "Service is in an invalid state"
         case .stateTransitionFailed:
-            return "State transition failed"
+            "State transition failed"
         case .stateLockTimeout:
-            return "Timeout waiting for state"
+            "Timeout waiting for state"
         // Dependency Errors
         case .dependencyUnavailable:
-            return "Required dependency is unavailable"
+            "Required dependency is unavailable"
         case .dependencyMisconfigured:
-            return "Dependency is misconfigured"
+            "Dependency is misconfigured"
         case .dependencyTimeout:
-            return "Timeout waiting for dependency"
+            "Timeout waiting for dependency"
         // Operation Errors
         case .operationFailed:
-            return "Operation failed"
+            "Operation failed"
         case .operationTimeout:
-            return "Operation timed out"
+            "Operation timed out"
         case .operationCancelled:
-            return "Operation was cancelled"
+            "Operation was cancelled"
         // Resource Errors
         case .resourceUnavailable:
-            return "Required resource is unavailable"
+            "Required resource is unavailable"
         case .resourceExhausted:
-            return "Resource is exhausted"
+            "Resource is exhausted"
         case .resourceLimitExceeded:
-            return "Resource limit exceeded"
+            "Resource limit exceeded"
         // Retry Errors
         case .retryFailed:
-            return "Retry attempt failed"
+            "Retry attempt failed"
         case .retryLimitExceeded:
-            return "Retry limit exceeded"
+            "Retry limit exceeded"
         // Security Errors
         case .authenticationFailed:
-            return "Authentication failed"
+            "Authentication failed"
         case .authorizationFailed:
-            return "Authorization failed"
+            "Authorization failed"
         case .securityViolation:
-            return "Security violation occurred"
+            "Security violation occurred"
         }
     }
 
@@ -367,51 +357,51 @@ import Foundation
         switch self {
         // Lifecycle Errors
         case .notInitialized:
-            return "Initialize the service before using it"
+            "Initialize the service before using it"
         case .alreadyInitialized:
-            return "Ensure service is not already initialized"
+            "Ensure service is not already initialized"
         case .initializationFailed:
-            return "Check the service configuration and try again"
+            "Check the service configuration and try again"
         // State Errors
         case .invalidState:
-            return "Reset service to a valid state"
+            "Reset service to a valid state"
         case .stateTransitionFailed:
-            return "Check if the state transition is valid and retry"
+            "Check if the state transition is valid and retry"
         case .stateLockTimeout:
-            return "Consider increasing the timeout duration or check for deadlocks"
+            "Consider increasing the timeout duration or check for deadlocks"
         // Dependency Errors
         case .dependencyUnavailable:
-            return "Ensure all required dependencies are available and running"
+            "Ensure all required dependencies are available and running"
         case .dependencyMisconfigured:
-            return "Check the dependency configuration and correct any issues"
+            "Check the dependency configuration and correct any issues"
         case .dependencyTimeout:
-            return "Verify the dependency is responsive and increase timeout if needed"
+            "Verify the dependency is responsive and increase timeout if needed"
         // Operation Errors
         case .operationFailed:
-            return "Check the operation parameters and try again"
+            "Check the operation parameters and try again"
         case .operationTimeout:
-            return "Consider increasing the operation timeout"
+            "Consider increasing the operation timeout"
         case .operationCancelled:
-            return "Retry the operation if needed"
+            "Retry the operation if needed"
         // Resource Errors
         case .resourceUnavailable:
-            return "Wait for the resource to become available or use an alternative"
+            "Wait for the resource to become available or use an alternative"
         case .resourceExhausted:
-            return "Wait for resources to be freed or increase resource limits"
+            "Wait for resources to be freed or increase resource limits"
         case .resourceLimitExceeded:
-            return "Reduce resource usage or increase resource limits"
+            "Reduce resource usage or increase resource limits"
         // Retry Errors
         case .retryFailed:
-            return "Check the underlying error and adjust retry strategy"
+            "Check the underlying error and adjust retry strategy"
         case .retryLimitExceeded:
-            return "Increase retry limit or investigate persistent failures"
+            "Increase retry limit or investigate persistent failures"
         // Security Errors
         case .authenticationFailed:
-            return "Verify credentials and try again"
+            "Verify credentials and try again"
         case .authorizationFailed:
-            return "Verify permissions and request access if needed"
+            "Verify permissions and request access if needed"
         case .securityViolation:
-            return "Review security policies and ensure compliance"
+            "Review security policies and ensure compliance"
         }
     }
 }

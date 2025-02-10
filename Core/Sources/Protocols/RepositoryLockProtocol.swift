@@ -14,7 +14,7 @@ public protocol RepositoryLockProtocol {
         operation: RepositoryOperation,
         timeout: TimeInterval
     ) async throws -> Bool
-    
+
     /// Releases the lock for the specified repository
     /// - Parameters:
     ///   - repository: The repository to unlock
@@ -24,13 +24,13 @@ public protocol RepositoryLockProtocol {
         for repository: Repository,
         operation: RepositoryOperation
     ) async throws
-    
+
     /// Checks if a repository is currently locked
     /// - Parameter repository: The repository to check
     /// - Returns: Lock information if locked, nil otherwise
     /// - Throws: LockError if lock status check fails
     func checkLockStatus(for repository: Repository) async throws -> LockInfo?
-    
+
     /// Breaks a stale lock for the specified repository
     /// - Parameter repository: The repository with the stale lock
     /// - Throws: LockError if breaking the lock fails
@@ -39,10 +39,10 @@ public protocol RepositoryLockProtocol {
 
 /// Represents different repository operations that require locking
 public enum RepositoryOperation: String {
-    case backup = "backup"
-    case restore = "restore"
-    case prune = "prune"
-    case check = "check"
+    case backup
+    case restore
+    case prune
+    case check
     case init = "init"
     case maintenance = "maintenance"
 }
@@ -51,19 +51,19 @@ public enum RepositoryOperation: String {
 public struct LockInfo: Codable, Equatable {
     /// The operation that holds the lock
     public let operation: RepositoryOperation
-    
+
     /// Timestamp when the lock was acquired
     public let timestamp: Date
-    
+
     /// Process ID that holds the lock
     public let pid: Int
-    
+
     /// Hostname of the machine holding the lock
     public let hostname: String
-    
+
     /// Username that holds the lock
     public let username: String
-    
+
     public init(
         operation: RepositoryOperation,
         timestamp: Date,
@@ -83,16 +83,16 @@ public struct LockInfo: Codable, Equatable {
 public enum LockError: Error {
     /// Repository is already locked
     case alreadyLocked(LockInfo)
-    
+
     /// Lock acquisition timed out
     case timeout(TimeInterval)
-    
+
     /// Lock file is corrupted
     case corruptLockFile
-    
+
     /// No permission to create/modify lock file
     case permissionDenied
-    
+
     /// Lock operation failed
     case operationFailed(String)
 }

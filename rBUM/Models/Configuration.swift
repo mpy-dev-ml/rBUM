@@ -1,16 +1,3 @@
-//
-//  Configuration.swift
-//  rBUM
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  First created: 6 February 2025
-//  Last updated: 6 February 2025
-//
-//  Created by Matthew Yeager on 30/01/2025.
-//
-
 import Foundation
 
 /// Represents application-wide configuration settings
@@ -61,7 +48,7 @@ struct Configuration: Codable, Equatable {
                 "~/Library/Caches",
                 "~/Library/Logs",
                 "**/node_modules",
-                "**/.git"
+                "**/.git",
             ]
         )
     }
